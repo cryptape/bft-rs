@@ -1,0 +1,8 @@
+[package]
+name = "bft-rs"
+version = "0.0.1"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+
+[dependencies]
+rustc-hex = "1.0"
+min-max-heap = "1.2.0"
