@@ -5,4 +5,5 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 
 [dependencies]
 rustc-hex = "1.0"
+lru-cache = "0.1"
 min-max-heap = "1.2.0"

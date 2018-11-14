@@ -29,14 +29,14 @@ pub struct TimeoutInfo {
     pub step: Step,
 }
 
-// overload an operator gt
+// overload operators gt and lt
 impl PartialOrd<TimeoutInfo> for TimeoutInfo {
     fn gt(&self, other: &TimeoutInfo) -> bool {
-        if self.timeval > other.timeval {
-            return true;
-        } else {
-            return false;
-        }
+        self.timeval > other.timeval
+    }
+
+    fn lt(&self, other: &TimeoutInfo) -> bool {
+        self.timeval < other.timeval
     }
 }
 
@@ -60,8 +60,8 @@ impl WaitTimer {
         loop {
             // take the peek of the min-heap-timer sub now as the sleep time otherwise set timeout as 100
             let timeout = if !timer_heap.is_empty() {
-                if *timer_heap.peek_min().unwrap() > Instant::now() {
-                    *timer_heap.peek_min().unwrap() - Instant::now()
+                if *timer_heap.peek_min().unwrap().timeval > Instant::now() {
+                    *timer_heap.peek_min().unwrap().timeval - Instant::now()
                 } else {
                     Duration::new(0, 0)
                 }
@@ -80,7 +80,7 @@ impl WaitTimer {
                 // if some timers are set as the same time, pop them and send timeout messages
                 while !timer_heap.is_empty() &&
                     timer_heap.peek_min().cloned().unwrap().timeval <= Instant::now() {
-                    self.timer_notify.send(timer_heap.pop_min.unwrap()).unwrap();
+                    self.timer_notify.send(timer_heap.pop_min().unwrap()).unwrap();
                 }
             }
         }
