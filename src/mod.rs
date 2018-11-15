@@ -17,6 +17,8 @@
 
 pub mod bft;
 pub mod timer;
+pub mod voteset;
 
 pub use self::bft::*;
 pub use self::timer::*;
+pub use self::voteset::*;

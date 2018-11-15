@@ -4,6 +4,9 @@ version = "0.0.1"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 
 [dependencies]
+bincode = "0.8.0"
 rustc-hex = "1.0"
+rustc-serialize = "0.3"
 lru-cache = "0.1"
 min-max-heap = "1.2.0"
+protobuf = { version = "2.0.2", features = ["with-bytes"]}

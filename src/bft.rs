@@ -23,6 +23,24 @@ use std::time::{Duration, Instant};
 
 use type::{Address, H256};
 
+const INIT_HEIGHT: usize = 1;
+const INIT_ROUND: usize = 0;
+
+const LOG_TYPE_PROPOSE: u8 = 1;
+const LOG_TYPE_VOTE: u8 = 2;
+const LOG_TYPE_STATE: u8 = 3;
+const LOG_TYPE_PREV_HASH: u8 = 4;
+const LOG_TYPE_COMMITS: u8 = 5;
+const LOG_TYPE_VERIFIED_PROPOSE: u8 = 6;
+const LOG_TYPE_AUTH_TXS: u8 = 7;
+
+const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
+const TIMEOUT_LOW_ROUND_MESSAGE_MULTIPLE: u32 = 20;
+
+const VERIFIED_PROPOSAL_OK: i8 = 1;
+const VERIFIED_PROPOSAL_FAILED: i8 = -1;
+const VERIFIED_PROPOSAL_UNDO: i8 = 0;
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
 pub enum Step {
     Propose,
@@ -66,9 +84,6 @@ fn get_idx_from_reqid(reqid: u64) -> (u64, u64) {
 }
 
 pub struct Bft {
-    pub_sender: Sender<PubType>,
-    pub_recver: Receiver<TransType>,
-
     timer_seter: Sender<TimeoutInfo>,
     timer_notity: Receiver<TimeoutInfo>,
 
@@ -85,13 +100,10 @@ pub struct Bft {
     locked_vote: Option<VoteSet>,
     // lock_round set, locked block means itself, else means proposal's block
     locked_block: Option<Block>,
-    // wal_log: Wal,
-    send_filter: HashMap<Address, (usize, Step, Instant)>,
+    wal_log: Wal,
     last_commit_round: Option<usize>,
     htime: Instant,
     auth_manage: AuthorityManage,
-    //params meaning: key :index 0->height,1->round ,value:0->verified msg,1->verified result
-    unverified_msg: BTreeMap<(usize, usize), (Message, i8)>,
     // VecDeque might work, Almost always it is better to use Vec or VecDeque instead of LinkedList
     block_txs: VecDeque<(usize, BlockTxs)>,
     block_proof: Option<(usize, BlockWithProof)>,
@@ -99,18 +111,14 @@ pub struct Bft {
 
 impl Bft {
     pub fn new(
-        s: Sender<PubType>,
-        r: Receiver<TransType>,
         ts: Sender<TimeoutInfo>,
         rs: Receiver<TimeoutInfo>,
         params: BftParams,
     ) -> Bft {
         let proof = BftProof::default();
-
         let logpath = DataPath::wal_path();
+
         Bft {
-            pub_sender: s,
-            pub_recver: r,
             timer_seter: ts,
             timer_notity: rs,
 
@@ -126,12 +134,10 @@ impl Bft {
             lock_round: None,
             locked_vote: None,
             locked_block: None,
-            // wal_log: Wal::new(&*logpath).unwrap(),
-            send_filter: HashMap::new(),
+            wal_log: Wal::new(&*logpath).unwrap(),
             last_commit_round: None,
             htime: Instant::now(),
             auth_manage: AuthorityManage::new(),
-            unverified_msg: BTreeMap::new(),
             block_txs: VecDeque::new(),
             block_proof: None,
         }
@@ -165,5 +171,6 @@ impl Bft {
             }))
         }
     }
+    
     
 }
