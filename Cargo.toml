@@ -10,3 +10,4 @@ rustc-serialize = "0.3"
 lru-cache = "0.1"
 min-max-heap = "1.2.0"
 protobuf = { version = "2.0.2", features = ["with-bytes"]}
+ethereum-types = "0.3.2"

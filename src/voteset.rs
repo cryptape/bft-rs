@@ -19,8 +19,6 @@ use super::Step;
 use bincode::{serialize, Infinite};
 use lru_cache::LruCache;
 use std::collections::HashMap;
-use protobuf::Message as Message_imported_for_functions;
-use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 use types::{Address, H256};
 
 pub struct VoteCollector {
@@ -291,84 +289,4 @@ pub struct Proposal {
     pub block: Vec<u8>,
     pub lock_round: Option<usize>,
     pub lock_votes: Option<VoteSet>,
-}
-
-pub struct BlockWithProof {
-    // message fields
-    pub blk: ::protobuf::SingularPtrField<Block>,
-    pub proof: ::protobuf::SingularPtrField<Proof>,
-    // special fields
-    unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::protobuf::CachedSize,
-}
-
-impl BlockWithProof {
-    pub fn new() -> BlockWithProof {
-        ::std::default::Default::default()
-    }
-
-    // .Block blk = 1;
-    pub fn clear_blk(&mut self) {
-        self.blk.clear();
-    }
-
-    pub fn has_blk(&self) -> bool {
-        self.blk.is_some()
-    }
-
-    // Param is passed by value, moved
-    pub fn set_blk(&mut self, v: Block) {
-        self.blk = ::protobuf::SingularPtrField::some(v);
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_blk(&mut self) -> &mut Block {
-        if self.blk.is_none() {
-            self.blk.set_default();
-        }
-        self.blk.as_mut().unwrap()
-    }
-
-    // Take field
-    pub fn take_blk(&mut self) -> Block {
-        self.blk.take().unwrap_or_else(|| Block::new())
-    }
-
-    pub fn get_blk(&self) -> &Block {
-        self.blk.as_ref().unwrap_or_else(|| Block::default_instance())
-    }
-
-    // .Proof proof = 2;
-
-    pub fn clear_proof(&mut self) {
-        self.proof.clear();
-    }
-
-    pub fn has_proof(&self) -> bool {
-        self.proof.is_some()
-    }
-
-    // Param is passed by value, moved
-    pub fn set_proof(&mut self, v: Proof) {
-        self.proof = ::protobuf::SingularPtrField::some(v);
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_proof(&mut self) -> &mut Proof {
-        if self.proof.is_none() {
-            self.proof.set_default();
-        }
-        self.proof.as_mut().unwrap()
-    }
-
-    // Take field
-    pub fn take_proof(&mut self) -> Proof {
-        self.proof.take().unwrap_or_else(|| Proof::new())
-    }
-
-    pub fn get_proof(&self) -> &Proof {
-        self.proof.as_ref().unwrap_or_else(|| Proof::default_instance())
-    }
 }

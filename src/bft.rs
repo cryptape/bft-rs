@@ -92,21 +92,17 @@ pub struct Bft {
     round: usize,
     step: Step,
     proof: BftProof,
-    pre_hash: Option<H256>,
+    // pre_hash: Option<H256>,
     votes: VoteCollector,
     proposals: ProposalCollector,
     proposal: Option<H256>,
     lock_round: Option<usize>,
-    locked_vote: Option<VoteSet>,
-    // lock_round set, locked block means itself, else means proposal's block
-    locked_block: Option<Block>,
+    lock_proposal: Option<Proposal>,
+    lock_vote: Option<VoteSet>,
     wal_log: Wal,
     last_commit_round: Option<usize>,
     htime: Instant,
     auth_manage: AuthorityManage,
-    // VecDeque might work, Almost always it is better to use Vec or VecDeque instead of LinkedList
-    block_txs: VecDeque<(usize, BlockTxs)>,
-    block_proof: Option<(usize, BlockWithProof)>,
 }
 
 impl Bft {
@@ -114,6 +110,7 @@ impl Bft {
         ts: Sender<TimeoutInfo>,
         rs: Receiver<TimeoutInfo>,
         params: BftParams,
+        authority_list: AuthorityManage,
     ) -> Bft {
         let proof = BftProof::default();
         let logpath = DataPath::wal_path();
@@ -127,19 +124,17 @@ impl Bft {
             round: INIT_ROUND,
             step: Step::Propose,
             proof,
-            pre_hash: None,
+            // pre_hash: None,
             votes: VoteCollector::new(),
             proposals: ProposalCollector::new(),
             proposal: None,
             lock_round: None,
-            locked_vote: None,
-            locked_block: None,
+            lock_proposal: None,
+            lock_vote: None,
             wal_log: Wal::new(&*logpath).unwrap(),
             last_commit_round: None,
             htime: Instant::now(),
-            auth_manage: AuthorityManage::new(),
-            block_txs: VecDeque::new(),
-            block_proof: None,
+            auth_manage: authority_list,
         }
     }
 
@@ -172,5 +167,34 @@ impl Bft {
         }
     }
     
-    
+    pub fn is_locked(&mut self) -> Option<Proposal> {
+        if let Some(lock_round) = self.lock_round {
+            let locked_vote = &self.lock_vote;
+            let locked_proposal = &self.lock_proposal.clone();
+            {
+                let locked_proposal_hash = locked_proposal.crypt_hash();
+                info!(
+                    "proposal lock block: height {:?}, round {:?} block hash {:?}",
+                    self.height, self.round, lock_blk_hash
+                );
+                self.proposal = Some(locked_proposal_hash);
+            }
+            let blk = locked_proposal.try_into().unwrap();
+            trace!(
+                "pub_proposal proposer vote locked block: height {}, round {}",
+                self.height,
+                self.round
+            );
+            let proposal = Proposal {
+                block: blk,
+                lock_round: Some(lock_round),
+                lock_votes: lock_vote.clone(),
+            };
+            Some(proposal)
+        } else {
+            None
+        }
+    }
+
+
 }
