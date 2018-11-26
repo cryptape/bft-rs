@@ -37,14 +37,6 @@ use serde_derive::{Deserialize, Serialize};
 const INIT_HEIGHT: usize = 1;
 const INIT_ROUND: usize = 0;
 
-const LOG_TYPE_PROPOSE: u8 = 1;
-const LOG_TYPE_VOTE: u8 = 2;
-const LOG_TYPE_STATE: u8 = 3;
-const LOG_TYPE_PREV_HASH: u8 = 4;
-const LOG_TYPE_COMMITS: u8 = 5;
-const LOG_TYPE_VERIFIED_PROPOSE: u8 = 6;
-const LOG_TYPE_AUTH_TXS: u8 = 7;
-
 const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
 const TIMEOUT_LOW_ROUND_MESSAGE_MULTIPLE: u32 = 20;
 
@@ -88,14 +80,6 @@ impl From<u8> for Step {
     }
 }
 
-fn gen_reqid_from_idx(h: u64, r: u64) -> u64 {
-    ((h & 0xffff_ffff_ffff) << 16) | r
-}
-
-fn get_idx_from_reqid(reqid: u64) -> (u64, u64) {
-    (reqid >> 16, reqid & 0xffff)
-}
-
 pub struct Bft {
     timer_seter: Sender<TimeoutInfo>,
     timer_notity: Receiver<TimeoutInfo>,
@@ -104,8 +88,6 @@ pub struct Bft {
     height: usize,
     round: usize,
     step: Step,
-    // proof: BftProof,
-    // pre_hash: Option<H256>,
     votes: VoteCollector,
     proposals: ProposalCollector,
     proposal: Option<H256>,
@@ -125,7 +107,6 @@ impl Bft {
         params: BftParams,
         authority_list: AuthorityManage,
     ) -> Bft {
-        // let proof = BftProof::default();
         let logpath = DataPath::wal_path();
 
         Bft {
@@ -136,8 +117,6 @@ impl Bft {
             height: 0,
             round: INIT_ROUND,
             step: Step::Propose,
-            // proof,
-            // pre_hash: None,
             votes: VoteCollector::new(),
             proposals: ProposalCollector::new(),
             proposal: None,
