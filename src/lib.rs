@@ -16,15 +16,45 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #![allow(unused_imports)]
 #![allow(unused_results)]
+#![feature(try_from)]
 
+#[macro_use]
 extern crate bincode;
 extern crate ethereum_types;
-extern crate protobuf;
+#[macro_use]
+extern crate logger;
 
-use core::wal::Wal;
+extern crate crypto_hash;
+extern crate lru_cache;
+extern crate min_max_heap;
+extern crate protobuf;
+extern crate rustc_serialize;
+#[macro_use]
+extern crate serde_derive;
+extern crate cita_crypto as crypto;
+extern crate engine;
+#[macro_use]
+extern crate util;
+extern crate log;
+
+pub mod bft;
+pub mod message;
+pub mod params;
+pub mod timer;
+pub mod voteset;
+pub mod wal;
 
 use bincode::{deserialize, serialize, Infinite};
+use crypto_hash::*;
 use ethereum_types::{Address, H256};
+use serde_derive::{Deserialize, Serialize};
+
+use voteset::Proposal;
+use wal::Wal;
+
+use std::collections::HashMap;
+use std::fs::File;
+use std::usize::MAX;
 
 pub const DATA_PATH: &'static str = "DATA_PATH";
 pub const LOG_TYPE_AUTHORITIES: u8 = 1;
@@ -75,7 +105,6 @@ impl AuthorityManage {
                 authority_manage.validators.extend_from_slice(&validators);
             }
         }
-
         authority_manage
     }
 

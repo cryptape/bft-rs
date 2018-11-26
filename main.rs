@@ -15,7 +15,4 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-extern crate bincode;
-extern crate lru_cache;
-extern crate min_max_heap;
-extern crate protobuf;
+#![feature(try_from)]

@@ -15,29 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use min_max_heap::MinMaxHeap;
+
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
-use min_max_heap::MinMaxHeap;
 
-#[derive(Debug, Clone, PartialOrd)]
+use bft::Step;
 
+#[derive(Debug, Clone)]
 pub struct TimeoutInfo {
     pub timeval: Instant,
     pub height: usize,
     pub round: usize,
     pub step: Step,
-}
-
-// overload operators gt and lt
-impl PartialOrd<TimeoutInfo> for TimeoutInfo {
-    fn gt(&self, other: &TimeoutInfo) -> bool {
-        self.timeval > other.timeval
-    }
-
-    fn lt(&self, other: &TimeoutInfo) -> bool {
-        self.timeval < other.timeval
-    }
 }
 
 // define a waittimer channel
@@ -56,12 +47,13 @@ impl WaitTimer {
 
     pub fn start(&self) {
         let mut timer_heap = MinMaxHeap::new();
+        let mut timeout_info = HashMap::new();
 
         loop {
             // take the peek of the min-heap-timer sub now as the sleep time otherwise set timeout as 100
             let timeout = if !timer_heap.is_empty() {
-                if *timer_heap.peek_min().unwrap().timeval > Instant::now() {
-                    *timer_heap.peek_min().unwrap().timeval - Instant::now()
+                if *timer_heap.peek_min().unwrap() > Instant::now() {
+                    *timer_heap.peek_min().unwrap() - Instant::now()
                 } else {
                     Duration::new(0, 0)
                 }
@@ -71,19 +63,24 @@ impl WaitTimer {
 
             let set_time = self.timer_seter.recv_timeout(timeout);
 
+            // put the timeval into a timerheap
+            // put the TimeoutInfo into a hashmap, K: timeval  V: TimeoutInfo
             if set_time.is_ok() {
                 let time_out = set_time.unwrap();
-                timer_heap.push(time_out);
+                timer_heap.push(time_out.timeval);
+                timeout_info.insert(time_out.timeval, time_out);
             }
 
             if !timer_heap.is_empty() {
-                // if some timers are set as the same time, pop them and send timeout messages
-                while !timer_heap.is_empty() &&
-                    timer_heap.peek_min().cloned().unwrap().timeval <= Instant::now() {
-                    self.timer_notify.send(timer_heap.pop_min().unwrap()).unwrap();
+                let now = Instant::now();
+
+                // if some timers are set as the same time, send timeout messages and pop them
+                while !timer_heap.is_empty() && now >= timer_heap.peek_min().cloned().unwrap() {
+                    self.timer_notify
+                        .send(timeout_info.remove(&timer_heap.pop_min().unwrap()).unwrap())
+                        .unwrap();
                 }
             }
         }
     }
 }
-

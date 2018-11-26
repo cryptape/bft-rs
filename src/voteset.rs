@@ -14,13 +14,24 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-use super::Step;
-use bincode::{serialize, Infinite};
+use bft::Step;
+use bincode::{deserialize, serialize, Infinite};
+use crypto::{pubkey_to_address, Sign, Signature};
+use ethereum_types::{Address, H256};
 use lru_cache::LruCache;
-use std::collections::HashMap;
-use types::{Address, H256};
+use serde_derive::{Deserialize, Serialize};
+use util::datapath::DataPath;
+use util::Hashable;
+use CryptHash;
+use crypto_hash::{Algorithm, digest};
 
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
+use std::usize::MAX;
+use std::vec::Vec;
+
+#[derive(Debug)]
 pub struct VoteCollector {
     pub votes: LruCache<usize, RoundCollector>,
 }
@@ -61,7 +72,7 @@ impl VoteCollector {
 }
 
 //1. sender's votemessage 2. proposal'hash count
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct VoteSet {
     pub votes_by_sender: HashMap<Address, VoteMessage>,
     pub votes_by_proposal: HashMap<H256, usize>,
@@ -126,47 +137,6 @@ impl VoteSet {
     }
 }
 
-// height -> round collector
-#[derive(Debug)]
-pub struct VoteCollector {
-    pub votes: LruCache<usize, RoundCollector>,
-}
-
-impl VoteCollector {
-    pub fn new() -> Self {
-        VoteCollector {
-            votes: LruCache::new(16),
-        }
-    }
-
-    pub fn add(
-        &mut self,
-        height: usize,
-        round: usize,
-        step: Step,
-        sender: Address,
-        vote: &VoteMessage,
-    ) -> bool {
-        if self.votes.contains_key(&height) {
-            self.votes
-                .get_mut(&height)
-                .unwrap()
-                .add(round, step, sender, vote)
-        } else {
-            let mut round_votes = RoundCollector::new();
-            round_votes.add(round, step, sender, vote);
-            self.votes.insert(height, round_votes);
-            true
-        }
-    }
-
-    pub fn get_voteset(&mut self, height: usize, round: usize, step: Step) -> Option<VoteSet> {
-        self.votes
-            .get_mut(&height)
-            .and_then(|rc| rc.get_voteset(round, step))
-    }
-}
-
 //round -> step collector
 #[derive(Debug)]
 pub struct RoundCollector {
@@ -226,6 +196,13 @@ impl StepCollector {
     }
 }
 
+#[derive(Serialize, Clone, Debug)]
+pub struct VoteMessage {
+    pub proposal: Option<H256>,
+    pub signature: Signature,
+}
+
+#[derive(Debug)]
 pub struct ProposalCollector {
     pub proposals: LruCache<usize, ProposalRoundCollector>,
 }
@@ -284,9 +261,124 @@ impl ProposalRoundCollector {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Proposal {
     pub block: Vec<u8>,
     pub lock_round: Option<usize>,
     pub lock_votes: Option<VoteSet>,
+}
+
+impl CryptHash for Proposal {
+    fn crypt_hash(&self) -> H256 {
+        H256::from(digest(Algorithm::SHA256, &self.block).as_slice())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ProposalwithProof {
+    pub proposal: Proposal,
+    pub proof: BftProof,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct SignProposal {
+    pub proposal: Proposal,
+    pub signature: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+pub struct BftProof {
+    pub proposal: H256,
+    // Prev height
+    pub height: usize,
+    pub round: usize,
+    pub commits: HashMap<Address, Signature>,
+}
+
+impl BftProof {
+    pub fn new(
+        height: usize,
+        round: usize,
+        proposal: H256,
+        commits: HashMap<Address, Signature>,
+    ) -> BftProof {
+        BftProof {
+            height: height,
+            round: round,
+            proposal: proposal,
+            commits: commits,
+        }
+    }
+
+    pub fn default() -> Self {
+        BftProof {
+            height: MAX,
+            round: MAX,
+            proposal: H256::default(),
+            commits: HashMap::new(),
+        }
+    }
+
+    pub fn store(&self) {
+        let proof_path = DataPath::proof_bin_path();
+        let mut file = File::create(&proof_path).unwrap();
+        let encoded_proof: Vec<u8> = serialize(&self, Infinite).unwrap();
+        file.write_all(&encoded_proof).unwrap();
+        let _ = file.sync_all();
+    }
+
+    pub fn load(&mut self) {
+        let proof_path = DataPath::proof_bin_path();
+        if let Ok(mut file) = File::open(&proof_path) {
+            let mut content = Vec::new();
+            if file.read_to_end(&mut content).is_ok() {
+                if let Ok(decoded) = deserialize(&content[..]) {
+                    //self.round = decoded.round;
+                    //self.proposal = decoded.proposal;
+                    //self.commits = decoded.commits;
+                    *self = decoded;
+                }
+            }
+        }
+    }
+
+    pub fn is_default(&self) -> bool {
+        if self.round == MAX {
+            return true;
+        }
+        return false;
+    }
+
+    // Check proof commits
+    pub fn check(&self, h: usize, authorities: &[Address]) -> bool {
+        if h == 0 {
+            return true;
+        }
+        if h != self.height {
+            return false;
+        }
+        if 2 * authorities.len() >= 3 * self.commits.len() {
+            return false;
+        }
+        self.commits.iter().all(|(sender, sig)| {
+            if authorities.contains(sender) {
+                let msg = serialize(
+                    &(
+                        h,
+                        self.round,
+                        Step::Precommit,
+                        sender,
+                        Some(self.proposal.clone()),
+                    ),
+                    Infinite,
+                )
+                .unwrap();
+                let signature = Signature(sig.0.into());
+                if let Ok(pubkey) = signature.recover(&msg.crypt_hash().into()) {
+                    return pubkey_to_address(&pubkey) == sender.clone().into();
+                }
+            }
+            false
+        })
+    }
 }

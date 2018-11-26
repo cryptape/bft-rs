@@ -14,7 +14,13 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+use std::fs::{read_dir, DirBuilder, File, OpenOptions};
+use std::io::{Read, Seek, Write};
+use std::mem::transmute;
+use std::path::Path;
+use std::{io, str};
 
+#[derive(Debug)]
 pub struct Wal {
     fs: File,
     dir: String,
