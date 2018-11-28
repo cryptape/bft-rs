@@ -17,13 +17,14 @@
 
 use crypto::{pubkey_to_address, CreateKey, Sign, Signature, SIGNATURE_BYTES_LEN};
 use engine::{unix_now, AsMillis, EngineError, Mismatch};
+use bincode::{deserialize, serialize, Infinite};
 use message::Message;
 use params::*;
 use timer::TimeoutInfo;
 use util::datapath::DataPath;
 use util::Hashable;
 use voteset::*;
-use wal::Wal;
+use wal::*;
 use {AuthorityManage, CryptHash};
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -44,6 +45,7 @@ const VERIFIED_PROPOSAL_OK: i8 = 1;
 const VERIFIED_PROPOSAL_FAILED: i8 = -1;
 const VERIFIED_PROPOSAL_UNDO: i8 = 0;
 
+const LOG_TYPE_STATE: u8 = 3;
 const MAX_PROPOSAL_TIME_COEF: usize = 10;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
@@ -446,7 +448,6 @@ impl Bft {
                 round
             }
         };
-        
         let mut tv = self.params.timer.get_propose() * 2u32.pow(coef as u32);
         if self.proposals.get_proposal(height, round).is_some() {
             tv = Duration::new(0, 0);
@@ -454,6 +455,28 @@ impl Bft {
             self.is_locked();
             tv = Duration::new(0, 0);
         }
+        //if is proposal,enter prevote stage immedietly
+        self.step = Step::ProposeWait;
+        let now = Instant::now();
+        let _ = self.timer_seter.send(TimeoutInfo {
+            timeval: now + tv,
+            height,
+            round,
+            step: Step::ProposeWait,
+        });
+    }
+
+    fn change_state_step(&mut self, height: usize, round: usize, s: Step, newflag: bool) {
+        self.height = height;
+        self.round = round;
+        self.step = s;
+
+        if newflag {
+            let _ = self.wal_log.set_height(height);
+        }
+
+        let message = serialize(&(height, round, s), Infinite).unwrap();
+        let _ = self.wal_log.save(height, LOG_TYPE_STATE, &message);
     }
 
     #[inline]
