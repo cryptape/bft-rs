@@ -466,7 +466,7 @@ impl Bft {
         });
     }
 
-    fn change_state_step(&mut self, height: usize, round: usize, s: Step, newflag: bool) {
+    fn change_step(&mut self, height: usize, round: usize, s: Step, newflag: bool) {
         self.height = height;
         self.round = round;
         self.step = s;
