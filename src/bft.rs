@@ -19,13 +19,14 @@ use bincode::{deserialize, serialize, Infinite};
 use crypto::{pubkey_to_address, CreateKey, Sign, Signature, SIGNATURE_BYTES_LEN};
 use engine::{unix_now, AsMillis, EngineError, Mismatch};
 use message::Message;
-use params::*;
+use params::BftParams;
 use timer::TimeoutInfo;
 use util::datapath::DataPath;
 use util::Hashable;
 use voteset::*;
-use wal::*;
-use {AuthorityManage, CryptHash};
+use wal::Wal;
+use authority_manage::AuthorityManage;
+use CryptHash;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::convert::{Into, TryFrom, TryInto};
