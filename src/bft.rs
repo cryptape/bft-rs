@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use authority_manage::AuthorityManage;
 use bincode::{deserialize, serialize, Infinite};
 use crypto::{pubkey_to_address, CreateKey, Sign, Signature, SIGNATURE_BYTES_LEN};
 use engine::{unix_now, AsMillis, EngineError, Mismatch};
@@ -25,7 +26,6 @@ use util::datapath::DataPath;
 use util::Hashable;
 use voteset::*;
 use wal::Wal;
-use authority_manage::AuthorityManage;
 use CryptHash;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -193,7 +193,7 @@ impl Bft {
         );
     }
 
-    fn proc_proposal(&mut self, height: usize, round: usize) -> bool {
+    fn proc_proposal(&mut self, height: usize, round: usize, proposal: ProposalCollector) -> bool {
         let proposal = self.proposals.get_proposal(height, round);
         if let Some(proposal) = proposal {
             trace!(
