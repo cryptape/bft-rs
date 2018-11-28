@@ -17,6 +17,13 @@
 
 use bft::Step;
 use ethereum_types::H256;
+use voteset::Proposal;
+
+pub struct ProposalMessage {
+    pub height: usize,
+    pub round: usize,
+    pub proposal: Proposal,
+}
 
 pub struct Message {
     pub height: usize,
