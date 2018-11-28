@@ -1,0 +1,34 @@
+[package]
+name = "bft-rs"
+version = "0.0.1"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+
+[dependencies]
+bincode = "0.8.0"
+serde = "1.0"
+serde_derive = "1.0"
+rustc-hex = "1.0"
+rustc-serialize = "0.3"
+cita-crypto = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+proof = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+libproto = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+time = "0.1.36"
+engine = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+util = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+lru-cache = "0.1"
+min-max-heap = "1.2.0"
+crypto-hash = "0.3.1"
+log = "=0.4.3"
+logger = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+protobuf = { version = "2.0.2", features = ["with-bytes"]}
+ethereum-types = "0.3.2"
+
+[build-dependencies]
+util = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+
+[features]
+default = ["secp256k1", "sha3hash"]
+secp256k1 = ["cita-crypto/secp256k1", "libproto/secp256k1", "proof/secp256k1","engine/secp256k1"]
+ed25519 = ["cita-crypto/ed25519", "libproto/ed25519", "proof/ed25519", "engine/ed25519"]
+sm2 = ["cita-crypto/sm2", "libproto/sm2", "proof/sm2", "engine/sm2"]
+sha3hash = ["util/sha3hash", "libproto/sha3hash", "proof/sha3hash", "engine/sha3hash"]
