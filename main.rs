@@ -15,4 +15,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(try_from)]
+use bft::Bft;
+use timer::WaitTimer;
+use params::{BftParams, Config, PrivateKey};
+
+use std::sync::mpsc::channel;
+use std::thread;
+
+fn main() {
+    let (main_to_timer, timer_from_main) = channel();
+    let (timer_to_main, main_from_timer) = channel();
+    let timethd = thread::spawn(move || {
+        let wt = WaitTimer::new(timer_to_main, timer_from_main);
+        wt.start();
+    });
+
+    let pk = PrivateKey::new(pk_path);
+    let params = BftParams::new(&pk);
+    
+}
