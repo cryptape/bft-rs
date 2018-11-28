@@ -17,13 +17,13 @@
 use bft::Step;
 use bincode::{deserialize, serialize, Infinite};
 use crypto::{pubkey_to_address, Sign, Signature};
+use crypto_hash::{digest, Algorithm};
 use ethereum_types::{Address, H256};
 use lru_cache::LruCache;
 use serde_derive::{Deserialize, Serialize};
 use util::datapath::DataPath;
 use util::Hashable;
 use CryptHash;
-use crypto_hash::{Algorithm, digest};
 
 use std::collections::HashMap;
 use std::fs::File;

@@ -15,9 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use bincode::{deserialize, serialize, Infinite};
 use crypto::{pubkey_to_address, CreateKey, Sign, Signature, SIGNATURE_BYTES_LEN};
 use engine::{unix_now, AsMillis, EngineError, Mismatch};
-use bincode::{deserialize, serialize, Infinite};
 use message::Message;
 use params::*;
 use timer::TimeoutInfo;
