@@ -193,7 +193,7 @@ impl Bft {
         );
     }
 
-    fn proc_proposal(&mut self, height: usize, round: usize, proposal: ProposalCollector) -> bool {
+    fn proc_proposal(&mut self, height: usize, round: usize) -> bool {
         let proposal = self.proposals.get_proposal(height, round);
         if let Some(proposal) = proposal {
             trace!(
@@ -236,6 +236,13 @@ impl Bft {
     }
 
     fn proc_prevote(&mut self) -> Message {
+        let height = self.height;
+        let round = self.round;
+
+        if self.proposal.is_none() {
+            self.proc_proposal(height, round);
+        }
+
         let now = Instant::now();
         let _ = self.timer_seter.send(TimeoutInfo {
             timeval: now + (self.params.timer.get_prevote() * TIMEOUT_RETRANSE_MULTIPLE),
