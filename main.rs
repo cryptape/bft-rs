@@ -16,11 +16,91 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bft::Bft;
+use voteset::*;
 use timer::WaitTimer;
+use message::{Message, ProposalMessage, CommitMessage};
 use params::{BftParams, Config, PrivateKey};
 
 use std::sync::mpsc::channel;
 use std::thread;
+
+const VERIFIED_OK: i8 = 1;
+
+fn new_proposal(h: usize, r: usize) -> Option<Proposal> {
+    ProposalCollecotr::get_proposal(h, r)
+}
+
+fn broadcast_proposal(pm: ProposalMessage) {
+
+}
+
+fn receive_proposal() -> ProposalMessage {
+
+}
+
+fn broadcast_message(m: Message) {
+
+}
+
+fn broadcast_commit_message(cm: CommitMessage) {
+
+}
+
+fn bft_process(mut engine: BFT) {
+    loop {
+        match engine.step {
+            Step::Propose => {
+                if engine.is_round_proposer(engine.height, engine.round, engine.params.signer.address).is_ok() {
+                    if let mut Some(prop) = engine.is_locked() {
+                        let pm = ProposalMessage {
+                            height: engine.height,
+                            round: engine.round,
+                            proposal: prop,
+                        };
+                        broadcast_proposal(pm);
+                    } else {
+                        let pm = ProposalMessage {
+                            height: engine.height,
+                            round: engine.round,
+                            Proposal: new_proposal(engine.height, engine.round).unwrap()
+                        };
+                        broadcast_proposal(pm);
+                    }
+                }
+                engine.change_step(engine.height, engine.round, Step::ProposeWait, true);
+            }
+            Step::ProposeWait => {
+                let rp = receive_proposal;
+                engine.handle_proposal(rp);
+                
+                let pvm = engine.proc_prevote();
+                broadcast_message(pvm);
+                engine.change_step(engine.height, engine.round, Step::Prevote);
+            }
+            Step::Prevote => {
+                engine.check_prevote(engine.height, engine.round);
+                engine.change_step(engine.height, engine.round, Step::PrevoteWait);
+            }
+            Step::PrevoteWait => {
+                let pcm = engine.proc_commit(VERIFIED_OK);
+                broadcast_message(pcm);
+                engine.change_step(engine.height, engine.round, Step::Precommit);
+            }
+            Step::Precommit => {
+                engine.check_precommit(engine.height, engine.round); 
+                engine.change_step(engine.height, engine.round, Step::PrecommitWait);
+            }
+            Step::PrecommitWait => {
+                let pwp = engine.proc_commit(engine.height, engine.round);
+                engine.change_step.(engine.height, engine.round, Step::Commit);
+            }
+            Step::Commit => {
+                engine.new_round(engine.height, engine.round);
+                engine.change_step(engine.height, engine.round, Step::Proposal);
+            }
+        }
+    }
+}
 
 fn main() {
     let (main_to_timer, timer_from_main) = channel();
@@ -32,5 +112,9 @@ fn main() {
 
     let pk = PrivateKey::new(pk_path);
     let params = BftParams::new(&pk);
-    
+    let mainthd = thread::spawn(move || {
+        let mut engine = Bft::new(main_from_timer, main_to_timer, params);
+        bft_process(engine);
+    });
+     
 }
