@@ -264,6 +264,8 @@ impl ProposalRoundCollector {
 #[derive(Clone, Debug, Default)]
 pub struct Proposal {
     pub block: Vec<u8>,
+    pub height: usize,
+    pub round: usize,
     pub lock_round: Option<usize>,
     pub lock_votes: Option<VoteSet>,
 }
