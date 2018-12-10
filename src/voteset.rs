@@ -270,6 +270,18 @@ pub struct Proposal {
     pub lock_votes: Option<VoteSet>,
 }
 
+impl Proposal {
+    pub fn new() -> Self {
+        Proposal {
+            block: Vec::new(),
+            height: MAX,
+            round: MAX,
+            lock_round: None,
+            lock_votes: None,
+        }
+    }
+}
+
 impl CryptHash for Proposal {
     fn crypt_hash(&self) -> H256 {
         H256::from(digest(Algorithm::SHA256, &self.block).as_slice())
@@ -383,4 +395,13 @@ impl BftProof {
             false
         })
     }
+}
+
+#[derive(Debug)]
+pub struct AuthorityManage {
+    pub authorities: Vec<Address>,
+    pub validators: Vec<Address>,
+    pub authorities_old: Vec<Address>,
+    pub validators_old: Vec<Address>,
+    pub height_old: usize,
 }
