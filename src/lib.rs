@@ -23,7 +23,7 @@ extern crate bincode;
 extern crate ethereum_types;
 #[macro_use]
 extern crate logger;
-extern crate authority_manage;
+// extern crate authority_manage;
 extern crate crypto_hash;
 extern crate lru_cache;
 extern crate min_max_heap;
@@ -48,13 +48,6 @@ use bincode::{deserialize, serialize, Infinite};
 use crypto_hash::*;
 use ethereum_types::{Address, H256};
 use serde_derive::{Deserialize, Serialize};
-
-use voteset::Proposal;
-use wal::Wal;
-
-use std::collections::HashMap;
-use std::fs::File;
-use std::usize::MAX;
 
 pub const DATA_PATH: &'static str = "DATA_PATH";
 pub const LOG_TYPE_AUTHORITIES: u8 = 1;
