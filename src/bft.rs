@@ -585,15 +585,16 @@ impl Bft {
 
     // start a new round
     pub fn new_round(&mut self, height: usize, round: usize, authority_list: AuthorityManage) {
-        // if consensus success, goto next height, update authority list
         let height_now = self.height;
-
+        // height_now != height => consensus success in the height, then goto next height
         if height_now != height {
+            // clean lock info, update authority list
             self.clean_save_info();
             self.height = height;
             self.round = round;
             self.auth_manage = authority_list;
         } else {
+            // only update the round info
             self.round = round;
         }
         // wait for 3s ?
@@ -612,19 +613,8 @@ impl Bft {
         let _ = self.wal_log.save(height, LOG_TYPE_STATE, &message);
     }
 
-    pub fn proc_timeout(&mut self) {
-        let tn = &self.timer_notity.recv();
-        trace!(
-            "proc_timeout {:?} on height {}, round {}, step {:?}",
-            tn,
-            self.height,
-            self.round,
-            self.step
-        );
-    }
-
     #[inline]
-    fn above_threshold(&self, n: usize) -> bool {
+    pub fn above_threshold(&self, n: usize) -> bool {
         n * 3 > self.auth_manage.validators.len() * 2
     }
 
