@@ -277,47 +277,37 @@ impl Bft {
     }
 
     // check lock
-    pub fn proc_proposal(&mut self) -> bool {
-        let height = self.height;
-        let round = self.round;
+    pub fn proc_proposal(&mut self, proposal: Proposal) {
+        let proposal_lock_round = proposal.lock_round;
 
-        if let Some(proposal) = self.proposal {
+        // try to unlock
+        if self.lock_round.is_some()
+            && proposal_lock_round.is_some()
+            && self.lock_round.unwrap() < proposal_lock_round.unwrap()
+            && proposal_lock_round.unwrap() < self.round
+        {
             trace!(
-                "proc proposal height {},round {} self {} {} ",
-                height,
-                round,
+                "unlock lock block: height {:?}, proposal {:?}",
                 self.height,
-                self.round
+                self.proposal
             );
-
-            let proposal_lock_round = self.proposals.lock_round;
-            if self.lock_round.is_some()
-                && proposal_lock_round.is_some()
-                && self.lock_round.unwrap() < proposal_lock_round.unwrap()
-                && proposal_lock_round.unwrap() < round
-            {
-                trace!(
-                    "unlock lock block: height {:?}, proposal {:?}",
-                    height,
-                    self.proposal
-                );
-                self.clean_save_info();
-            }
-            if self.lock_round.is_some() {
-                let locked_proposal = &self.lock_proposal.clone().unwrap();
-                self.proposal = Some(locked_proposal.crypt_hash());
-                trace!(
-                    "still have lock block {} locked round {} {:?}",
-                    self.height,
-                    self.lock_round.unwrap(),
-                    self.proposal.unwrap()
-                );
-            } else {
-                // self.lock_proposal = Some(proposal);
-            }
-            return true;
+            self.clean_save_info();
         }
-        false
+
+        // fail to unlock, then prevote it
+        if self.lock_round.is_some() {
+            self.proposal = Some(self.lock_proposal.clone().unwrap().crypt_hash());
+        } else {
+            // use the new proposal and lock it
+            self.proposal = Some(proposal.block.crypt_hash());
+            self.lock_proposal = Some(proposal);
+            debug!(
+                "save the proposal's hash: height {:?}, round {}, proposal {:?}",
+                self.height,
+                self.round,
+                self.proposal.unwrap()
+            );
+        }
     }
 
     // do prevote
