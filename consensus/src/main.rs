@@ -16,8 +16,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bft::Bft;
-use voteset::*;
+use bft::voteset::*;
 use timer::WaitTimer;
+use engine::EngineError;
+use bincode::{deserialize, serialize, Infinite};
 use message::{Message, ProposalMessage, CommitMessage};
 use params::{BftParams, Config, PrivateKey};
 
@@ -30,11 +32,11 @@ fn new_proposal(h: usize, r: usize) -> Option<Proposal> {
     ProposalCollecotr::get_proposal(h, r)
 }
 
-fn broadcast_proposal(pm: ProposalMessage) {
+fn broadcast_proposal(pm: Proposal) {
 
 }
 
-fn receive_proposal() -> ProposalMessage {
+fn receive_proposal() -> Result<SignProposal, EngineError> {
 
 }
 
@@ -42,15 +44,67 @@ fn broadcast_message(m: Message) {
 
 }
 
+fn receive_message() -> Result<VoteCollector, EngineError> {
+    let log_msg = message.to_owned();
+    let res = deserialize(&message[..]);
+    if let Ok(decoded) = res {
+        let (message, address): 
+    }
+}
+
 fn broadcast_commit_message(cm: CommitMessage) {
 
+}
+
+fn bft_recv_timeout(engine: BFT) -> bool {
+    match engine.step {
+        Step::ProposeWait => {
+            while engine.timer_notity.try_recv().is_err(){
+                if let Some(rp) = receive_proposal() {
+                    return true;
+                }
+            }
+            return false;
+        },
+        Step::Prevote => {
+            while engine.timer_notity.try_recv().is_err() {
+                if receive_message().is_ok(){
+                    let num = receive_message().unwrap().len();
+                    if engine.above_threshold(num) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        },
+        Step::PrevoteWait => {
+
+        },
+        Step::Precommit => {
+            while engine.timer_notity.try_recv().is_err() {
+                if receive_message().is_ok(){
+                    let num = receive_message().unwrap().len();
+                    if engine.above_threshold(num) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        },
+        Step::PrecommitWait => {
+            
+        },
+        Step::Commit => {
+
+        },
+    }
 }
 
 fn bft_process(mut engine: BFT) {
     loop {
         match engine.step {
             Step::Propose => {
-                if engine.is_round_proposer(engine.height, engine.round, engine.params.signer.address).is_ok() {
+                if engine.is_round_proposer(engine.height, engine.round, engine.params.signer.address) {
                     if let mut Some(prop) = engine.is_locked() {
                         let pm = ProposalMessage {
                             height: engine.height,
@@ -68,36 +122,47 @@ fn bft_process(mut engine: BFT) {
                     }
                 }
                 engine.change_step(engine.height, engine.round, Step::ProposeWait, true);
-            }
+            },
             Step::ProposeWait => {
-                let rp = receive_proposal;
+                engine.proc_timeout();
+                let rp = receive_proposal();
                 engine.handle_proposal(rp);
-                
+                engine.proc_proposal();
                 let pvm = engine.proc_prevote();
                 broadcast_message(pvm);
                 engine.change_step(engine.height, engine.round, Step::Prevote);
-            }
+            },
             Step::Prevote => {
+                engine.proc_timeout();
+                // storage and verify received prevote 
                 engine.check_prevote(engine.height, engine.round);
                 engine.change_step(engine.height, engine.round, Step::PrevoteWait);
-            }
+            },
             Step::PrevoteWait => {
-                let pcm = engine.proc_commit(VERIFIED_OK);
+                engine.proc_timeout();
+                let pcm = engine.proc_precommit(VERIFIED_OK);
                 broadcast_message(pcm);
                 engine.change_step(engine.height, engine.round, Step::Precommit);
-            }
+            },
             Step::Precommit => {
+                engin.proc_timeout();
+                // storage and verify precommit
                 engine.check_precommit(engine.height, engine.round); 
                 engine.change_step(engine.height, engine.round, Step::PrecommitWait);
-            }
+            },
             Step::PrecommitWait => {
+                engine.proc_timeout();
                 let pwp = engine.proc_commit(engine.height, engine.round);
+                // 
                 engine.change_step.(engine.height, engine.round, Step::Commit);
-            }
+            },
             Step::Commit => {
-                engine.new_round(engine.height, engine.round);
+                engine.proc_timeout();
+                engine.new_round(engine.height, engine.round,);
+                
                 engine.change_step(engine.height, engine.round, Step::Proposal);
-            }
+            },
+            _ => panic!("Invalid step."),
         }
     }
 }

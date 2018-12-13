@@ -399,9 +399,9 @@ impl BftProof {
 
 #[derive(Debug)]
 pub struct AuthorityManage {
-    pub authorities: Vec<Address>,
+    pub proposers: Vec<Address>,
     pub validators: Vec<Address>,
-    pub authorities_old: Vec<Address>,
+    pub proposers_old: Vec<Address>,
     pub validators_old: Vec<Address>,
     pub height_old: usize,
 }

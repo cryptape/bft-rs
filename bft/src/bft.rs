@@ -140,14 +140,14 @@ impl Bft {
         let height = self.height;
         let round = self.round;
 
-        if authority_list.authorities.is_empty() {
+        if authority_list.proposers.is_empty() {
             warn!("There are no authorities");
             return false;
         }
 
         let proposer: &Address = authority_list
-            .authorities
-            .get((height + round) % authority_list.authorities.len())
+            .proposers
+            .get((height + round) % authority_list.proposers.len())
             .expect(
                 "There are validator_n() authorities; \
                  taking number modulo validator_n() gives number in validator_n() range; QED",

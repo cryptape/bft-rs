@@ -1,0 +1,7 @@
+[package]
+name = "consensus"
+version = "0.0.1"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+
+[dependencies]
+bincode = "0.8.0"
