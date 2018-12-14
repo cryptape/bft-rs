@@ -85,13 +85,13 @@ impl From<u8> for Step {
 }
 
 pub struct Bft {
-    timer_seter: Sender<TimeoutInfo>,
-    timer_notity: Receiver<TimeoutInfo>,
+    pub timer_seter: Sender<TimeoutInfo>,
+    pub timer_notity: Receiver<TimeoutInfo>,
 
-    params: BftParams,
-    height: usize,
-    round: usize,
-    step: Step,
+    pub params: BftParams,
+    pub height: usize,
+    pub round: usize,
+    pub step: Step,
     votes: VoteCollector,
     proposals: Proposal,
     proposal: Option<H256>,
