@@ -5,3 +5,7 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 
 [dependencies]
 bincode = "0.8.0"
+bft-rs = {path = "../bft"}
+ethereum-types = "0.3.2"
+engine = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+log = "=0.4.3"
