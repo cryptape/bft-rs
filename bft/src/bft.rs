@@ -100,7 +100,6 @@ pub struct Bft {
     lock_vote: Option<VoteSet>,
     wal_log: Wal,
     last_commit_round: Option<usize>,
-    htime: Instant,
     auth_manage: AuthorityManage,
 }
 
@@ -129,7 +128,6 @@ impl Bft {
             lock_vote: None,
             wal_log: Wal::new(&*logpath).unwrap(),
             last_commit_round: None,
-            htime: Instant::now(),
             auth_manage: authority_list,
         }
     }
@@ -604,12 +602,17 @@ impl Bft {
     }
 
     #[inline]
+    pub fn is_validator(&self, address: &Address) -> bool {
+        self.auth_manage.validators.contains(address)
+    }
+
+    #[inline]
     pub fn above_threshold(&self, n: usize) -> bool {
         n * 3 > self.auth_manage.validators.len() * 2
     }
 
     #[inline]
-    fn all_vote(&self, n: usize) -> bool {
+    pub fn all_vote(&self, n: usize) -> bool {
         n == self.auth_manage.validators.len()
     }
 
