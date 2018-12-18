@@ -135,12 +135,6 @@ impl VoteSet {
         }
         Err("vote set check error!")
     }
-
-    pub fn get_voteset(&mut self, height: usize, round: usize, step: Step) -> Option<VoteSet> {
-        self.votes
-            .get_mut(&height)
-            .and_then(|rc| rc.get_voteset(round, step))
-    }
 }
 
 //round -> step collector

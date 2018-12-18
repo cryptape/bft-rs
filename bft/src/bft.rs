@@ -119,7 +119,7 @@ impl Bft {
             params,
             height: 0,
             round: INIT_ROUND,
-            step: Step::Propose,
+            step: Step::default(),
             votes: VoteCollector::new(),
             proposals: Proposal::new(),
             proposal: None,

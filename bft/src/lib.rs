@@ -28,7 +28,7 @@ extern crate crypto_hash;
 extern crate lru_cache;
 extern crate min_max_heap;
 extern crate protobuf;
-extern crate rustc_serialize;
+// extern crate rustc_serialize;
 #[macro_use]
 extern crate serde_derive;
 extern crate cita_crypto as crypto;
@@ -46,7 +46,8 @@ pub mod wal;
 
 use bincode::{deserialize, serialize, Infinite};
 use crypto_hash::*;
-use ethereum_types::{Address, H256};
+use engine::EngineError;
+use ethereum_types::{Address, H256, H512};
 use serde_derive::{Deserialize, Serialize};
 
 pub const DATA_PATH: &'static str = "DATA_PATH";
