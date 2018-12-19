@@ -602,6 +602,17 @@ impl Bft {
     }
 
     #[inline]
+    fn set_timer(&self, tv: Duration) {
+        let now = Instant::now();
+        let _ = self.timer_seter.send(TimeoutInfo {
+            timeval: now + tv,
+            height: self.height,
+            round: self.round,
+            step: self.step,
+        });
+    }
+
+    #[inline]
     pub fn is_validator(&self, address: &Address) -> bool {
         self.auth_manage.validators.contains(address)
     }
