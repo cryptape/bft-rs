@@ -264,8 +264,22 @@ impl ProposalRoundCollector {
 #[derive(Clone, Debug, Default)]
 pub struct Proposal {
     pub block: Vec<u8>,
+    pub height: usize,
+    pub round: usize,
     pub lock_round: Option<usize>,
     pub lock_votes: Option<VoteSet>,
+}
+
+impl Proposal {
+    pub fn new() -> Self {
+        Proposal {
+            block: Vec::new(),
+            height: MAX,
+            round: MAX,
+            lock_round: None,
+            lock_votes: None,
+        }
+    }
 }
 
 impl CryptHash for Proposal {
@@ -381,4 +395,13 @@ impl BftProof {
             false
         })
     }
+}
+
+#[derive(Debug)]
+pub struct AuthorityManage {
+    pub proposers: Vec<Address>,
+    pub validators: Vec<Address>,
+    pub proposers_old: Vec<Address>,
+    pub validators_old: Vec<Address>,
+    pub height_old: usize,
 }

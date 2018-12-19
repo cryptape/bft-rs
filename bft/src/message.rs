@@ -17,10 +17,26 @@
 
 use bft::Step;
 use ethereum_types::H256;
+use voteset::{Proposal, ProposalwithProof, SignProposal};
 
+#[derive(Clone, Debug)]
+pub struct ProposalMessage {
+    pub height: usize,
+    pub round: usize,
+    pub proposal: SignProposal,
+}
+
+#[derive(Clone, Debug)]
 pub struct Message {
     pub height: usize,
     pub round: usize,
     pub step: Step,
     pub proposal: Option<H256>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CommitMessage {
+    pub height: usize,
+    pub round: usize,
+    pub proposal: ProposalwithProof,
 }
