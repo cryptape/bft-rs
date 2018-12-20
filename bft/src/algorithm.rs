@@ -93,7 +93,7 @@ pub struct Bft {
     pub round: usize,
     pub step: Step,
     votes: VoteCollector,
-    proposals: Proposal,
+    proposals: ProposalCollector,
     proposal: Option<H256>,
     lock_round: Option<usize>,
     lock_proposal: Option<Proposal>,
@@ -121,7 +121,7 @@ impl Bft {
             round: INIT_ROUND,
             step: Step::default(),
             votes: VoteCollector::new(),
-            proposals: Proposal::new(),
+            proposals: ProposalCollector::new(),
             proposal: None,
             lock_round: None,
             lock_proposal: None,
@@ -162,13 +162,8 @@ impl Bft {
                     round
                 }
             };
-            let now = Instant::now();
-            let _ = self.timer_seter.send(TimeoutInfo {
-                timeval: now + self.params.timer.get_propose() * 2u32.pow(coef as u32),
-                height,
-                round,
-                step: Step::ProposeWait,
-            });
+            let tv = self.params.timer.get_propose() * 2u32.pow(coef as u32);
+            self.set_timer(tv);
             return false;
         }
     }
@@ -197,37 +192,23 @@ impl Bft {
             );
             let proposal = Proposal {
                 block: blk,
-                height: height,
-                round: round,
                 lock_round: Some(lock_round),
                 lock_votes: locked_vote.clone(),
             };
-            let now = Instant::now();
-            let _ = self.timer_seter.send(TimeoutInfo {
-                timeval: now + Duration::new(0, 0),
-                height,
-                round,
-                step: Step::ProposeWait,
-            });
+            self.set_timer(Duration::new(0, 0));
             Some(proposal)
         } else {
-            let now = Instant::now();
-            let _ = self.timer_seter.send(TimeoutInfo {
-                timeval: now + Duration::new(0, 0),
-                height,
-                round,
-                step: Step::ProposeWait,
-            });
+            self.set_timer(Duration::new(0, 0));
             None
         }
     }
 
-    // check something of signature
-    pub fn handle_proposal(
+    // save checked proposal after receive it
+    pub fn recv_proposal(
         &mut self,
-        // proposal_height: usize,
-        // proposal_round: usize,
-        signed_proposal: SignProposal,
+        proposal_height: usize,
+        proposal_round: usize,
+        proposal: Proposal,
     ) -> Result<(usize, usize), EngineError> {
         trace!(
             "handle proposal here self height {} round {} step {:?} ",
@@ -235,16 +216,6 @@ impl Bft {
             self.round,
             self.step,
         );
-
-        let proposal = signed_proposal.proposal;
-        let signature = signed_proposal.signature;
-        let proposal_height = proposal.height;
-        let proposal_round = proposal.round;
-
-        // check the length of signature
-        if signature.len() != SIGNATURE_BYTES_LEN {
-            return Err(EngineError::InvalidSignature);
-        }
 
         // check proposal's height and round
         if proposal_height < self.height
@@ -268,7 +239,8 @@ impl Bft {
                 "add proposal height {} round {}",
                 proposal_height, proposal_round
             );
-            self.proposals = proposal;
+            
+            self.proposals.add(proposal_height, proposal_height, proposal);
             return Ok((proposal_height, proposal_round));
         }
         Err(EngineError::UnexpectedMessage)
@@ -312,14 +284,9 @@ impl Bft {
     pub fn proc_prevote(&mut self) -> Message {
         let height = self.height;
         let round = self.round;
+        let tv = self.params.timer.get_prevote() * TIMEOUT_RETRANSE_MULTIPLE;
+        self.set_timer(tv);
 
-        let now = Instant::now();
-        let _ = self.timer_seter.send(TimeoutInfo {
-            timeval: now + (self.params.timer.get_prevote() * TIMEOUT_RETRANSE_MULTIPLE),
-            height: height,
-            round: round,
-            step: Step::Prevote,
-        });
         // if has a lock, prevote it, else prevote nil
         if self.lock_round.is_some() || self.proposal.is_some() {
             Message {
@@ -391,13 +358,7 @@ impl Bft {
 
                 if self.step == Step::Prevote {
                     // self.change_state_step(height, round, Step::PrevoteWait, false);
-                    let now = Instant::now();
-                    let _ = self.timer_seter.send(TimeoutInfo {
-                        timeval: now + tv,
-                        height,
-                        round,
-                        step: Step::PrevoteWait,
-                    });
+                    self.set_timer(tv);
                 }
                 return true;
             }
@@ -407,14 +368,9 @@ impl Bft {
 
     // do precommit
     pub fn proc_precommit(&mut self, verify_result: i8) -> Message {
-        let now = Instant::now();
+        let tv = self.params.timer.get_commit() * TIMEOUT_RETRANSE_MULTIPLE;
         //timeout for resending vote msg
-        let _ = self.timer_seter.send(TimeoutInfo {
-            timeval: now + (self.params.timer.get_precommit() * TIMEOUT_RETRANSE_MULTIPLE),
-            height: self.height,
-            round: self.round,
-            step: Step::Precommit,
-        });
+        self.set_timer(tv);
 
         if verify_result == VERIFIED_PROPOSAL_OK {
             Message {
@@ -503,13 +459,7 @@ impl Bft {
                 }
 
                 if self.step == Step::Precommit {
-                    let now = Instant::now();
-                    let _ = self.timer_seter.send(TimeoutInfo {
-                        timeval: now + tv,
-                        height,
-                        round,
-                        step: Step::PrecommitWait,
-                    });
+                    self.set_timer(tv);
                 }
                 return true;
             }
