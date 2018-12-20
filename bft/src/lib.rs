@@ -37,7 +37,7 @@ extern crate engine;
 extern crate util;
 extern crate log;
 
-pub mod bft;
+pub mod algorithm;
 pub mod message;
 pub mod params;
 pub mod timer;
@@ -49,10 +49,23 @@ use crypto_hash::*;
 use engine::EngineError;
 use ethereum_types::{Address, H256, H512};
 use serde_derive::{Deserialize, Serialize};
+use voteset::Proposal;
 
 pub const DATA_PATH: &'static str = "DATA_PATH";
 pub const LOG_TYPE_AUTHORITIES: u8 = 1;
 
 pub trait CryptHash {
     fn crypt_hash(&self) -> H256;
+}
+
+// if proposal need to be verified by auth, use this trait
+pub trait PrecommitAuth {
+    fn pub_to_auth(&self);
+    fn recv_from_auth(&self) -> bool;
+}
+
+// this trait is used to handle proposal or message
+pub trait CheckSignature {
+    fn after_recv_proposal(&self) -> Result<Proposal, &str>;
+    fn before_prec_vote(&self) -> bool;
 }
