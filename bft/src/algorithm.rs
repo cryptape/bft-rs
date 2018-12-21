@@ -92,7 +92,7 @@ pub struct Bft {
     pub height: usize,
     pub round: usize,
     pub step: Step,
-    votes: VoteCollector,
+    pub votes: VoteCollector,
     proposals: ProposalCollector,
     proposal: Option<H256>,
     lock_round: Option<usize>,
@@ -239,8 +239,9 @@ impl Bft {
                 "add proposal height {} round {}",
                 proposal_height, proposal_round
             );
-            
-            self.proposals.add(proposal_height, proposal_height, proposal);
+
+            self.proposals
+                .add(proposal_height, proposal_height, proposal);
             return Ok((proposal_height, proposal_round));
         }
         Err(EngineError::UnexpectedMessage)
@@ -269,7 +270,7 @@ impl Bft {
             self.proposal = Some(self.lock_proposal.clone().unwrap().crypt_hash());
         } else {
             // use the new proposal and lock it
-            self.proposal = Some(proposal.block.crypt_hash());
+            self.proposal = Some(proposal.crypt_hash());
             self.lock_proposal = Some(proposal);
             debug!(
                 "save the proposal's hash: height {:?}, round {}, proposal {:?}",
