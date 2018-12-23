@@ -117,7 +117,7 @@ impl Bft {
             timer_notity: rs,
 
             params,
-            height: 0,
+            height: INIT_HEIGHT,
             round: INIT_ROUND,
             step: Step::default(),
             votes: VoteCollector::new(),
