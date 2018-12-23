@@ -35,6 +35,7 @@ use std::sync::mpsc::channel;
 use std::usize::MAX;
 use std::vec::Vec;
 
+
 struct NodeInfo {
     keypair: KeyPair,
     address: Address,
@@ -82,8 +83,7 @@ fn generate_proposal() -> Proposal {
 }
 
 fn generate_message(
-    engine: Bft,
-    auth: AuthorityManage,
+    engine: &mut Bft,
     infos: Vec<NodeInfo>,
     p: Proposal,
     s: Step,
@@ -137,8 +137,50 @@ fn test_bft_without_nil() {
             address: address,
         },
     };
-    let (authority_list, info) = create_auth();
+    let (authority_list, init_infos) = create_auth();
     let (main_to_timer, timer_from_main) = channel();
     let (timer_to_main, main_from_timer) = channel();
     let mut engine = Bft::new(main_to_timer, main_from_timer, params, authority_list);
+    let mut height = 1;
+    let mut round = 0;
+
+    while height < 1000 {
+        let proposal = generate_proposal();
+        let mut infos = init_infos;
+        match engine.step {
+            Step::ProposeWait => {
+                let _ = engine.recv_proposal(height, round, proposal.clone());
+                engine.proc_proposal(proposal);
+                let _ = engine.proc_prevote();
+                engine.change_step(height, round, Step::Prevote, true);
+            }
+            Step::Prevote => {
+                generate_message(&mut engine, infos, proposal, Step::Prevote, height, round);
+                engine.check_prevote(height, round);
+                engine.change_step(height, round, Step::PrevoteWait, true);
+            }
+            Step::PrevoteWait => {
+                generate_message(&mut engine, infos, proposal, Step::Precommit, height, round);
+                engine.change_step(height, round, Step::Precommit, true);
+            }
+            Step::Precommit => {
+                engine.check_precommit(height, round);
+                engine.change_step(height, round, Step::PrecommitWait, true);
+            }
+            Step::PrecommitWait => {
+                let commit = engine.proc_commit(height, round);
+                // write to log
+                
+                engine.change_step(height, round, Step::Commit, true);
+            }
+            Step::CommitWait => {
+                let (authority_list, info) = create_auth();
+                infos = info;
+                height += 1;
+                round += 1;
+                engine.new_round(height, round, authority_list);
+            }
+            _ => panic!("Invalid step."),
+        }
+    }
 }
