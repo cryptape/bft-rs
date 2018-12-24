@@ -35,7 +35,6 @@ use std::sync::mpsc::channel;
 use std::usize::MAX;
 use std::vec::Vec;
 
-
 struct NodeInfo {
     keypair: KeyPair,
     address: Address,
@@ -57,7 +56,7 @@ fn create_auth() -> (AuthorityManage, Vec<NodeInfo>) {
     let info_3 = gen_info();
     let proposers = vec![info_1.address, info_2.address, info_3.address];
     let validators = proposers.clone();
-    let mut info = vec![info_1, info_2, info_3];
+    let info = vec![info_1, info_2, info_3];
     let auth = AuthorityManage {
         proposers: proposers,
         validators: validators,
@@ -84,7 +83,7 @@ fn generate_proposal() -> Proposal {
 
 fn generate_message(
     engine: &mut Bft,
-    infos: Vec<NodeInfo>,
+    auth: AuthorityManage,
     p: Proposal,
     s: Step,
     h: usize,
@@ -97,14 +96,14 @@ fn generate_message(
         *x = rng.gen();
     }
 
-    let byzantine_node = infos[2].address;
-    for ii in infos.iter() {
-        if ii.address != byzantine_node {
+    let byzantine_node = auth.validators[2];
+    for ii in 0..2 {
+        if auth.validators[ii] != byzantine_node {
             engine.votes.add(
                 h,
                 r,
                 s,
-                ii.address,
+                auth.validators[ii],
                 &VoteMessage {
                     proposal: Some(H256::from(digest(Algorithm::SHA256, &p.block).as_slice())),
                     signature: Signature::default(),
@@ -115,7 +114,7 @@ fn generate_message(
                 h,
                 r,
                 s,
-                ii.address,
+                auth.validators[ii],
                 &VoteMessage {
                     proposal: Some(H256::from(digest(Algorithm::SHA256, &byzantine).as_slice())),
                     signature: Signature::default(),
@@ -126,7 +125,7 @@ fn generate_message(
 }
 
 #[test]
-fn test_bft_without_nil() {
+fn test_bft_without_propose() {
     let key_pair = KeyPair::gen_keypair();
     let pub_key = *key_pair.pubkey();
     let address = pubkey_to_address(&pub_key);
@@ -137,50 +136,69 @@ fn test_bft_without_nil() {
             address: address,
         },
     };
-    let (authority_list, init_infos) = create_auth();
+    let (authority_list, _) = create_auth();
     let (main_to_timer, timer_from_main) = channel();
     let (timer_to_main, main_from_timer) = channel();
-    let mut engine = Bft::new(main_to_timer, main_from_timer, params, authority_list);
+    let mut engine = Bft::new(
+        main_to_timer,
+        main_from_timer,
+        params,
+        authority_list.clone(),
+    );
     let mut height = 1;
     let mut round = 0;
+    let mut proposals: Vec<Vec<u8>> = Vec::new();
+    let mut consensus_results: Vec<Vec<u8>> = Vec::new();
 
     while height < 1000 {
+        // step commit
+        let (auth, _) = create_auth();
+        height += 1;
+        round = 0;
+        engine.new_round(height, round, auth.clone());
+
+        // step proposal
         let proposal = generate_proposal();
-        let mut infos = init_infos;
-        match engine.step {
-            Step::ProposeWait => {
-                let _ = engine.recv_proposal(height, round, proposal.clone());
-                engine.proc_proposal(proposal);
-                let _ = engine.proc_prevote();
-                engine.change_step(height, round, Step::Prevote, true);
-            }
-            Step::Prevote => {
-                generate_message(&mut engine, infos, proposal, Step::Prevote, height, round);
-                engine.check_prevote(height, round);
-                engine.change_step(height, round, Step::PrevoteWait, true);
-            }
-            Step::PrevoteWait => {
-                generate_message(&mut engine, infos, proposal, Step::Precommit, height, round);
-                engine.change_step(height, round, Step::Precommit, true);
-            }
-            Step::Precommit => {
-                engine.check_precommit(height, round);
-                engine.change_step(height, round, Step::PrecommitWait, true);
-            }
-            Step::PrecommitWait => {
-                let commit = engine.proc_commit(height, round);
-                // write to log
-                
-                engine.change_step(height, round, Step::Commit, true);
-            }
-            Step::CommitWait => {
-                let (authority_list, info) = create_auth();
-                infos = info;
-                height += 1;
-                round += 1;
-                engine.new_round(height, round, authority_list);
-            }
-            _ => panic!("Invalid step."),
-        }
+        proposals.push(proposal.block.clone());
+
+        // step proposal wait
+        let _ = engine.recv_proposal(height, round, proposal.clone());
+        engine.proc_proposal(proposal.clone());
+        let _ = engine.proc_prevote();
+        engine.change_step(height, round, Step::Prevote, true);
+
+        // step prevote
+        generate_message(
+            &mut engine,
+            auth.clone(),
+            proposal.clone(),
+            Step::Prevote,
+            height,
+            round,
+        );
+        engine.check_prevote(height, round);
+        engine.change_step(height, round, Step::PrevoteWait, true);
+
+        // step prevote wait
+        generate_message(
+            &mut engine,
+            auth.clone(),
+            proposal,
+            Step::Precommit,
+            height,
+            round,
+        );
+        engine.change_step(height, round, Step::Precommit, true);
+
+        // step precommit
+        engine.check_precommit(height, round);
+        engine.change_step(height, round, Step::PrecommitWait, true);
+
+        // step precommit wait
+        let commit = engine.proc_commit(height, round);
+        consensus_results.push(commit.unwrap().proposal.block);
+        // write to log
+
+        engine.change_step(height, round, Step::Commit, true);
     }
 }
