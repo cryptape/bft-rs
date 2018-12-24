@@ -159,6 +159,12 @@ fn test_bft_without_propose() {
 
         // step proposal
         let proposal = generate_proposal();
+        println!(
+            "the proposal is {:?}, height{}, round{}.",
+            proposal.block.clone(),
+            height,
+            round
+        );
         proposals.push(proposal.block.clone());
 
         // step proposal wait
@@ -196,7 +202,13 @@ fn test_bft_without_propose() {
 
         // step precommit wait
         let commit = engine.proc_commit(height, round);
-        consensus_results.push(commit.unwrap().proposal.block);
+        consensus_results.push(commit.clone().unwrap().proposal.block);
+        println!(
+            "the consensus is {:?}, height{}, round{}",
+            commit.clone().unwrap().proposal.block,
+            height,
+            round
+        );
         // write to log
 
         engine.change_step(height, round, Step::Commit, true);
