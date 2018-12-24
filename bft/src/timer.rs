@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
-use bft::Step;
+use algorithm::Step;
 
 #[derive(Debug, Clone)]
 pub struct TimeoutInfo {

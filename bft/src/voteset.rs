@@ -14,7 +14,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use bft::Step;
+use algorithm::Step;
 use bincode::{deserialize, serialize, Infinite};
 use crypto::{pubkey_to_address, Sign, Signature};
 use crypto_hash::{digest, Algorithm};
@@ -264,8 +264,6 @@ impl ProposalRoundCollector {
 #[derive(Clone, Debug, Default)]
 pub struct Proposal {
     pub block: Vec<u8>,
-    pub height: usize,
-    pub round: usize,
     pub lock_round: Option<usize>,
     pub lock_votes: Option<VoteSet>,
 }
@@ -274,8 +272,6 @@ impl Proposal {
     pub fn new() -> Self {
         Proposal {
             block: Vec::new(),
-            height: MAX,
-            round: MAX,
             lock_round: None,
             lock_votes: None,
         }

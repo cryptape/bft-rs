@@ -22,6 +22,7 @@ log = "=0.4.3"
 logger = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
 protobuf = { version = "2.0.2", features = ["with-bytes"]}
 ethereum-types = "0.3.2"
+rand = "0.6.1"
 
 [build-dependencies]
 util = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
