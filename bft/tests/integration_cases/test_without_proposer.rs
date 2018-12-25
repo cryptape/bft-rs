@@ -19,13 +19,14 @@ use bft::algorithm::{Bft, Step};
 use bft::params::{BftParams, BftTimer};
 use bft::voteset::*;
 use crypto::{pubkey_to_address, CreateKey, KeyPair, Signature, Signer};
-use ethereum_types::{Address, H256};
+use ethereum_types::H256;
 use hash::{digest, Algorithm};
 use rand::{thread_rng, Rng};
 
 use std::sync::mpsc::channel;
-use std::usize::MAX;
 use std::vec::Vec;
+
+use {generate_auth, generate_proposal};
 
 fn generate_message(
     engine: &mut Bft,
@@ -43,7 +44,7 @@ fn generate_message(
     }
 
     let byzantine_node = auth.validators[3];
-    for ii in 0..3 {
+    for ii in 0..4 {
         if auth.validators[ii] != byzantine_node {
             engine.votes.add(
                 h,
@@ -82,7 +83,7 @@ fn test_bft_without_proposer() {
             address: address,
         },
     };
-    let (authority_list, _) = create_auth();
+    let (authority_list, _) = generate_auth();
     let (main_to_timer, _timer_from_main) = channel();
     let (_timer_to_main, main_from_timer) = channel();
     let mut engine = Bft::new(
@@ -98,7 +99,7 @@ fn test_bft_without_proposer() {
 
     while height < 1000 {
         // step commit
-        let (auth, _) = create_auth();
+        let (auth, _) = generate_auth();
         height += 1;
         round = 0;
         engine.new_round(height, round, auth.clone());

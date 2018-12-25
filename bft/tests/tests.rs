@@ -28,6 +28,16 @@ use rand::{thread_rng, Rng};
 
 use std::usize::MAX;
 
+pub const ASCII_WORD: &str = r#"
+   ._____. ._____.  _. ._   ._____. ._____.   ._.   ._____. ._____.
+   | .___| |___. | | | | |  |___. | |_____|   |_|   |___. | |_____|
+   | |     ._. | | | |_| |  ._. | |   ._.   ._____. ._. | | ._____.
+   | |     | | |_| \_____/  | | |_/   | |   | ,_, | | | |_/ |_____|
+   | |___. | | ._.   ._.    | |       | |   | | | | | |     ._____.
+   |_____| |_| |_|   |_|    |_|       |_|   |_| |_| |_|     |_____|
+"#;
+
+#[warn(dead_code)]
 pub struct NodeInfo {
     keypair: KeyPair,
     address: Address,
@@ -82,3 +92,5 @@ pub fn generate_proposal() -> Proposal {
         lock_votes: None,
     }
 }
+
+mod integration_cases;
