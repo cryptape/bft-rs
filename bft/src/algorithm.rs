@@ -98,7 +98,7 @@ pub struct Bft {
     lock_round: Option<usize>,
     lock_proposal: Option<Proposal>,
     lock_vote: Option<VoteSet>,
-    wal_log: Wal,
+    // wal_log: Wal,
     last_commit_round: Option<usize>,
     auth_manage: AuthorityManage,
 }
@@ -110,7 +110,7 @@ impl Bft {
         params: BftParams,
         authority_list: AuthorityManage,
     ) -> Bft {
-        let logpath = DataPath::wal_path();
+        // let logpath = DataPath::wal_path();
 
         Bft {
             timer_seter: ts,
@@ -126,7 +126,7 @@ impl Bft {
             lock_round: None,
             lock_proposal: None,
             lock_vote: None,
-            wal_log: Wal::new(&*logpath).unwrap(),
+            // wal_log: Wal::new(&*logpath).unwrap(),
             last_commit_round: None,
             auth_manage: authority_list,
         }
@@ -532,9 +532,11 @@ impl Bft {
             self.height = height;
             self.round = round;
             self.auth_manage = authority_list;
+            trace!("Consensus successful, go to new height{} .", self.height);
         } else {
             // only update the round info
             self.round = round;
+            trace!("Consensus unsuccessful, go to new round{} .", self.round);
         }
         // wait for 3s ?
     }
@@ -545,11 +547,11 @@ impl Bft {
         self.step = s;
 
         if newflag {
-            let _ = self.wal_log.set_height(height);
+            // let _ = self.wal_log.set_height(height);
         }
 
         let message = serialize(&(height, round, s), Infinite).unwrap();
-        let _ = self.wal_log.save(height, LOG_TYPE_STATE, &message);
+        // let _ = self.wal_log.save(height, LOG_TYPE_STATE, &message);
     }
 
     #[inline]
