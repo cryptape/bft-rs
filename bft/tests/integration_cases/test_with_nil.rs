@@ -19,13 +19,12 @@ use bft::algorithm::{Bft, Step};
 use bft::params::{BftParams, BftTimer};
 use bft::voteset::*;
 use crypto::{pubkey_to_address, CreateKey, KeyPair, Signature, Signer};
-use ethereum_types::{Address, H256};
+use ethereum_types::{H160, H256};
 use hash::{digest, Algorithm};
-use rand::{gen_rng, thread_rng, Rng};
-use generate_auth;
+use rand::{thread_rng, Rng};
+use {generate_auth, generate_proposal, ASCII_WORD};
 
 use std::sync::mpsc::channel;
-use std::usize::MAX;
 use std::vec::Vec;
 
 fn generate_message(
@@ -43,28 +42,47 @@ fn generate_message(
         *x = rng.gen();
     }
 
-    let offline_node = auth.validators[thread_rng().gen_rng(0, 2)];
+    // there is 1/3 probability that node 2 become offline
+    let mut offline_node = H160::zero();
+    let mut rng = thread_rng();
+    let x: usize = rng.gen_range(0, 10);
+    if x < 4 {
+        offline_node = auth.validators[2];
+    }
+
     let byzantine_node = auth.validators[3];
-    for ii in 0..3 {
+    for ii in 0..4 {
         if auth.validators[ii] != byzantine_node && auth.validators[ii] != offline_node {
+            let proposal = H256::from(digest(Algorithm::SHA256, &p.block).as_slice());
+            println!(
+                "do {:?} on height {}, round {}, for {:?}",
+                s, h, r, proposal
+            );
+
             engine.votes.add(
                 h,
                 r,
                 s,
                 auth.validators[ii],
                 &VoteMessage {
-                    proposal: Some(H256::from(digest(Algorithm::SHA256, &p.block).as_slice())),
+                    proposal: Some(proposal),
                     signature: Signature::default(),
                 },
             );
         } else {
+            let proposal = H256::from(digest(Algorithm::SHA256, &byzantine).as_slice());
+            println!(
+                "do {:?} on height {}, round {}, for {:?}",
+                s, h, r, proposal
+            );
+
             engine.votes.add(
                 h,
                 r,
                 s,
                 auth.validators[ii],
                 &VoteMessage {
-                    proposal: Some(H256::from(digest(Algorithm::SHA256, &byzantine).as_slice())),
+                    proposal: Some(proposal),
                     signature: Signature::default(),
                 },
             );
@@ -84,7 +102,7 @@ fn test_bft_without_proposer() {
             address: address,
         },
     };
-    let (authority_list, _) = create_auth();
+    let (authority_list, _) = generate_auth();
     let (main_to_timer, _timer_from_main) = channel();
     let (_timer_to_main, main_from_timer) = channel();
     let mut engine = Bft::new(
@@ -93,20 +111,20 @@ fn test_bft_without_proposer() {
         params,
         authority_list.clone(),
     );
-    let mut height = 1;
+    let mut height = 2;
     let mut round = 0;
     let mut proposals: Vec<Vec<u8>> = Vec::new();
     let mut consensus_results: Vec<Vec<u8>> = Vec::new();
+    println!("{}", ASCII_WORD);
 
     while height < 1000 {
         // step commit
-        let (auth, _) = create_auth();
-        
-        height += 1;
-        round = 0;
+        let (auth, _) = generate_auth();
+        println!("height {}, self.height {}", height, engine.height);
         engine.new_round(height, round, auth.clone());
 
         // step proposal
+        println!("start height{}, round{}", height, round);
         let proposal = generate_proposal();
         println!(
             "the proposal is {:?}, height{}, round{}.",
@@ -138,7 +156,7 @@ fn test_bft_without_proposer() {
         generate_message(
             &mut engine,
             auth.clone(),
-            proposal,
+            proposal.clone(),
             Step::Precommit,
             height,
             round,
@@ -150,19 +168,32 @@ fn test_bft_without_proposer() {
         engine.change_step(height, round, Step::PrecommitWait, true);
 
         // step precommit wait
+        let height_old = height;
+        let round_old = round;
         let commit = engine.proc_commit(height, round);
-        consensus_results.push(commit.clone().unwrap().proposal.block);
-        println!(
-            "the consensus result is {:?}, height{}, round{}",
-            commit.clone().unwrap().proposal.block,
-            height,
-            round
-        );
-        // write to log
-        if consensus_results != proposals {
-            panic!("Consensus Error in height{}, round {}!", height, round);
+        if commit.clone().is_some() {
+            consensus_results.push(commit.clone().unwrap().proposal.block);
+            println!(
+                "consensus success! the result is {:?}, height{}, round{}",
+                commit.clone().unwrap().proposal.block,
+                height,
+                round
+            );
+            height += 1;
+            round = 0
+        } else {
+            println!(
+                "the consensus result is nil, height{}, round{}, then go to next round",
+                height, round
+            );
+            round += 1;
         }
 
-        engine.change_step(height, round, Step::Commit, true);
+        if commit.clone().is_some()
+            && commit.clone().unwrap().proposal.block != proposal.clone().block
+        {
+            panic!("Consensus Error in height{}, round {}!", height - 1, round - 1);
+        }
+        engine.change_step(height_old, round_old, Step::Commit, true);
     }
 }

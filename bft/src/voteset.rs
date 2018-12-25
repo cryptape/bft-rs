@@ -393,7 +393,7 @@ impl BftProof {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AuthorityManage {
     pub proposers: Vec<Address>,
     pub validators: Vec<Address>,

@@ -588,4 +588,17 @@ impl Bft {
         self.lock_proposal = None;
         self.last_commit_round = None;
     }
+
+    #[inline]
+    fn print_all_info(&mut self) {
+        println!("the proposal is {:?}", self.proposal);
+        println!("the lock proposal is {:?}", self.lock_proposal);
+        println!("the lock round is {:?}", self.lock_round);
+        println!(
+            "the vote is {:?}",
+            self.votes
+                .get_voteset(self.height, self.round, Step::Precommit)
+        );
+        println!("the last commit round is {:?}", self.last_commit_round);
+    }
 }
