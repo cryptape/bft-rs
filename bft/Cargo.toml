@@ -7,7 +7,7 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 bincode = "0.8.0"
 serde = "1.0"
 serde_derive = "1.0"
-rustc-hex = "1.0"
+rustc-hex = "2.0"
 cita-crypto = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
 proof = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
 libproto = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
