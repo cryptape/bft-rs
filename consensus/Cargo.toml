@@ -7,7 +7,7 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 bincode = "0.8.0"
 bft-rs = {path = "../bft"}
 crypto-hash = "0.3.1"
-ethereum-types = "0.3.2"
+ethereum-types = "0.4.0"
 log = "=0.4.3"
 engine = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
 cita-crypto = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
