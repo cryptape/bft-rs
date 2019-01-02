@@ -38,16 +38,8 @@ use serde_derive::{Deserialize, Serialize};
 
 const INIT_HEIGHT: usize = 1;
 const INIT_ROUND: usize = 0;
-
 const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
-const TIMEOUT_LOW_ROUND_MESSAGE_MULTIPLE: u32 = 20;
-
 const VERIFIED_PROPOSAL_OK: i8 = 1;
-const VERIFIED_PROPOSAL_FAILED: i8 = -1;
-const VERIFIED_PROPOSAL_UNDO: i8 = 0;
-
-const LOG_TYPE_PROPOSE: u8 = 1;
-const LOG_TYPE_STATE: u8 = 3;
 const MAX_PROPOSAL_TIME_COEF: usize = 10;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]

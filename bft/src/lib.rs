@@ -1,5 +1,5 @@
 // CITA
-// Copyright 2016-2017 Cryptape Technologies LLC.
+// Copyright 2016-2019 Cryptape Technologies LLC.
 
 // This program is free software: you can redistribute it
 // and/or modify it under the terms of the GNU General Public
@@ -61,7 +61,7 @@ pub trait CryptHash {
 // if proposal need to be verified by auth, use this trait
 pub trait PrecommitAuth {
     fn pub_to_auth(&self);
-    fn recv_from_auth(&self) -> bool;
+    fn recv_from_auth(&self) -> i8;
 }
 
 // this trait is used to handle proposal or message
