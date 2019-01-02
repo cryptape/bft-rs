@@ -1,5 +1,5 @@
 // CITA
-// Copyright 2016-2017 Cryptape Technologies LLC.
+// Copyright 2016-2019 Cryptape Technologies LLC.
 
 // This program is free software: you can redistribute it
 // and/or modify it under the terms of the GNU General Public
@@ -93,7 +93,7 @@ fn test_bft_without_proposer() {
         authority_list.clone(),
     );
     let mut height = 1;
-    let mut round = 0;
+    let mut round;
     let mut proposals: Vec<Vec<u8>> = Vec::new();
     let mut consensus_results: Vec<Vec<u8>> = Vec::new();
 
