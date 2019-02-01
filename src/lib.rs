@@ -20,52 +20,72 @@
 
 #[macro_use]
 extern crate bincode;
-extern crate ethereum_types;
 #[macro_use]
-extern crate logger;
-// extern crate authority_manage;
+extern crate crossbeam;
 extern crate crypto_hash;
 extern crate lru_cache;
 extern crate min_max_heap;
 extern crate protobuf;
-// extern crate rustc_serialize;
 #[macro_use]
 extern crate serde_derive;
-extern crate cita_crypto as crypto;
-extern crate engine;
 #[macro_use]
 extern crate util;
-extern crate log;
 
 pub mod algorithm;
-pub mod message;
 pub mod params;
 pub mod timer;
 pub mod voteset;
 pub mod wal;
 
-use bincode::{deserialize, serialize, Infinite};
-use crypto_hash::*;
-use engine::EngineError;
-use ethereum_types::{Address, H256, H512};
-use serde_derive::{Deserialize, Serialize};
-use voteset::Proposal;
+pub type Address = Vec<u8>;
+pub type Target = Vec<u8>;
 
-pub const DATA_PATH: &'static str = "DATA_PATH";
-pub const LOG_TYPE_AUTHORITIES: u8 = 1;
-
-pub trait CryptHash {
-    fn crypt_hash(&self) -> H256;
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum VoteType {
+    Prevote = 0,
+    PreCommit = 1,
 }
 
-// if proposal need to be verified by auth, use this trait
-pub trait PrecommitAuth {
-    fn pub_to_auth(&self);
-    fn recv_from_auth(&self) -> i8;
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Proposal {
+    height: usize,
+    round: usize,
+    content: Target, // block hash
+    lock_status: Option<Lock_stat>,
+    proposer: Address,
 }
 
-// this trait is used to handle proposal or message
-pub trait CheckSignature {
-    fn after_recv_proposal(&self) -> Result<Proposal, &str>;
-    fn before_prec_vote(&self) -> bool;
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LockStatus {
+    proposal: Target, // block hash
+    round: usize,
+    votes: Vec<Vote>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Vote {
+    vote_type: VoteType,
+    height: usize,
+    round: usize,
+    proposal: Target, // block hash
+    voter: Address,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Feed {
+    height: usize,
+    proposal: Target, // block hash
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Commit {
+    height: usize,
+    proposal: Target, // block hash
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Status {
+    height: usize,
+    interval: u64,
+    authority_list: Vec<Address>,
 }
