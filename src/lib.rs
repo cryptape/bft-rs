@@ -22,14 +22,12 @@
 extern crate bincode;
 #[macro_use]
 extern crate crossbeam;
-extern crate crypto_hash;
+extern crate log;
+extern crate log4rs;
 extern crate lru_cache;
 extern crate min_max_heap;
-extern crate protobuf;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate util;
 
 pub mod algorithm;
 pub mod params;
@@ -40,10 +38,25 @@ pub mod wal;
 pub type Address = Vec<u8>;
 pub type Target = Vec<u8>;
 
+#[derive(Clone, Debug)]
+pub enum MsgType {
+    Proposal,
+    Vote,
+    Feed,
+    RichStatus,
+    Outcome,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum VoteType {
     Prevote = 0,
     PreCommit = 1,
+}
+
+#[derive(Clone, Debug)]
+pub struct BftMsg {
+    msg: Vec<u8>,
+    msg_type: MsgType,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -51,7 +64,7 @@ pub struct Proposal {
     height: usize,
     round: usize,
     content: Target, // block hash
-    lock_status: Option<Lock_stat>,
+    lock_status: Option<LockStatus>,
     proposer: Address,
 }
 
