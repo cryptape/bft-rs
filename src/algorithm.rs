@@ -139,9 +139,11 @@ impl Bft {
             return false;
         };
         let nonce = self.height + self.round;
+
         if self.params.address == self.authority_list.get(nonce % count) {
             return true;
         }
+        
         let timer_duration = self.params.timer.get_propose();
         let _ = self.set_timer(timer_duration, Step::ProposeWait);
         false
