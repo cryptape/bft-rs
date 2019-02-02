@@ -14,8 +14,24 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+use super::Target;
 use std::cell::Cell;
 use std::time::Duration;
+
+#[derive(Clone, Debug)]
+pub struct BftParams {
+    address: Target,
+    timer: BftTimer,
+}
+
+impl BftParams {
+    pub fn new(local_address: Target) -> Self {
+        BftParams {
+            address: local_address,
+            timer: BftTimer::default(),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct BftTimer {
