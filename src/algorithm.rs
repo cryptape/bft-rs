@@ -17,7 +17,8 @@
 
 use bincode::{deserialize, serialize, Infinite};
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
-use params::BftTimer;
+use log;
+use params::BftParams;
 use timer::TimeoutInfo;
 use voteset::AuthorityManage;
 use voteset::*;
@@ -77,7 +78,7 @@ pub struct Bft {
     height: usize,
     round: usize,
     step: Step,
-    proposals: Option<Target>,
+    proposals: Option<Target>, // proposals means the latest proposal given by auth
     proposal: Option<Target>,
     votes: VoteCollector,
     lock_status: Option<LockStatus>,
@@ -89,10 +90,10 @@ pub struct Bft {
 }
 
 impl Bft {
-    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, timer: BftTimer) {
+    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Target) {
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
-        let engine = Bft::initialize(s, r, bft2timer, bft4timer, timer);
+        let engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
     }
 
     fn initialize(
@@ -100,8 +101,8 @@ impl Bft {
         r: Receiver<BftMsg>,
         ts: Sender<TimeoutInfo>,
         tn: Receiver<TimeoutInfo>,
-        timer: u64,
-    ) -> Bft {
+        local_address: Target,
+    ) -> Self {
         Bft {
             msg_sender: s,
             msg_receiver: r,
@@ -110,14 +111,39 @@ impl Bft {
 
             height: INIT_HEIGHT,
             round: INIT_ROUND,
-            Step: Step::Propose,
+            Step: Step::default(),
             proposals: None,
             proposal: None,
             vote: VoteCollector::new(),
             last_commit_round: None,
             last_commit_proposal: None,
             authority_list: Vec::new(),
-            interval: timer,
+            params: BftParams::new(local_address),
         }
+    }
+
+    fn set_timer(&self, duration: Duration, s: Step) {
+        self.bft2timer.send(TimeoutInfo {
+            timeval: Instant::now() + duration,
+            height: self.height,
+            round: self.round,
+            step: s,
+        });
+    }
+
+    fn determine_proposer(&self) -> bool {
+        let count = if self.authority_list.len() != 0 {
+            self.authority_list.len()
+        } else {
+            warn!("The authority list is empty!");
+            return false;
+        };
+        let nonce = self.height + self.round;
+        if self.params.address == self.authority_list.get(nonce % count) {
+            return true;
+        }
+        let timer_duration = self.params.timer.get_propose();
+        let _ = self.set_timer(timer_duration, Step::ProposeWait);
+        false
     }
 }

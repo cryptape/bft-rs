@@ -22,6 +22,7 @@
 extern crate bincode;
 #[macro_use]
 extern crate crossbeam;
+#[macro_use]
 extern crate log;
 extern crate log4rs;
 extern crate lru_cache;
@@ -44,7 +45,7 @@ pub enum MsgType {
     Vote,
     Feed,
     RichStatus,
-    Outcome,
+    Commit,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -94,11 +95,12 @@ pub struct Feed {
 pub struct Commit {
     height: usize,
     proposal: Target, // block hash
+    lock_votes: Vec<Vote>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Status {
+pub struct RichStatus {
     height: usize,
-    interval: u64,
+    interval: Option<u64>,
     authority_list: Vec<Address>,
 }
