@@ -48,7 +48,7 @@ pub enum MsgType {
     Commit,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, PartialOrd, Eq, Copy, Hash)]
 pub enum VoteType {
     Prevote = 0,
     PreCommit = 1,
