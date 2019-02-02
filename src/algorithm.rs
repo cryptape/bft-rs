@@ -20,7 +20,7 @@ use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
 use log;
 use params::BftParams;
 use timer::TimeoutInfo;
-use voteset::AuthorityManage;
+use voteset::VoteCollector;
 use voteset::*;
 use wal::Wal;
 
@@ -80,13 +80,13 @@ pub struct Bft {
     step: Step,
     proposals: Option<Target>, // proposals means the latest proposal given by auth
     proposal: Option<Target>,
-    votes: VoteCollector,
+    vote: VoteCollector,
     lock_status: Option<LockStatus>,
     // wal_log: Wal,
     last_commit_round: Option<usize>,
     last_commit_proposal: Option<Target>,
     authority_list: Vec<Address>,
-    interval: u64,
+    params: BftParams,
 }
 
 impl Bft {
@@ -111,10 +111,11 @@ impl Bft {
 
             height: INIT_HEIGHT,
             round: INIT_ROUND,
-            Step: Step::default(),
+            step: Step::default(),
             proposals: None,
             proposal: None,
             vote: VoteCollector::new(),
+            lock_status: None,
             last_commit_round: None,
             last_commit_proposal: None,
             authority_list: Vec::new(),
@@ -123,7 +124,7 @@ impl Bft {
     }
 
     fn set_timer(&self, duration: Duration, s: Step) {
-        self.bft2timer.send(TimeoutInfo {
+        let _ = self.timer_seter.send(TimeoutInfo {
             timeval: Instant::now() + duration,
             height: self.height,
             round: self.round,
@@ -140,10 +141,10 @@ impl Bft {
         };
         let nonce = self.height + self.round;
 
-        if self.params.address == self.authority_list.get(nonce % count) {
+        if self.params.address == *(self.authority_list.get(nonce % count).unwrap()) {
             return true;
         }
-        
+
         let timer_duration = self.params.timer.get_propose();
         let _ = self.set_timer(timer_duration, Step::ProposeWait);
         false

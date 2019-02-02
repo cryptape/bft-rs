@@ -14,10 +14,10 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+use super::{Address, Target, VoteType};
 use bincode::{deserialize, serialize, Infinite};
 use lru_cache::LruCache;
 use serde_derive::{Deserialize, Serialize};
-use super::{Address, Target, VoteType};
 
 use std::collections::HashMap;
 use std::io::prelude::*;
