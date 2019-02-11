@@ -155,6 +155,7 @@ impl Bft {
 
     fn try_broadcast_proposal(&self) -> bool {
         if self.lock_status.is_none() && self.proposals.is_none() {
+            warn!("The lock status and proposals are both none!");
             return false;
         }
 
