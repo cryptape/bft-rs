@@ -20,8 +20,8 @@ use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub struct BftParams {
-    address: Target,
-    timer: BftTimer,
+    pub address: Target,
+    pub timer: BftTimer,
 }
 
 impl BftParams {

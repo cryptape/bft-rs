@@ -14,7 +14,6 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 use bincode::{deserialize, serialize, Infinite};
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
 use log;
@@ -78,7 +77,7 @@ pub struct Bft {
     height: usize,
     round: usize,
     step: Step,
-    proposals: Option<Target>, // proposals means the latest proposal given by auth
+    proposals: Option<Target>, // proposals means the latest proposal given by auth at this height
     proposal: Option<Target>,
     vote: VoteCollector,
     lock_status: Option<LockStatus>,
@@ -90,7 +89,7 @@ pub struct Bft {
 }
 
 impl Bft {
-    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Target) {
+    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
         let engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
@@ -132,6 +131,10 @@ impl Bft {
         });
     }
 
+    fn send_bft_msg(&self, msg: BftMsg) {
+        let _ = self.msg_sender.send(msg);
+    }
+
     fn determine_proposer(&self) -> bool {
         let count = if self.authority_list.len() != 0 {
             self.authority_list.len()
@@ -148,5 +151,41 @@ impl Bft {
         let timer_duration = self.params.timer.get_propose();
         let _ = self.set_timer(timer_duration, Step::ProposeWait);
         false
+    }
+
+    fn try_broadcast_proposal(&self) -> bool {
+        if self.lock_status.is_none() && self.proposals.is_none() {
+            return false;
+        }
+        
+        let msg = if self.lock_status.is_some() {
+            let proposal_msg = Proposal {
+                height: self.height,
+                round: self.round,
+                content: self.lock_status.clone().unwrap().proposal,
+                lock_round: Some(self.lock_status.clone().unwrap().round),
+                lock_votes: Some(self.lock_status.clone().unwrap().votes),
+                proposer: self.params.address.clone(),
+            };
+            BftMsg {
+                msg: serialize(&proposal_msg, Infinite).unwrap(),
+                msg_type: MsgType::Proposal,
+            }
+        } else {
+            let proposal_msg = Proposal {
+                height: self.height,
+                round: self.round,
+                content: self.proposals.clone().unwrap(),
+                lock_round: None,
+                lock_votes: None,
+                proposer: self.params.address.clone(),
+            };
+            BftMsg {
+                msg: serialize(&proposal_msg, Infinite).unwrap(),
+                msg_type: MsgType::Proposal,
+            }
+        };
+        self.send_bft_msg(msg);
+        true
     }
 }

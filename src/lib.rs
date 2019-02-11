@@ -65,7 +65,8 @@ pub struct Proposal {
     height: usize,
     round: usize,
     content: Target, // block hash
-    lock_status: Option<LockStatus>,
+    lock_round: Option<usize>,
+    lock_votes: Option<Vec<Vote>>,
     proposer: Address,
 }
 
