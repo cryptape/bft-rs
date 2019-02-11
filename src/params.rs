@@ -14,30 +14,22 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use crypto::{PrivKey, Signer};
-use ethereum_types::clean_0x;
-use serde_derive::{Deserialize, Serialize};
+use super::Target;
 use std::cell::Cell;
-use std::fs::File;
-use std::io::Read;
-use std::str::FromStr;
 use std::time::Duration;
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct PrivateKey {
-    signer: PrivKey,
+#[derive(Clone, Debug)]
+pub struct BftParams {
+    pub address: Target,
+    pub timer: BftTimer,
 }
 
-impl PrivateKey {
-    pub fn new(path: &str) -> Self {
-        let mut buffer = String::new();
-        File::open(path)
-            .and_then(|mut f| f.read_to_string(&mut buffer))
-            .unwrap_or_else(|err| panic!("Error while loading PrivateKey: [{}]", err));
-
-        let signer = PrivKey::from_str(clean_0x(&buffer)).unwrap();
-
-        PrivateKey { signer }
+impl BftParams {
+    pub fn new(local_address: Target) -> Self {
+        BftParams {
+            address: local_address,
+            timer: BftTimer::default(),
+        }
     }
 }
 
@@ -83,19 +75,5 @@ impl BftTimer {
 
     pub fn get_commit(&self) -> Duration {
         Duration::from_millis(self.total_duration.get() * self.commit.0 / self.commit.1)
-    }
-}
-
-pub struct BftParams {
-    pub timer: BftTimer,
-    pub signer: Signer,
-}
-
-impl BftParams {
-    pub fn new(priv_key: &PrivateKey) -> Self {
-        BftParams {
-            signer: Signer::from(priv_key.signer),
-            timer: BftTimer::default(),
-        }
     }
 }
