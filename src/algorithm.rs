@@ -157,7 +157,7 @@ impl Bft {
         if self.lock_status.is_none() && self.proposals.is_none() {
             return false;
         }
-        
+
         let msg = if self.lock_status.is_some() {
             let proposal_msg = Proposal {
                 height: self.height,
