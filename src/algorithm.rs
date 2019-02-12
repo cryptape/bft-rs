@@ -160,6 +160,7 @@ impl Bft {
         }
 
         let msg = if self.lock_status.is_some() {
+            // if is locked, boradcast the lock proposal
             let proposal_msg = Proposal {
                 height: self.height,
                 round: self.round,
@@ -173,6 +174,7 @@ impl Bft {
                 msg_type: MsgType::Proposal,
             }
         } else {
+            // if is not locked, broadcast the cached proposal
             let proposal_msg = Proposal {
                 height: self.height,
                 round: self.round,
@@ -185,6 +187,75 @@ impl Bft {
                 msg: serialize(&proposal_msg, Infinite).unwrap(),
                 msg_type: MsgType::Proposal,
             }
+        };
+        self.send_bft_msg(msg);
+        true
+    }
+
+    fn handle_proposal(&self, proposal_msg: &[u8]) -> Option<Proposal> {
+        let proposal: Proposal = if let Ok(decode) = deserialize(proposal_msg) {
+            decode
+        } else {
+            warn!("The proposal message is invalided!");
+            return None;
+        };
+
+        if proposal.height != self.height || proposal.round < self.round {
+            warn!("The proposal is unexpected");
+            return None;
+        }
+        Some(proposal)
+    }
+
+    fn save_proposal(&mut self, proposal: Proposal) {
+        if proposal.lock_round.is_some()
+            && proposal.lock_votes.is_some()
+            && (self.lock_status.is_none()
+                || self.lock_status.clone().unwrap().round <= proposal.lock_round.unwrap())
+        {
+            // receive a proposal with a later PoLC
+            self.round = proposal.round;
+            self.lock_status = Some(LockStatus {
+                proposal: proposal.content.clone(),
+                round: proposal.lock_round.unwrap(),
+                votes: proposal.lock_votes.unwrap(),
+            });
+            self.proposal = Some(proposal.content);
+        } else if proposal.lock_votes.is_none()
+            && self.lock_status.is_none()
+            && proposal.round == self.round
+        {
+            // receive a proposal without PoLC
+            self.proposal = Some(proposal.content);
+        } else if proposal.round != self.round {
+            // receive a proposal of higher round
+            self.proposals = Some(proposal.content);
+        } else {
+            warn!("The proposal is problematic");
+        }
+    }
+
+    fn try_broadcast_prevote(&self) -> bool {
+        let prevote = if let Some(lock_proposal) = self.lock_status.clone() {
+            lock_proposal.proposal
+        } else if let Some(proposal) = self.proposal.clone() {
+            proposal
+        } else {
+            warn!("There is no proposal and lock proposal!");
+            return false;
+        };
+
+        let prevote_msg = Vote {
+            vote_type: VoteType::Prevote,
+            height: self.height,
+            round: self.round,
+            proposal: prevote,
+            voter: self.params.address.clone(),
+        };
+
+        let msg = BftMsg {
+            msg: serialize(&prevote_msg, Infinite).unwrap(),
+            msg_type: MsgType::Vote,
         };
         self.send_bft_msg(msg);
         true
