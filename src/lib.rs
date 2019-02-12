@@ -39,7 +39,7 @@ pub mod wal;
 pub type Address = Vec<u8>;
 pub type Target = Vec<u8>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Copy, Hash)]
 pub enum MsgType {
     Proposal,
     Vote,

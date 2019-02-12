@@ -14,7 +14,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use super::{Address, Target, VoteType};
+use super::{Address, Target, Vote, VoteType};
 use bincode::{deserialize, serialize, Infinite};
 use lru_cache::LruCache;
 use serde_derive::{Deserialize, Serialize};
@@ -67,7 +67,7 @@ impl VoteCollector {
     }
 }
 
-//1. sender's votemessage 2. proposal'hash count
+// 1. sender's vote message  2. proposal's hash  3. count
 #[derive(Clone, Debug)]
 pub struct VoteSet {
     pub votes_by_sender: HashMap<Address, Target>,
@@ -84,7 +84,7 @@ impl VoteSet {
         }
     }
 
-    //just add ,not check
+    // just add, not check
     pub fn add(&mut self, sender: Address, vote: Target) -> bool {
         let mut is_add = false;
         self.votes_by_sender.entry(sender).or_insert_with(|| {
@@ -97,9 +97,31 @@ impl VoteSet {
         }
         is_add
     }
+
+    pub fn abstract_polc(
+        &self,
+        height: usize,
+        round: usize,
+        vote_type: VoteType,
+        proposal: Target,
+    ) -> Vec<Vote> {
+        let mut polc = Vec::new();
+        for (address, vote_proposal) in &self.votes_by_sender {
+            if *vote_proposal == proposal.clone() {
+                polc.push(Vote {
+                    vote_type: vote_type,
+                    height: height,
+                    round: round,
+                    proposal: proposal.clone(),
+                    voter: address.clone(),
+                });
+            }
+        }
+        polc
+    }
 }
 
-//round -> step collector
+// round -> step collector
 #[derive(Debug)]
 pub struct RoundCollector {
     pub round_votes: LruCache<usize, StepCollector>,
@@ -139,7 +161,7 @@ impl RoundCollector {
     }
 }
 
-//step -> voteset
+// step -> voteset
 #[derive(Debug)]
 pub struct StepCollector {
     pub step_votes: HashMap<VoteType, VoteSet>,

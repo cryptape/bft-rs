@@ -122,6 +122,7 @@ impl Bft {
         }
     }
 
+    #[inline]
     fn set_timer(&self, duration: Duration, s: Step) {
         let _ = self.timer_seter.send(TimeoutInfo {
             timeval: Instant::now() + duration,
@@ -131,9 +132,22 @@ impl Bft {
         });
     }
 
+    #[inline]
     fn send_bft_msg(&self, msg: BftMsg) {
         let _ = self.msg_sender.send(msg);
     }
+
+    #[inline]
+    fn cal_above_threshold(&self, count: usize) -> bool {
+        count * 3 > self.authority_list.len() * 2
+    }
+
+    #[inline]
+    fn cal_all_vote(&self, count: usize) -> bool {
+        count == self.authority_list.len()
+    }
+
+    fn rebroadcast_vote(&self, proposal: Target) {}
 
     fn determine_proposer(&self) -> bool {
         let count = if self.authority_list.len() != 0 {
@@ -258,6 +272,78 @@ impl Bft {
             msg_type: MsgType::Vote,
         };
         self.send_bft_msg(msg);
+        self.set_timer(
+            self.params.timer.get_prevote() * TIMEOUT_RETRANSE_MULTIPLE,
+            Step::Prevote,
+        );
         true
+    }
+
+    fn try_save_vote(&mut self, vote_msg: &[u8]) -> bool {
+        let vote: Vote = deserialize(vote_msg).unwrap();
+        if vote.height != self.height {
+            return false;
+        }
+
+        if Some(vote.round) == self.last_commit_round {
+            self.rebroadcast_vote(vote.proposal);
+            return false;
+        }
+
+        if vote.round >= self.round && self.vote.add(
+            vote.height,
+            vote.round,
+            vote.vote_type,
+            vote.voter,
+            vote.proposal,
+        ) {
+            return true;
+        }
+        false
+    }
+
+    fn check_prevote(&mut self) -> bool {
+        if let Some(prevote_set) = self
+            .vote
+            .get_voteset(self.height, self.round, VoteType::Prevote)
+        {
+            let mut tv = if self.cal_all_vote(prevote_set.count) {
+                Duration::new(0, 0)
+            } else {
+                self.params.timer.get_prevote()
+            };
+            for (hash, count) in &prevote_set.votes_by_proposal {
+                if self.cal_above_threshold(*count) {
+                    if self.lock_status.is_some()
+                        && self.lock_status.clone().unwrap().round < self.round
+                    {
+                        if hash.is_empty() {
+                            // receive +2/3 prevote for nil, clean lock info
+                            self.proposal = None;
+                            self.lock_status = None;
+                            tv = Duration::new(0, 0);
+                        } else {
+                            // receive a new PoLC, update lock info
+                            self.proposal = Some(hash.clone());
+                            self.lock_status = Some(LockStatus {
+                                proposal: hash.clone(),
+                                round: self.round,
+                                votes: prevote_set.abstract_polc(
+                                    self.height,
+                                    self.round,
+                                    VoteType::Prevote,
+                                    hash.clone(),
+                                ),
+                            });
+                            tv = Duration::new(0, 0);
+                        }
+                    }
+                }
+                break;
+            }
+            self.set_timer(tv, Step::PrevoteWait);
+            return true;
+        }
+        false
     }
 }
