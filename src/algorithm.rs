@@ -147,7 +147,36 @@ impl Bft {
         count == self.authority_list.len()
     }
 
-    fn rebroadcast_vote(&self, proposal: Target) {}
+    fn rebroadcast_vote(&self, round: usize) {
+        let prevote = Vote {
+            vote_type: VoteType::Prevote,
+            height: self.height - 1,
+            round: round,
+            proposal: self.last_commit_proposal.clone().unwrap(),
+            voter: self.params.clone().address,
+        };
+
+        let precommit = Vote {
+            vote_type: VoteType::PreCommit,
+            height: self.height - 1,
+            round: self.last_commit_round.unwrap(),
+            proposal: self.last_commit_proposal.clone().unwrap(),
+            voter: self.params.clone().address,
+        };
+
+        let prevote_msg = serialize(&prevote, Infinite).unwrap();
+        let precommit_msg = serialize(&precommit, Infinite).unwrap();
+
+        self.send_bft_msg(BftMsg {
+            msg: prevote_msg,
+            msg_type: MsgType::Vote,
+        });
+
+        self.send_bft_msg(BftMsg {
+            msg: precommit_msg,
+            msg_type: MsgType::Vote,
+        });
+    }
 
     fn determine_proposer(&self) -> bool {
         let count = if self.authority_list.len() != 0 {
@@ -214,11 +243,15 @@ impl Bft {
             return None;
         };
 
-        if proposal.height != self.height || proposal.round < self.round {
+        if proposal.height == self.height - 1 && Some(proposal.round) >= self.last_commit_round {
+            self.rebroadcast_vote(proposal.round);
+            return None;
+        } else if proposal.height != self.height || proposal.round < self.round {
             warn!("The proposal is unexpected");
             return None;
+        } else {
+            Some(proposal)
         }
-        Some(proposal)
     }
 
     fn save_proposal(&mut self, proposal: Proposal) {
@@ -229,12 +262,12 @@ impl Bft {
         {
             // receive a proposal with a later PoLC
             self.round = proposal.round;
+            self.proposal = Some(proposal.content.clone());
             self.lock_status = Some(LockStatus {
-                proposal: proposal.content.clone(),
+                proposal: proposal.content,
                 round: proposal.lock_round.unwrap(),
                 votes: proposal.lock_votes.unwrap(),
             });
-            self.proposal = Some(proposal.content);
         } else if proposal.lock_votes.is_none()
             && self.lock_status.is_none()
             && proposal.round == self.round
@@ -279,24 +312,24 @@ impl Bft {
     }
 
     fn try_save_vote(&mut self, vote_msg: &[u8]) -> bool {
-        let vote: Vote = deserialize(vote_msg).unwrap();
-        if vote.height != self.height {
-            return false;
-        }
+        if let Ok(decode) = deserialize(vote_msg) {
+            let vote: Vote = decode;
+            if vote.height == self.height - 1 && Some(vote.round) >= self.last_commit_round {
+                self.rebroadcast_vote(vote.round);
+                return false;
+            } else if vote.height != self.height {
+                return false;
+            }
 
-        if vote.height == self.height - 1 && Some(vote.round) == self.last_commit_round {
-            self.rebroadcast_vote(vote.proposal);
-            return false;
-        }
-
-        if vote.round >= self.round && self.vote.add(
-            vote.height,
-            vote.round,
-            vote.vote_type,
-            vote.voter,
-            vote.proposal,
-        ) {
-            return true;
+            if vote.round >= self.round && self.vote.add(
+                vote.height,
+                vote.round,
+                vote.vote_type,
+                vote.voter,
+                vote.proposal,
+            ) {
+                return true;
+            }
         }
         false
     }
@@ -393,7 +426,7 @@ impl Bft {
                     if hash.is_empty() {
                         self.proposal = None;
                         self.lock_status = None;
-                        self.goto_new_round();
+                        self.goto_next_round();
                         // tv = Duration::new(0, 0);
                         return false;
                     } else {
@@ -440,20 +473,42 @@ impl Bft {
         false
     }
 
+    fn try_handle_status(&mut self, status_msg: &[u8]) -> bool {
+        if let Ok(decode) = deserialize(status_msg) {
+            let rich_status: RichStatus = decode;
+            if rich_status.height >= self.height {
+                // goto new height directly and update authorty list
+                self.height = rich_status.height;
+                self.round = 0;
+                self.authority_list = rich_status.authority_list;
+                if let Some(interval) = rich_status.interval {
+                    // update the bft interval
+                    self.params.timer.set_total_duration(interval);
+                }
+            }
+            return true;
+        }
+        false
+    }
+
+    #[inline]
     fn change_to_step(&mut self, step: Step) {
         self.step = step;
     }
 
-    fn goto_new_round(&mut self) {
+    #[inline]
+    fn goto_next_round(&mut self) {
         self.round += 1;
     }
 
-    fn goto_new_height(&mut self) {
+    #[inline]
+    fn goto_next_height(&mut self) {
         self.height += 1;
         self.round = 0;
         self.clean_save_info();
     }
 
+    #[inline]
     fn clean_save_info(&mut self) {
         self.proposal = None;
         self.proposals = None;
