@@ -105,6 +105,7 @@ impl VoteSet {
         vote_type: VoteType,
         proposal: Target,
     ) -> Vec<Vote> {
+        // abstract the votes for the polc proposal into a vec
         let mut polc = Vec::new();
         for (address, vote_proposal) in &self.votes_by_sender {
             if *vote_proposal == proposal.clone() {

@@ -249,14 +249,13 @@ impl Bft {
         }
     }
 
-    fn try_broadcast_prevote(&self) -> bool {
+    fn broadcast_prevote(&self) {
         let prevote = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
         } else if let Some(proposal) = self.proposal.clone() {
             proposal
         } else {
-            warn!("There is no proposal and lock proposal!");
-            return false;
+            Vec::new()
         };
 
         let prevote_msg = Vote {
@@ -271,12 +270,12 @@ impl Bft {
             msg: serialize(&prevote_msg, Infinite).unwrap(),
             msg_type: MsgType::Vote,
         };
+
         self.send_bft_msg(msg);
         self.set_timer(
             self.params.timer.get_prevote() * TIMEOUT_RETRANSE_MULTIPLE,
             Step::Prevote,
         );
-        true
     }
 
     fn try_save_vote(&mut self, vote_msg: &[u8]) -> bool {
@@ -285,7 +284,7 @@ impl Bft {
             return false;
         }
 
-        if Some(vote.round) == self.last_commit_round {
+        if vote.height == self.height - 1 && Some(vote.round) == self.last_commit_round {
             self.rebroadcast_vote(vote.proposal);
             return false;
         }
@@ -338,10 +337,84 @@ impl Bft {
                             tv = Duration::new(0, 0);
                         }
                     }
+                    break;
                 }
-                break;
             }
-            self.set_timer(tv, Step::PrevoteWait);
+            if self.step == Step::Prevote {
+                self.set_timer(tv, Step::PrevoteWait);
+            }
+            return true;
+        }
+        false
+    }
+
+    fn broadcast_precommit(&self) {
+        let precommit = if let Some(lock_proposal) = self.lock_status.clone() {
+            lock_proposal.proposal
+        } else if let Some(proposal) = self.proposal.clone() {
+            proposal
+        } else {
+            Vec::new()
+        };
+
+        let precommit_msg = Vote {
+            vote_type: VoteType::PreCommit,
+            height: self.height,
+            round: self.round,
+            proposal: precommit,
+            voter: self.params.address.clone(),
+        };
+
+        let msg = BftMsg {
+            msg: serialize(&precommit_msg, Infinite).unwrap(),
+            msg_type: MsgType::Vote,
+        };
+
+        self.send_bft_msg(msg);
+        self.set_timer(
+            self.params.timer.get_precommit() * TIMEOUT_RETRANSE_MULTIPLE,
+            Step::Precommit,
+        );
+    }
+
+    fn check_precommit(&mut self) -> bool {
+        if let Some(precommit_set) =
+            self.vote
+                .get_voteset(self.height, self.round, VoteType::PreCommit)
+        {
+            let mut tv = if self.cal_all_vote(precommit_set.count) {
+                Duration::new(0, 0)
+            } else {
+                self.params.timer.get_precommit()
+            };
+
+            for (hash, count) in &precommit_set.votes_by_proposal {
+                if self.cal_above_threshold(*count) {
+                    if hash.is_empty() {
+                        self.proposal = None;
+                        self.lock_status = None;
+                        self.round += 1;
+                        // tv = Duration::new(0, 0);
+                        return false;
+                    } else {
+                        self.proposal = Some(hash.clone());
+                        self.lock_status = Some(LockStatus {
+                            proposal: hash.clone(),
+                            round: self.round,
+                            votes: precommit_set.abstract_polc(
+                                self.height,
+                                self.round,
+                                VoteType::PreCommit,
+                                hash.clone(),
+                            ),
+                        });
+                    }
+                    break;
+                }
+            }
+            if self.step == Step::Precommit {
+                self.set_timer(tv, Step::PrecommitWait);
+            }
             return true;
         }
         false
