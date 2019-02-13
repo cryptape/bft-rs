@@ -39,25 +39,19 @@ pub mod wal;
 pub type Address = Vec<u8>;
 pub type Target = Vec<u8>;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Copy, Hash)]
-pub enum MsgType {
-    Proposal,
-    Vote,
-    Feed,
-    RichStatus,
-    Commit,
+#[derive(Clone, Debug)]
+pub enum BftMsg {
+    Proposal(Proposal),
+    Vote(Vote),
+    Feed(Feed),
+    RichStatus(RichStatus),
+    Commit(Commit),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, PartialOrd, Eq, Copy, Hash)]
 pub enum VoteType {
     Prevote = 0,
-    PreCommit = 1,
-}
-
-#[derive(Clone, Debug)]
-pub struct BftMsg {
-    msg: Vec<u8>,
-    msg_type: MsgType,
+    Precommit = 1,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

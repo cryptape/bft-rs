@@ -148,34 +148,21 @@ impl Bft {
     }
 
     fn rebroadcast_vote(&self, round: usize) {
-        let prevote = Vote {
+        self.send_bft_msg(BftMsg::Vote(Vote {
             vote_type: VoteType::Prevote,
             height: self.height - 1,
             round: round,
             proposal: self.last_commit_proposal.clone().unwrap(),
             voter: self.params.clone().address,
-        };
+        }));
 
-        let precommit = Vote {
-            vote_type: VoteType::PreCommit,
+        self.send_bft_msg(BftMsg::Vote(Vote {
+            vote_type: VoteType::Precommit,
             height: self.height - 1,
-            round: self.last_commit_round.unwrap(),
+            round: round,
             proposal: self.last_commit_proposal.clone().unwrap(),
             voter: self.params.clone().address,
-        };
-
-        let prevote_msg = serialize(&prevote, Infinite).unwrap();
-        let precommit_msg = serialize(&precommit, Infinite).unwrap();
-
-        self.send_bft_msg(BftMsg {
-            msg: prevote_msg,
-            msg_type: MsgType::Vote,
-        });
-
-        self.send_bft_msg(BftMsg {
-            msg: precommit_msg,
-            msg_type: MsgType::Vote,
-        });
+        }));
     }
 
     fn determine_proposer(&self) -> bool {
@@ -201,48 +188,32 @@ impl Bft {
             warn!("The lock status and proposals are both none!");
             return false;
         }
-
         let msg = if self.lock_status.is_some() {
             // if is locked, boradcast the lock proposal
-            let proposal_msg = Proposal {
+            BftMsg::Proposal(Proposal {
                 height: self.height,
                 round: self.round,
                 content: self.lock_status.clone().unwrap().proposal,
                 lock_round: Some(self.lock_status.clone().unwrap().round),
                 lock_votes: Some(self.lock_status.clone().unwrap().votes),
                 proposer: self.params.address.clone(),
-            };
-            BftMsg {
-                msg: serialize(&proposal_msg, Infinite).unwrap(),
-                msg_type: MsgType::Proposal,
-            }
+            })
         } else {
             // if is not locked, broadcast the cached proposal
-            let proposal_msg = Proposal {
+            BftMsg::Proposal(Proposal {
                 height: self.height,
                 round: self.round,
                 content: self.proposals.clone().unwrap(),
                 lock_round: None,
                 lock_votes: None,
                 proposer: self.params.address.clone(),
-            };
-            BftMsg {
-                msg: serialize(&proposal_msg, Infinite).unwrap(),
-                msg_type: MsgType::Proposal,
-            }
+            })
         };
         self.send_bft_msg(msg);
         true
     }
 
-    fn handle_proposal(&self, proposal_msg: &[u8]) -> Option<Proposal> {
-        let proposal: Proposal = if let Ok(decode) = deserialize(proposal_msg) {
-            decode
-        } else {
-            warn!("The proposal message is invalided!");
-            return None;
-        };
-
+    fn handle_proposal(&self, proposal: Proposal) -> Option<Proposal> {
         if proposal.height == self.height - 1 && Some(proposal.round) >= self.last_commit_round {
             self.rebroadcast_vote(proposal.round);
             return None;
@@ -250,7 +221,7 @@ impl Bft {
             warn!("The proposal is unexpected");
             return None;
         } else {
-            Some(proposal)
+            return Some(proposal);
         }
     }
 
@@ -291,18 +262,13 @@ impl Bft {
             Vec::new()
         };
 
-        let prevote_msg = Vote {
+        let msg = BftMsg::Vote(Vote {
             vote_type: VoteType::Prevote,
             height: self.height,
             round: self.round,
             proposal: prevote,
             voter: self.params.address.clone(),
-        };
-
-        let msg = BftMsg {
-            msg: serialize(&prevote_msg, Infinite).unwrap(),
-            msg_type: MsgType::Vote,
-        };
+        });
 
         self.send_bft_msg(msg);
         self.set_timer(
@@ -311,26 +277,20 @@ impl Bft {
         );
     }
 
-    fn try_save_vote(&mut self, vote_msg: &[u8]) -> bool {
-        if let Ok(decode) = deserialize(vote_msg) {
-            let vote: Vote = decode;
-            if vote.height == self.height - 1 && Some(vote.round) >= self.last_commit_round {
-                self.rebroadcast_vote(vote.round);
-                return false;
-            } else if vote.height != self.height {
-                return false;
-            }
-
-            if vote.round >= self.round && self.vote.add(
-                vote.height,
-                vote.round,
-                vote.vote_type,
-                vote.voter,
-                vote.proposal,
-            ) {
-                return true;
-            }
+    fn try_save_vote(&mut self, vote: Vote) -> bool {
+        if vote.height == self.height - 1 && Some(vote.round) >= self.last_commit_round {
+            self.rebroadcast_vote(vote.round);
+            return false;
+        } else if vote.round >= self.round && self.vote.add(
+            vote.height,
+            vote.round,
+            vote.vote_type,
+            vote.voter,
+            vote.proposal,
+        ) {
+            return true;
         }
+
         false
     }
 
@@ -390,18 +350,13 @@ impl Bft {
             Vec::new()
         };
 
-        let precommit_msg = Vote {
-            vote_type: VoteType::PreCommit,
+        let msg = BftMsg::Vote(Vote {
+            vote_type: VoteType::Precommit,
             height: self.height,
             round: self.round,
             proposal: precommit,
             voter: self.params.address.clone(),
-        };
-
-        let msg = BftMsg {
-            msg: serialize(&precommit_msg, Infinite).unwrap(),
-            msg_type: MsgType::Vote,
-        };
+        });
 
         self.send_bft_msg(msg);
         self.set_timer(
@@ -413,7 +368,7 @@ impl Bft {
     fn check_precommit(&mut self) -> bool {
         if let Some(precommit_set) =
             self.vote
-                .get_voteset(self.height, self.round, VoteType::PreCommit)
+                .get_voteset(self.height, self.round, VoteType::Precommit)
         {
             let mut tv = if self.cal_all_vote(precommit_set.count) {
                 Duration::new(0, 0)
@@ -437,7 +392,7 @@ impl Bft {
                             votes: precommit_set.abstract_polc(
                                 self.height,
                                 self.round,
-                                VoteType::PreCommit,
+                                VoteType::Precommit,
                                 hash.clone(),
                             ),
                         });
@@ -455,41 +410,34 @@ impl Bft {
 
     fn proc_commit(&mut self) -> bool {
         if let Some(result) = self.lock_status.clone() {
-            let commit_msg = Commit {
+            let msg = BftMsg::Commit(Commit {
                 height: self.height,
-                proposal: self.lock_status.clone().unwrap().proposal,
+                proposal: result.clone().proposal,
                 lock_votes: self.lock_status.clone().unwrap().votes,
-            };
-            let msg = serialize(&commit_msg, Infinite).unwrap();
-            self.send_bft_msg(BftMsg {
-                msg: msg,
-                msg_type: MsgType::Commit,
             });
+
+            self.send_bft_msg(msg);
             self.last_commit_round = Some(self.round);
-            self.last_commit_proposal = Some(commit_msg.proposal);
+            self.last_commit_proposal = Some(result.proposal);
             self.set_timer(self.params.timer.get_commit(), Step::CommitWait);
             return true;
         }
         false
     }
 
-    fn try_handle_status(&mut self, status_msg: &[u8]) -> bool {
-        if let Ok(decode) = deserialize(status_msg) {
-            let rich_status: RichStatus = decode;
-            if rich_status.height >= self.height {
-                // goto new height directly and update authorty list
-                self.height = rich_status.height;
-                self.round = 0;
-                self.clean_save_info();
-                self.authority_list = rich_status.authority_list;
-                if let Some(interval) = rich_status.interval {
-                    // update the bft interval
-                    self.params.timer.set_total_duration(interval);
-                }
+    fn try_handle_status(&mut self, rich_status: RichStatus) -> bool {
+        if rich_status.height >= self.height {
+            // goto new height directly and update authorty list
+            self.height = rich_status.height;
+            self.round = 0;
+            self.clean_save_info();
+            self.authority_list = rich_status.authority_list;
+            if let Some(interval) = rich_status.interval {
+                // update the bft interval
+                self.params.timer.set_total_duration(interval);
             }
-            return true;
         }
-        false
+        true
     }
 
     #[inline]
