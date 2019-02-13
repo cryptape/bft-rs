@@ -16,9 +16,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use min_max_heap::MinMaxHeap;
+use crossbeam::crossbeam_channel::{Receiver, Sender};
 
 use std::collections::HashMap;
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use algorithm::Step;
