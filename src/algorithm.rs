@@ -480,6 +480,7 @@ impl Bft {
                 // goto new height directly and update authorty list
                 self.height = rich_status.height;
                 self.round = 0;
+                self.clean_save_info();
                 self.authority_list = rich_status.authority_list;
                 if let Some(interval) = rich_status.interval {
                     // update the bft interval
