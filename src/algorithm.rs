@@ -393,7 +393,7 @@ impl Bft {
                     if hash.is_empty() {
                         self.proposal = None;
                         self.lock_status = None;
-                        self.round += 1;
+                        self.goto_new_round();
                         // tv = Duration::new(0, 0);
                         return false;
                     } else {
@@ -418,5 +418,45 @@ impl Bft {
             return true;
         }
         false
+    }
+
+    fn proc_commit(&mut self) -> bool {
+        if let Some(result) = self.lock_status.clone() {
+            let commit_msg = Commit {
+                height: self.height,
+                proposal: self.lock_status.clone().unwrap().proposal,
+                lock_votes: self.lock_status.clone().unwrap().votes,
+            };
+            let msg = serialize(&commit_msg, Infinite).unwrap();
+            self.send_bft_msg(BftMsg {
+                msg: msg,
+                msg_type: MsgType::Commit,
+            });
+            self.last_commit_round = Some(self.round);
+            self.last_commit_proposal = Some(commit_msg.proposal);
+            self.set_timer(self.params.timer.get_commit(), Step::CommitWait);
+            return true;
+        }
+        false
+    }
+
+    fn change_to_step(&mut self, step: Step) {
+        self.step = step;
+    }
+
+    fn goto_new_round(&mut self) {
+        self.round += 1;
+    }
+
+    fn goto_new_height(&mut self) {
+        self.height += 1;
+        self.round = 0;
+        self.clean_save_info();
+    }
+
+    fn clean_save_info(&mut self) {
+        self.proposal = None;
+        self.proposals = None;
+        self.lock_status = None;
     }
 }
