@@ -29,19 +29,18 @@ pub struct VoteCollector {
 impl VoteCollector {
     pub fn new() -> Self {
         VoteCollector {
-            votes: LruCache::new(4),
+            votes: LruCache::new(16),
             prevote_count: HashMap::new(),
         }
     }
 
-    pub fn add(
-        &mut self,
-        height: usize,
-        round: usize,
-        vote_type: VoteType,
-        sender: Address,
-        vote: Target,
-    ) -> bool {
+    pub fn add(&mut self, vote: Vote) -> bool {
+        let height = vote.height;
+        let round = vote.round;
+        let vote_type = vote.vote_type;
+        let sender = vote.voter;
+        let vote = vote.proposal;
+
         if vote_type == VoteType::Prevote {
             if self.votes.contains_key(&height) {
                 if self
@@ -53,10 +52,10 @@ impl VoteCollector {
                     // update prevote count hashmap
                     let counter = self.prevote_count.entry(round).or_insert(0);
                     *counter += 1;
-                    return true;
+                    true
                 } else {
                     // if add prevote fail, do not update prevote hashmap
-                    return false;
+                    false
                 }
             } else {
                 let mut round_votes = RoundCollector::new();
@@ -67,18 +66,16 @@ impl VoteCollector {
                 *counter += 1;
                 true
             }
+        } else if self.votes.contains_key(&height) {
+            self.votes
+                .get_mut(&height)
+                .unwrap()
+                .add(round, vote_type, sender, vote)
         } else {
-            if self.votes.contains_key(&height) {
-                self.votes
-                    .get_mut(&height)
-                    .unwrap()
-                    .add(round, vote_type, sender, vote)
-            } else {
-                let mut round_votes = RoundCollector::new();
-                round_votes.add(round, vote_type, sender, vote);
-                self.votes.insert(height, round_votes);
-                true
-            }
+            let mut round_votes = RoundCollector::new();
+            round_votes.add(round, vote_type, sender, vote);
+            self.votes.insert(height, round_votes);
+            true
         }
     }
 
@@ -134,16 +131,16 @@ impl VoteSet {
         height: usize,
         round: usize,
         vote_type: VoteType,
-        proposal: Target,
+        proposal: &Target,
     ) -> Vec<Vote> {
         // abstract the votes for the polc proposal into a vec
         let mut polc = Vec::new();
         for (address, vote_proposal) in &self.votes_by_sender {
-            if *vote_proposal == proposal.clone() {
+            if vote_proposal == proposal {
                 polc.push(Vote {
-                    vote_type: vote_type,
-                    height: height,
-                    round: round,
+                    vote_type,
+                    height,
+                    round,
                     proposal: proposal.clone(),
                     voter: address.clone(),
                 });
@@ -194,7 +191,7 @@ impl RoundCollector {
 }
 
 // step -> voteset
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StepCollector {
     pub step_votes: HashMap<VoteType, VoteSet>,
 }
