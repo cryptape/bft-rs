@@ -14,13 +14,13 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use super::Target;
+use super::{Address, Target};
 use std::cell::Cell;
 use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub struct BftParams {
-    pub address: Target,
+    pub address: Address,
     pub timer: BftTimer,
 }
 
