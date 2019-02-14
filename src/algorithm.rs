@@ -18,21 +18,19 @@ use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 use log;
 use params::BftParams;
 use timer::{TimeoutInfo, WaitTimer};
-use voteset::VoteCollector;
-use voteset::*;
+use voteset::{VoteCollector, VoteSet};
 use wal::Wal;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::convert::{Into, TryFrom, TryInto};
-use std::time::{Duration, Instant};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use super::*;
 
 const INIT_HEIGHT: usize = 1;
 const INIT_ROUND: usize = 0;
-const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
 const MAX_PROPOSAL_TIME_COEF: usize = 10;
+const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
 pub enum Step {
@@ -234,17 +232,37 @@ impl Bft {
             return true;
         }
 
-        let timer_duration = self.params.timer.get_propose();
-        let _ = self.set_timer(timer_duration, Step::ProposeWait);
+        // if is not proposer, goto step proposewait
+        let coef = if self.round > MAX_PROPOSAL_TIME_COEF {
+            MAX_PROPOSAL_TIME_COEF
+        } else {
+            self.round
+        };
+
+        self.set_timer(
+            self.params.timer.get_propose() * 2u32.pow(coef as u32),
+            Step::ProposeWait,
+        );
         false
     }
 
     fn try_broadcast_proposal(&self) -> bool {
         if self.lock_status.is_none() && self.proposals.is_none() {
+            // if a proposer find there is no proposal nor lock, goto step proposewait
             warn!("The lock status and proposals are both none!");
-            self.set_timer(self.params.timer.get_propose(), Step::ProposeWait);
+            let coef = if self.round > MAX_PROPOSAL_TIME_COEF {
+                MAX_PROPOSAL_TIME_COEF
+            } else {
+                self.round
+            };
+
+            self.set_timer(
+                self.params.timer.get_propose() * 2u32.pow(coef as u32),
+                Step::ProposeWait,
+            );
             return false;
         }
+
         let msg = if self.lock_status.is_some() {
             // if is locked, boradcast the lock proposal
             BftMsg::Proposal(Proposal {
@@ -328,17 +346,33 @@ impl Bft {
         });
 
         self.send_bft_msg(msg);
-        // self.set_timer(
-        //     self.params.timer.get_prevote() * TIMEOUT_RETRANSE_MULTIPLE,
-        //     Step::Prevote,
-        // );
+        self.set_timer(
+            self.params.timer.get_prevote() * TIMEOUT_RETRANSE_MULTIPLE,
+            Step::Prevote,
+        );
     }
 
     fn try_save_vote(&mut self, vote: Vote) -> bool {
         if vote.height == self.height - 1 && Some(vote.round) >= self.last_commit_round {
+            // deal with height fall behind one, round ge last commit round
             self.rebroadcast_vote(vote.round);
             return false;
-        } else if vote.round >= self.round && self.vote.add(
+        } else if vote.height == self.height && vote.round < self.round {
+            // deal with equal height, round fall behind
+            let prop = if self.proposal.is_some() {
+                self.proposal.clone().unwrap()
+            } else {
+                Vec::new()
+            };
+            self.send_bft_msg(BftMsg::Vote(Vote {
+                vote_type: VoteType::Precommit,
+                height: vote.height,
+                round: vote.round,
+                proposal: prop,
+                voter: self.params.clone().address,
+            }));
+            return false;
+        } else if vote.height == self.height && vote.round >= self.round && self.vote.add(
             vote.height,
             vote.round,
             vote.vote_type,
@@ -381,22 +415,11 @@ impl Bft {
                     {
                         if hash.is_empty() {
                             // receive +2/3 prevote for nil, clean lock info
-                            self.proposal = None;
-                            self.lock_status = None;
+                            self.clean_polc();
                             tv = Duration::new(0, 0);
                         } else {
                             // receive a new PoLC, update lock info
-                            self.proposal = Some(hash.clone());
-                            self.lock_status = Some(LockStatus {
-                                proposal: hash.clone(),
-                                round: self.round,
-                                votes: prevote_set.abstract_polc(
-                                    self.height,
-                                    self.round,
-                                    VoteType::Prevote,
-                                    hash.clone(),
-                                ),
-                            });
+                            self.set_polc(hash.clone(), prevote_set.clone(), VoteType::Prevote);                            
                             tv = Duration::new(0, 0);
                         }
                     }
@@ -429,10 +452,10 @@ impl Bft {
         });
 
         self.send_bft_msg(msg);
-        // self.set_timer(
-        //     self.params.timer.get_precommit() * TIMEOUT_RETRANSE_MULTIPLE,
-        //     Step::Precommit,
-        // );
+        self.set_timer(
+            self.params.timer.get_precommit() * TIMEOUT_RETRANSE_MULTIPLE,
+            Step::Precommit,
+        );
     }
 
     fn check_precommit(&mut self) -> bool {
@@ -454,23 +477,15 @@ impl Bft {
                 if self.cal_above_threshold(*count) {
                     if hash.is_empty() {
                         // if get +2/3 precommits to nil, goto new round directly
-                        self.proposal = None;
-                        self.lock_status = None;
+                        if self.lock_status.is_none() {
+                            self.proposal = None;
+                        }
                         self.goto_next_round();
                         self.new_round_start();
                         return false;
                     } else {
-                        self.proposal = Some(hash.clone());
-                        self.lock_status = Some(LockStatus {
-                            proposal: hash.clone(),
-                            round: self.round,
-                            votes: precommit_set.abstract_polc(
-                                self.height,
-                                self.round,
-                                VoteType::Precommit,
-                                hash.clone(),
-                            ),
-                        });
+                        self.set_polc(hash.clone(), precommit_set.clone(), VoteType::Precommit);
+                        tv = Duration::new(0, 0);                       
                     }
                     break;
                 }
@@ -499,11 +514,32 @@ impl Bft {
         false
     }
 
+    fn set_polc(&mut self, hash: Target, voteset: VoteSet, vote_type: VoteType) {
+        self.proposal = Some(hash.clone());
+        self.lock_status = Some(LockStatus {
+            proposal: hash.clone(),
+            round: self.round,
+            votes: voteset.abstract_polc(
+                self.height,
+                self.round,
+                vote_type,
+                hash,
+            ),
+        });
+    }
+
+    fn clean_polc(&mut self) {
+        self.proposal = None;
+        self.lock_status = None;
+    }
+
     fn try_handle_status(&mut self, rich_status: RichStatus) -> bool {
+        // receive a rich status that height ge self.height is the only way to go to new height
         if rich_status.height >= self.height {
             // goto new height directly and update authorty list
             self.goto_new_height(rich_status.height + 1);
             self.authority_list = rich_status.authority_list;
+
             if let Some(interval) = rich_status.interval {
                 // update the bft interval
                 self.params.timer.set_total_duration(interval);
@@ -514,13 +550,9 @@ impl Bft {
     }
 
     fn try_handle_feed(&mut self, feed: Feed) -> bool {
-        if feed.height > self.height {
-            self.goto_new_height(feed.height);
+        if feed.height >= self.height {
             self.proposals = Some(feed.proposal);
             return true;
-        } else if feed.height == self.height {
-            self.proposals = Some(feed.proposal);
-            return false;
         } else {
             false
         }
@@ -582,7 +614,9 @@ impl Bft {
             }
             BftMsg::Feed(feed) => {
                 if self.try_handle_feed(feed) {
-                    self.new_round_start();
+                    if self.step == Step::ProposeWait {
+                        self.new_round_start();
+                    }
                 }
             }
             BftMsg::RichStatus(rich_status) => {
@@ -603,6 +637,28 @@ impl Bft {
         }
         if tminfo.height == self.height && tminfo.round == self.round && tminfo.step != self.step {
             return;
+        }
+
+        match tminfo.step {
+            Step::ProposeWait => {
+
+            }
+            Step::Prevote => {
+
+            }
+            Step::PrevoteWait => {
+
+            }
+            Step::Precommit => {
+
+            }
+            Step::PrecommitWait => {
+
+            }
+            Step::CommitWait => {
+
+            }
+            _ => error!("Invalid timeout info!"),
         }
     }
 }
