@@ -14,8 +14,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use bincode::{deserialize, serialize, Infinite};
-use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 use log;
 use params::BftParams;
 use timer::{TimeoutInfo, WaitTimer};
@@ -91,15 +90,38 @@ pub struct Bft {
 
 impl Bft {
     pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
+        // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
-        let engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
-        let timer_thread = {
-            thread::spawn(move || {
-                let timer = WaitTimer::new(timer2bft, timer4bft);
-                timer.start();
-            });
-        };
+
+        // start timer module
+        let timer_thread = thread::spawn(move || {
+            let timer = WaitTimer::new(timer2bft, timer4bft);
+            timer.start();
+        });
+
+        // start main
+        let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
+        let main_thread = thread::spawn(move || loop {
+            let mut get_timer_msg = Err(RecvError);
+            let mut get_msg = Err(RecvError);
+
+            select! {
+                recv(engine.timer_notity) -> msg => get_timer_msg = msg,
+                recv(engine.msg_receiver) -> msg => get_msg = msg,
+            }
+
+            if let Ok(ok_timer) = get_timer_msg {
+                engine.timeout_process(&ok_timer);
+            }
+
+            if let Ok(ok_msg) = get_msg {
+                engine.process(ok_msg);
+            }
+        });
+
+        main_thread.join().unwrap();
+        timer_thread.join().unwrap();
     }
 
     fn initialize(
@@ -173,9 +195,11 @@ impl Bft {
 
     #[inline]
     fn clean_save_info(&mut self) {
+        // clear prevote count needed when goto new height
         self.proposal = None;
         self.proposals = None;
         self.lock_status = None;
+        self.vote.clear_prevote_count();
         self.authority_list = Vec::new();
     }
 
@@ -530,7 +554,7 @@ impl Bft {
                         }
                     }
                 }
-            },
+            }
             BftMsg::Vote(vote) => {
                 if vote.vote_type == VoteType::Prevote {
                     if self.step < Step::Prevote {
@@ -551,21 +575,21 @@ impl Bft {
                         if self.check_precommit() {
                             self.change_to_step(Step::PrevoteWait);
                         }
-                    } 
+                    }
                 } else {
                     error!("Invalid vote type!");
                 }
-            },
+            }
             BftMsg::Feed(feed) => {
                 if self.try_handle_feed(feed) {
                     self.new_round_start();
                 }
-            },
+            }
             BftMsg::RichStatus(rich_status) => {
                 if self.try_handle_status(rich_status) {
                     self.new_round_start();
                 }
-            },
+            }
             _ => error!("Invalid Message!"),
         }
     }

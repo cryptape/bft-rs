@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use min_max_heap::MinMaxHeap;
 use crossbeam::crossbeam_channel::{Receiver, Sender};
+use min_max_heap::MinMaxHeap;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

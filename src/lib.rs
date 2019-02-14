@@ -48,13 +48,13 @@ pub enum BftMsg {
     Commit(Commit),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, PartialOrd, Eq, Copy, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Copy, Hash)]
 pub enum VoteType {
     Prevote = 0,
     Precommit = 1,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Proposal {
     height: usize,
     round: usize,
@@ -64,14 +64,14 @@ pub struct Proposal {
     proposer: Address,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct LockStatus {
     proposal: Target, // block hash
     round: usize,
     votes: Vec<Vote>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Vote {
     vote_type: VoteType,
     height: usize,
@@ -80,20 +80,20 @@ pub struct Vote {
     voter: Address,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Feed {
     height: usize,
     proposal: Target, // block hash
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Commit {
     height: usize,
     proposal: Target, // block hash
     lock_votes: Vec<Vote>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct RichStatus {
     height: usize,
     interval: Option<u64>,

@@ -15,9 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use super::{Address, Target, Vote, VoteType};
-use bincode::{deserialize, serialize, Infinite};
 use lru_cache::LruCache;
-use serde_derive::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 use std::io::prelude::*;
@@ -25,12 +23,14 @@ use std::io::prelude::*;
 #[derive(Debug)]
 pub struct VoteCollector {
     pub votes: LruCache<usize, RoundCollector>,
+    pub prevote_count: HashMap<usize, usize>,
 }
 
 impl VoteCollector {
     pub fn new() -> Self {
         VoteCollector {
             votes: LruCache::new(4),
+            prevote_count: HashMap::new(),
         }
     }
 
@@ -42,16 +42,43 @@ impl VoteCollector {
         sender: Address,
         vote: Target,
     ) -> bool {
-        if self.votes.contains_key(&height) {
-            self.votes
-                .get_mut(&height)
-                .unwrap()
-                .add(round, vote_type, sender, vote)
+        if vote_type == VoteType::Prevote {
+            if self.votes.contains_key(&height) {
+                if self
+                    .votes
+                    .get_mut(&height)
+                    .unwrap()
+                    .add(round, vote_type, sender, vote)
+                {
+                    // update prevote count hashmap
+                    let counter = self.prevote_count.entry(round).or_insert(0);
+                    *counter += 1;
+                    return true;
+                } else {
+                    // if add prevote fail, do not update prevote hashmap
+                    return false;
+                }
+            } else {
+                let mut round_votes = RoundCollector::new();
+                round_votes.add(round, vote_type, sender, vote);
+                self.votes.insert(height, round_votes);
+                // update prevote count hashmap
+                let counter = self.prevote_count.entry(round).or_insert(0);
+                *counter += 1;
+                true
+            }
         } else {
-            let mut round_votes = RoundCollector::new();
-            round_votes.add(round, vote_type, sender, vote);
-            self.votes.insert(height, round_votes);
-            true
+            if self.votes.contains_key(&height) {
+                self.votes
+                    .get_mut(&height)
+                    .unwrap()
+                    .add(round, vote_type, sender, vote)
+            } else {
+                let mut round_votes = RoundCollector::new();
+                round_votes.add(round, vote_type, sender, vote);
+                self.votes.insert(height, round_votes);
+                true
+            }
         }
     }
 
@@ -64,6 +91,10 @@ impl VoteCollector {
         self.votes
             .get_mut(&height)
             .and_then(|rc| rc.get_voteset(round, vote_type))
+    }
+
+    pub fn clear_prevote_count(&mut self) {
+        self.prevote_count.clear();
     }
 }
 
