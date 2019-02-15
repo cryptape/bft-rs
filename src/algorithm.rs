@@ -29,7 +29,7 @@ use super::*;
 
 const INIT_HEIGHT: usize = 1;
 const INIT_ROUND: usize = 0;
-const PROPOSAL_TIMES_CEIL: usize = 10;
+const PROPOSAL_TIMES_COEF: usize = 10;
 const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
@@ -83,6 +83,7 @@ pub struct Bft {
     last_commit_round: Option<usize>,
     last_commit_proposal: Option<Target>,
     authority_list: Vec<Address>,
+    htime: Instant,
     params: BftParams,
 }
 
@@ -145,17 +146,18 @@ impl Bft {
             last_commit_round: None,
             last_commit_proposal: None,
             authority_list: Vec::new(),
+            htime: Instant::now(),
             params: BftParams::new(local_address),
         }
     }
 
     #[inline]
-    fn set_timer(&self, duration: Duration, s: Step) {
+    fn set_timer(&self, duration: Duration, step: Step) {
         let _ = self.timer_seter.send(TimeoutInfo {
             timeval: Instant::now() + duration,
             height: self.height,
             round: self.round,
-            step: s,
+            step,
         });
     }
 
@@ -181,14 +183,16 @@ impl Bft {
 
     #[inline]
     fn goto_next_round(&mut self) {
+        trace!("Goto next round {:?}", self.round + 1);
         self.round += 1;
     }
 
     #[inline]
     fn goto_new_height(&mut self, new_height: usize) {
+        self.clean_save_info();
         self.height = new_height;
         self.round = 0;
-        self.clean_save_info();
+        self.htime = Instant::now();
     }
 
     #[inline]
@@ -200,7 +204,18 @@ impl Bft {
         self.authority_list = Vec::new();
     }
 
-    fn rebroadcast_vote(&self, round: usize) {
+    fn retransmit_vote(&self, round: usize) {
+        info!(
+            "Some nodes are at low height, retransmit votes of height {:?}, round {:?}",
+            self.height - 1,
+            round
+        );
+
+        debug!(
+            "Retransmit votes to proposal {:?}",
+            self.last_commit_proposal.clone().unwrap()
+        );
+
         self.send_bft_msg(BftMsg::Vote(Vote {
             vote_type: VoteType::Prevote,
             height: self.height - 1,
@@ -228,37 +243,41 @@ impl Bft {
 
         let nonce = self.height + self.round;
         if self.params.address == self.authority_list[nonce % count] {
+            info!(
+                "Become proposer at height {:?}, round {:?}",
+                self.height, self.round
+            );
             return true;
         }
 
         // if is not proposer, goto step proposewait
-        let ceil = if self.round > PROPOSAL_TIMES_CEIL {
-            PROPOSAL_TIMES_CEIL
+        let coef = if self.round > PROPOSAL_TIMES_COEF {
+            PROPOSAL_TIMES_COEF
         } else {
             self.round
         };
 
         self.set_timer(
-            self.params.timer.get_propose() * 2u32.pow(ceil as u32),
+            self.params.timer.get_propose() * 2u32.pow(coef as u32),
             Step::ProposeWait,
         );
         false
     }
 
-    fn try_broadcast_proposal(&self) -> bool {
+    fn try_transmit_proposal(&self) -> bool {
         if self.lock_status.is_none()
             && (self.feed.is_none() || self.feed.clone().unwrap().height != self.height)
         {
             // if a proposer find there is no proposal nor lock, goto step proposewait
             warn!("The lock status is none and feed is mismatched!");
-            let ceil = if self.round > PROPOSAL_TIMES_CEIL {
-                PROPOSAL_TIMES_CEIL
+            let coef = if self.round > PROPOSAL_TIMES_COEF {
+                PROPOSAL_TIMES_COEF
             } else {
                 self.round
             };
 
             self.set_timer(
-                self.params.timer.get_propose() * 2u32.pow(ceil as u32),
+                self.params.timer.get_propose() * 2u32.pow(coef as u32),
                 Step::ProposeWait,
             );
             return false;
@@ -266,6 +285,13 @@ impl Bft {
 
         let msg = if self.lock_status.is_some() {
             // if is locked, boradcast the lock proposal
+            trace!(
+                "Proposal at height {:?}, round {:?}, is {:?}",
+                self.height,
+                self.round,
+                self.lock_status.clone().unwrap().proposal
+            );
+
             BftMsg::Proposal(Proposal {
                 height: self.height,
                 round: self.round,
@@ -275,7 +301,14 @@ impl Bft {
                 proposer: self.params.address.clone(),
             })
         } else {
-            // if is not locked, broadcast the cached proposal
+            // if is not locked, transmit the cached proposal
+            trace!(
+                "Proposal at height {:?}, round {:?}, is {:?}",
+                self.height,
+                self.round,
+                self.feed.clone().unwrap().proposal
+            );
+
             BftMsg::Proposal(Proposal {
                 height: self.height,
                 round: self.round,
@@ -285,16 +318,23 @@ impl Bft {
                 proposer: self.params.address.clone(),
             })
         };
+        info!(
+            "Transmit proposal at height {:?}, round {:?}",
+            self.height, self.round
+        );
         self.send_bft_msg(msg);
         true
     }
 
     fn handle_proposal(&self, proposal: Proposal) -> Option<Proposal> {
         if proposal.height == self.height - 1 && Some(proposal.round) >= self.last_commit_round {
-            self.rebroadcast_vote(proposal.round);
+            // deal with height fall behind one, round ge last commit round
+            self.retransmit_vote(proposal.round);
             None
-        } else if proposal.height != self.height || proposal.round < self.round {
-            warn!("Received mismatched proposal!");
+        } else if proposal.height != self.height || proposal.round != self.round {
+            // bft-rs lib only handle the proposals with same round, the proposals of
+            // higher round should be saved outside
+            warn!("Receive mismatched proposal!");
             warn!("The proposal height is {:?}, round is {:?}, self height is {:?}, round is {:?}, the proposal is {:?} !", 
                 proposal.height, proposal.round, self.height, self.round, proposal.content);
             None
@@ -304,11 +344,24 @@ impl Bft {
     }
 
     fn save_proposal(&mut self, proposal: Proposal) {
+        trace!(
+            "Receive a proposal at height {:?}, round {:?}",
+            self.height,
+            self.round
+        );
+
         if proposal.lock_round.is_some()
             && (self.lock_status.is_none()
                 || self.lock_status.clone().unwrap().round <= proposal.lock_round.unwrap())
         {
             // receive a proposal with a later PoLC
+            debug!(
+                "Receive a proposal with the PoLC that proposal is {:?}, lock round is {:?}, lock votes are {:?}",
+                proposal.content,
+                proposal.lock_round,
+                proposal.lock_votes
+            );
+
             self.round = proposal.round;
             self.proposal = Some(proposal.content.clone());
             self.lock_status = Some(LockStatus {
@@ -321,13 +374,18 @@ impl Bft {
             && proposal.round == self.round
         {
             // receive a proposal without PoLC
+            debug!(
+                "Receive a proposal without PoLC, the proposal is {:?}",
+                proposal.content
+            );
             self.proposal = Some(proposal.content);
         } else {
+            debug!("Receive a proposal that the PoLC is earlier than mine");
             return;
         }
     }
 
-    fn broadcast_prevote(&self) {
+    fn transmit_prevote(&self) {
         let prevote = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
         } else if let Some(proposal) = self.proposal.clone() {
@@ -336,14 +394,21 @@ impl Bft {
             Vec::new()
         };
 
+        trace!(
+            "Transmit prevote at height {:?}, round {:?}",
+            self.height,
+            self.round
+        );
+
         let msg = BftMsg::Vote(Vote {
             vote_type: VoteType::Prevote,
             height: self.height,
             round: self.round,
-            proposal: prevote,
+            proposal: prevote.clone(),
             voter: self.params.address.clone(),
         });
 
+        debug!("Prevote to {:?}", prevote);
         self.send_bft_msg(msg);
         self.set_timer(
             self.params.timer.get_prevote() * TIMEOUT_RETRANSE_MULTIPLE,
@@ -354,10 +419,11 @@ impl Bft {
     fn try_save_vote(&mut self, vote: Vote) -> bool {
         if vote.height == self.height - 1 && Some(vote.round) >= self.last_commit_round {
             // deal with height fall behind one, round ge last commit round
-            self.rebroadcast_vote(vote.round);
+            self.retransmit_vote(vote.round);
             return false;
         } else if vote.height == self.height && vote.round == self.round - 1 {
             // deal with equal height, round fall behind
+            info!("Some nodes fall behind, send nil vote to help them pursue");
             self.send_bft_msg(BftMsg::Vote(Vote {
                 vote_type: VoteType::Precommit,
                 height: vote.height,
@@ -367,6 +433,11 @@ impl Bft {
             }));
             return false;
         } else if vote.height == self.height && vote.round >= self.round && self.votes.add(vote) {
+            trace!(
+                "Receive a vote at height {:?}, round {:?}",
+                self.height,
+                self.round
+            );
             return true;
         }
         false
@@ -384,6 +455,11 @@ impl Bft {
             return false;
         }
 
+        info!(
+            "Receive over 2/3 prevote at height {:?}, round {:?}",
+            self.height, self.round
+        );
+
         if let Some(prevote_set) =
             self.votes
                 .get_voteset(self.height, self.round, VoteType::Prevote)
@@ -400,7 +476,8 @@ impl Bft {
                         && self.lock_status.clone().unwrap().round < self.round
                     {
                         if hash.is_empty() {
-                            // receive +2/3 prevote for nil, clean lock info
+                            // receive +2/3 prevote to nil, clean lock info
+                            trace!("Receive over 2/3 prevote to nil");
                             self.clean_polc();
                             tv = Duration::new(0, 0);
                         } else {
@@ -429,14 +506,21 @@ impl Bft {
             Vec::new()
         };
 
+        trace!(
+            "Transmit precommit at height {:?}, round{:?}",
+            self.height,
+            self.round
+        );
+
         let msg = BftMsg::Vote(Vote {
             vote_type: VoteType::Precommit,
             height: self.height,
             round: self.round,
-            proposal: precommit,
+            proposal: precommit.clone(),
             voter: self.params.address.clone(),
         });
 
+        debug!("Precommit proposal is {:?}", precommit);
         self.send_bft_msg(msg);
         self.set_timer(
             self.params.timer.get_precommit() * TIMEOUT_RETRANSE_MULTIPLE,
@@ -454,15 +538,20 @@ impl Bft {
             } else {
                 self.params.timer.get_precommit()
             };
-
             if !self.cal_above_threshold(precommit_set.count) {
                 return false;
             }
+
+            info!(
+                "Receive over 2/3 precommit at height {:?}, round {:?}",
+                self.height, self.round
+            );
 
             for (hash, count) in &precommit_set.votes_by_proposal {
                 if self.cal_above_threshold(*count) {
                     if hash.is_empty() {
                         // if get +2/3 precommits to nil, goto new round directly
+                        info!("Reach nil consensus, goto next round {:?}", self.round + 1);
                         if self.lock_status.is_none() {
                             self.proposal = None;
                         }
@@ -492,9 +581,15 @@ impl Bft {
                 lock_votes: self.lock_status.clone().unwrap().votes,
             }));
 
+            info!(
+                "Commit {:?} at height {:?}, consensus time {:?}.",
+                result.clone().proposal,
+                self.height,
+                Instant::now() - self.htime
+            );
+
             self.last_commit_round = Some(self.round);
             self.last_commit_proposal = Some(result.proposal);
-            self.set_timer(self.params.timer.get_commit(), Step::CommitWait);
             return true;
         }
         false
@@ -507,11 +602,23 @@ impl Bft {
             round: self.round,
             votes: voteset.abstract_polc(self.height, self.round, vote_type, &hash),
         });
+
+        info!(
+            "Get PoLC at height {:?}, round {:?}, on proposal {:?}",
+            self.height,
+            self.round,
+            hash.to_owned()
+        );
     }
 
     fn clean_polc(&mut self) {
         self.proposal = None;
         self.lock_status = None;
+        trace!(
+            "Clean PoLC at height {:?}, round {:?}",
+            self.height,
+            self.round
+        );
     }
 
     fn try_handle_status(&mut self, rich_status: RichStatus) -> bool {
@@ -520,11 +627,15 @@ impl Bft {
             // goto new height directly and update authorty list
             self.goto_new_height(rich_status.height + 1);
             self.authority_list = rich_status.authority_list;
-
             if let Some(interval) = rich_status.interval {
                 // update the bft interval
                 self.params.timer.set_total_duration(interval);
             }
+
+            info!(
+                "Receive rich status, goto new height {:?}",
+                rich_status.height + 1
+            );
             return true;
         }
         false
@@ -533,6 +644,10 @@ impl Bft {
     fn try_handle_feed(&mut self, feed: Feed) -> bool {
         if feed.height >= self.height {
             self.feed = Some(feed);
+            info!(
+                "Receive feed of height {:?}",
+                self.feed.clone().unwrap().height
+            );
             true
         } else {
             false
@@ -540,9 +655,10 @@ impl Bft {
     }
 
     fn new_round_start(&mut self) {
+        info!("Start height {:?}, round{:?}", self.height, self.round);
         if self.determine_proposer() {
-            if self.try_broadcast_proposal() {
-                self.broadcast_prevote();
+            if self.try_transmit_proposal() {
+                self.transmit_prevote();
                 self.change_to_step(Step::Prevote);
             } else {
                 self.change_to_step(Step::ProposeWait);
@@ -560,7 +676,7 @@ impl Bft {
                         self.save_proposal(prop);
                         if self.step == Step::ProposeWait {
                             self.change_to_step(Step::Prevote);
-                            self.broadcast_prevote();
+                            self.transmit_prevote();
                             if self.check_prevote() {
                                 self.change_to_step(Step::PrevoteWait);
                             }
@@ -583,11 +699,11 @@ impl Bft {
                     if self.step == Step::Precommit || self.step == Step::PrecommitWait {
                         let _ = self.try_save_vote(vote);
                         if self.check_precommit() {
-                            self.change_to_step(Step::PrevoteWait);
+                            self.change_to_step(Step::PrecommitWait);
                         }
                     }
                 } else {
-                    error!("Invalid vote type!");
+                    error!("Invalid Vote Type!");
                 }
             }
             BftMsg::Feed(feed) => {
@@ -616,12 +732,32 @@ impl Bft {
         }
 
         match tminfo.step {
-            Step::ProposeWait => {}
-            Step::Prevote => {}
-            Step::PrevoteWait => {}
-            Step::Precommit => {}
-            Step::PrecommitWait => {}
-            Step::CommitWait => {}
+            Step::ProposeWait => {
+                self.change_to_step(Step::Prevote);
+                self.broadcast_precommit();
+                if self.check_prevote() {
+                    self.change_to_step(Step::PrevoteWait);
+                }
+            }
+            Step::Prevote => {
+                self.transmit_prevote();
+            }
+            Step::PrevoteWait => {
+                self.change_to_step(Step::Precommit);
+                self.broadcast_precommit();
+                if self.check_precommit() {
+                    self.change_to_step(Step::PrecommitWait);
+                }
+            }
+            Step::Precommit => {
+                self.transmit_prevote();
+                self.broadcast_precommit();
+            }
+            Step::PrecommitWait => {
+                self.change_to_step(Step::Commit);
+                self.proc_commit();
+                self.change_to_step(Step::CommitWait);
+            }
             _ => error!("Invalid timeout info!"),
         }
     }
