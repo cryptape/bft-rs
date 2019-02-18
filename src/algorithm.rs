@@ -460,9 +460,9 @@ impl Bft {
             self.height, self.round
         );
 
-        if let Some(prevote_set) =
-            self.votes
-                .get_voteset(self.height, self.round, Step::Prevote)
+        if let Some(prevote_set) = self
+            .votes
+            .get_voteset(self.height, self.round, Step::Prevote)
         {
             let mut tv = if self.cal_all_vote(prevote_set.count) {
                 Duration::new(0, 0)
