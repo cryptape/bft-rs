@@ -99,7 +99,7 @@ impl Bft {
             timer.start();
         });
 
-        // start main
+        // start main loop module
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
         let main_thread = thread::spawn(move || loop {
             let mut get_timer_msg = Err(RecvError);
@@ -237,7 +237,7 @@ impl Bft {
         let count = if self.authority_list.is_empty() {
             self.authority_list.len()
         } else {
-            error!("The authority list is empty!");
+            error!("The Authority List is Empty!");
             return false;
         };
 
@@ -497,7 +497,7 @@ impl Bft {
         false
     }
 
-    fn broadcast_precommit(&self) {
+    fn transmit_precommit(&self) {
         let precommit = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
         } else if let Some(proposal) = self.proposal.clone() {
@@ -734,7 +734,7 @@ impl Bft {
         match tminfo.step {
             Step::ProposeWait => {
                 self.change_to_step(Step::Prevote);
-                self.broadcast_precommit();
+                self.transmit_precommit();
                 if self.check_prevote() {
                     self.change_to_step(Step::PrevoteWait);
                 }
@@ -744,21 +744,21 @@ impl Bft {
             }
             Step::PrevoteWait => {
                 self.change_to_step(Step::Precommit);
-                self.broadcast_precommit();
+                self.transmit_precommit();
                 if self.check_precommit() {
                     self.change_to_step(Step::PrecommitWait);
                 }
             }
             Step::Precommit => {
                 self.transmit_prevote();
-                self.broadcast_precommit();
+                self.transmit_precommit();
             }
             Step::PrecommitWait => {
                 self.change_to_step(Step::Commit);
                 self.proc_commit();
                 self.change_to_step(Step::CommitWait);
             }
-            _ => error!("Invalid timeout info!"),
+            _ => error!("Invalid Timeout Info!"),
         }
     }
 }
