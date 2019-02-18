@@ -14,7 +14,8 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use super::{Address, Target, Vote, VoteType};
+use algorithm::Step;
+use super::{Address, Target, Vote};
 use lru_cache::LruCache;
 
 use std::collections::HashMap;
@@ -41,7 +42,7 @@ impl VoteCollector {
         let sender = vote.voter;
         let vote = vote.proposal;
 
-        if vote_type == VoteType::Prevote {
+        if vote_type == Step::Prevote {
             if self.votes.contains_key(&height) {
                 if self
                     .votes
@@ -83,7 +84,7 @@ impl VoteCollector {
         &mut self,
         height: usize,
         round: usize,
-        vote_type: VoteType,
+        vote_type: Step,
     ) -> Option<VoteSet> {
         self.votes
             .get_mut(&height)
@@ -130,7 +131,7 @@ impl VoteSet {
         &self,
         height: usize,
         round: usize,
-        vote_type: VoteType,
+        vote_type: Step,
         proposal: &Target,
     ) -> Vec<Vote> {
         // abstract the votes for the polc proposal into a vec
@@ -166,7 +167,7 @@ impl RoundCollector {
     pub fn add(
         &mut self,
         round: usize,
-        vote_type: VoteType,
+        vote_type: Step,
         sender: Address,
         vote: Target,
     ) -> bool {
@@ -183,7 +184,7 @@ impl RoundCollector {
         }
     }
 
-    pub fn get_voteset(&mut self, round: usize, vote_type: VoteType) -> Option<VoteSet> {
+    pub fn get_voteset(&mut self, round: usize, vote_type: Step) -> Option<VoteSet> {
         self.round_votes
             .get_mut(&round)
             .and_then(|sc| sc.get_voteset(vote_type))
@@ -193,7 +194,7 @@ impl RoundCollector {
 // step -> voteset
 #[derive(Debug, Default)]
 pub struct StepCollector {
-    pub step_votes: HashMap<VoteType, VoteSet>,
+    pub step_votes: HashMap<Step, VoteSet>,
 }
 
 impl StepCollector {
@@ -203,14 +204,14 @@ impl StepCollector {
         }
     }
 
-    pub fn add(&mut self, vote_type: VoteType, sender: Address, vote: Target) -> bool {
+    pub fn add(&mut self, vote_type: Step, sender: Address, vote: Target) -> bool {
         self.step_votes
             .entry(vote_type)
             .or_insert_with(VoteSet::new)
             .add(sender, vote)
     }
 
-    pub fn get_voteset(&self, vote_type: VoteType) -> Option<VoteSet> {
+    pub fn get_voteset(&self, vote_type: Step) -> Option<VoteSet> {
         self.step_votes.get(&vote_type).cloned()
     }
 }

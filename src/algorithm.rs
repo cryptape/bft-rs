@@ -99,7 +99,7 @@ impl Bft {
             timer.start();
         });
 
-        // start main
+        // start main loop module
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
         let main_thread = thread::spawn(move || loop {
             let mut get_timer_msg = Err(RecvError);
@@ -217,7 +217,7 @@ impl Bft {
         );
 
         self.send_bft_msg(BftMsg::Vote(Vote {
-            vote_type: VoteType::Prevote,
+            vote_type: Step::Prevote,
             height: self.height - 1,
             round,
             proposal: self.last_commit_proposal.clone().unwrap(),
@@ -225,7 +225,7 @@ impl Bft {
         }));
 
         self.send_bft_msg(BftMsg::Vote(Vote {
-            vote_type: VoteType::Precommit,
+            vote_type: Step::Precommit,
             height: self.height - 1,
             round,
             proposal: self.last_commit_proposal.clone().unwrap(),
@@ -237,7 +237,7 @@ impl Bft {
         let count = if self.authority_list.is_empty() {
             self.authority_list.len()
         } else {
-            error!("The authority list is empty!");
+            error!("The Authority List is Empty!");
             return false;
         };
 
@@ -401,7 +401,7 @@ impl Bft {
         );
 
         let msg = BftMsg::Vote(Vote {
-            vote_type: VoteType::Prevote,
+            vote_type: Step::Prevote,
             height: self.height,
             round: self.round,
             proposal: prevote.clone(),
@@ -425,7 +425,7 @@ impl Bft {
             // deal with equal height, round fall behind
             info!("Some nodes fall behind, send nil vote to help them pursue");
             self.send_bft_msg(BftMsg::Vote(Vote {
-                vote_type: VoteType::Precommit,
+                vote_type: Step::Precommit,
                 height: vote.height,
                 round: vote.round,
                 proposal: Vec::new(),
@@ -462,7 +462,7 @@ impl Bft {
 
         if let Some(prevote_set) =
             self.votes
-                .get_voteset(self.height, self.round, VoteType::Prevote)
+                .get_voteset(self.height, self.round, Step::Prevote)
         {
             let mut tv = if self.cal_all_vote(prevote_set.count) {
                 Duration::new(0, 0)
@@ -482,7 +482,7 @@ impl Bft {
                             tv = Duration::new(0, 0);
                         } else {
                             // receive a new PoLC, update lock info
-                            self.set_polc(&hash, &prevote_set, VoteType::Prevote);
+                            self.set_polc(&hash, &prevote_set, Step::Prevote);
                             tv = Duration::new(0, 0);
                         }
                     }
@@ -497,7 +497,7 @@ impl Bft {
         false
     }
 
-    fn broadcast_precommit(&self) {
+    fn transmit_precommit(&self) {
         let precommit = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
         } else if let Some(proposal) = self.proposal.clone() {
@@ -513,7 +513,7 @@ impl Bft {
         );
 
         let msg = BftMsg::Vote(Vote {
-            vote_type: VoteType::Precommit,
+            vote_type: Step::Precommit,
             height: self.height,
             round: self.round,
             proposal: precommit.clone(),
@@ -531,7 +531,7 @@ impl Bft {
     fn check_precommit(&mut self) -> bool {
         if let Some(precommit_set) =
             self.votes
-                .get_voteset(self.height, self.round, VoteType::Precommit)
+                .get_voteset(self.height, self.round, Step::Precommit)
         {
             let mut tv = if self.cal_all_vote(precommit_set.count) {
                 Duration::new(0, 0)
@@ -559,7 +559,7 @@ impl Bft {
                         self.new_round_start();
                         return false;
                     } else {
-                        self.set_polc(&hash, &precommit_set, VoteType::Precommit);
+                        self.set_polc(&hash, &precommit_set, Step::Precommit);
                         tv = Duration::new(0, 0);
                     }
                     break;
@@ -595,7 +595,7 @@ impl Bft {
         false
     }
 
-    fn set_polc(&mut self, hash: &Target, voteset: &VoteSet, vote_type: VoteType) {
+    fn set_polc(&mut self, hash: &Target, voteset: &VoteSet, vote_type: Step) {
         self.proposal = Some(hash.to_owned());
         self.lock_status = Some(LockStatus {
             proposal: hash.to_owned(),
@@ -685,14 +685,14 @@ impl Bft {
                 }
             }
             BftMsg::Vote(vote) => {
-                if vote.vote_type == VoteType::Prevote {
+                if vote.vote_type == Step::Prevote {
                     if self.step <= Step::PrevoteWait {
                         let _ = self.try_save_vote(vote);
                         if self.step >= Step::Prevote && self.check_prevote() {
                             self.change_to_step(Step::PrevoteWait);
                         }
                     }
-                } else if vote.vote_type == VoteType::Precommit {
+                } else if vote.vote_type == Step::Precommit {
                     if self.step < Step::Precommit {
                         let _ = self.try_save_vote(vote.clone());
                     }
@@ -734,7 +734,7 @@ impl Bft {
         match tminfo.step {
             Step::ProposeWait => {
                 self.change_to_step(Step::Prevote);
-                self.broadcast_precommit();
+                self.transmit_precommit();
                 if self.check_prevote() {
                     self.change_to_step(Step::PrevoteWait);
                 }
@@ -744,21 +744,21 @@ impl Bft {
             }
             Step::PrevoteWait => {
                 self.change_to_step(Step::Precommit);
-                self.broadcast_precommit();
+                self.transmit_precommit();
                 if self.check_precommit() {
                     self.change_to_step(Step::PrecommitWait);
                 }
             }
             Step::Precommit => {
                 self.transmit_prevote();
-                self.broadcast_precommit();
+                self.transmit_precommit();
             }
             Step::PrecommitWait => {
                 self.change_to_step(Step::Commit);
                 self.proc_commit();
                 self.change_to_step(Step::CommitWait);
             }
-            _ => error!("Invalid timeout info!"),
+            _ => error!("Invalid Timeout Info!"),
         }
     }
 }

@@ -30,6 +30,8 @@ extern crate min_max_heap;
 #[macro_use]
 extern crate serde_derive;
 
+use algorithm::Step;
+
 pub mod algorithm;
 pub mod params;
 pub mod timer;
@@ -46,12 +48,6 @@ pub enum BftMsg {
     Feed(Feed),
     RichStatus(RichStatus),
     Commit(Commit),
-}
-
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Copy, Hash)]
-pub enum VoteType {
-    Prevote = 0,
-    Precommit = 1,
 }
 
 #[derive(Clone, Debug)]
@@ -73,7 +69,7 @@ pub struct LockStatus {
 
 #[derive(Clone, Debug)]
 pub struct Vote {
-    vote_type: VoteType,
+    vote_type: Step,
     height: usize,
     round: usize,
     proposal: Target, // block hash
