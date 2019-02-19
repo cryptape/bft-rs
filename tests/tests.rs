@@ -18,11 +18,11 @@ extern crate bft_rs as bft;
 extern crate crossbeam;
 extern crate rand;
 
-use bft::*;
 use bft::algorithm::Bft;
-use crossbeam::crossbeam_channel::{Receiver, Sender, unbounded};
+use bft::*;
+use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
 
-pub fn start_process(address: Address) -> (Sender<BftMsg>, Receiver<BftMsg>){
+pub fn start_process(address: Address) -> (Sender<BftMsg>, Receiver<BftMsg>) {
     let (main2bft, bft4main) = unbounded();
     let (bft2main, main4bft) = unbounded();
     Bft::start(bft2main, bft4main, address);
