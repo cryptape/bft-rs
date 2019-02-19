@@ -14,8 +14,8 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use algorithm::Step;
 use super::{Address, Target, Vote};
+use algorithm::Step;
 use lru_cache::LruCache;
 
 use std::collections::HashMap;
@@ -80,12 +80,7 @@ impl VoteCollector {
         }
     }
 
-    pub fn get_voteset(
-        &mut self,
-        height: usize,
-        round: usize,
-        vote_type: Step,
-    ) -> Option<VoteSet> {
+    pub fn get_voteset(&mut self, height: usize, round: usize, vote_type: Step) -> Option<VoteSet> {
         self.votes
             .get_mut(&height)
             .and_then(|rc| rc.get_voteset(round, vote_type))
@@ -164,13 +159,7 @@ impl RoundCollector {
         }
     }
 
-    pub fn add(
-        &mut self,
-        round: usize,
-        vote_type: Step,
-        sender: Address,
-        vote: Target,
-    ) -> bool {
+    pub fn add(&mut self, round: usize, vote_type: Step, sender: Address, vote: Target) -> bool {
         if self.round_votes.contains_key(&round) {
             self.round_votes
                 .get_mut(&round)

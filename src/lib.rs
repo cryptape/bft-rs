@@ -78,20 +78,20 @@ pub struct Vote {
 
 #[derive(Clone, Debug)]
 pub struct Feed {
-    height: usize,
-    proposal: Target, // block hash
+    pub height: usize,
+    pub proposal: Target, // block hash
 }
 
 #[derive(Clone, Debug)]
 pub struct Commit {
-    height: usize,
-    proposal: Target, // block hash
-    lock_votes: Vec<Vote>,
+    pub height: usize,
+    pub proposal: Target, // block hash
+    pub lock_votes: Vec<Vote>,
 }
 
 #[derive(Clone, Debug)]
 pub struct RichStatus {
-    height: usize,
-    interval: Option<u64>,
-    authority_list: Vec<Address>,
+    pub height: usize,
+    pub interval: Option<u64>,
+    pub authority_list: Vec<Address>,
 }
