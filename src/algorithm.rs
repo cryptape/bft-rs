@@ -425,7 +425,7 @@ impl Bft {
             // deal with height fall behind one, round ge last commit round
             self.retransmit_vote(vote.round);
             return false;
-        } else if vote.height == self.height && vote.round == self.round - 1 {
+        } else if vote.height == self.height && self.round != 0 && vote.round == self.round - 1 {
             // deal with equal height, round fall behind
             info!("Some nodes fall behind, send nil vote to help them pursue");
             self.send_bft_msg(BftMsg::Vote(Vote {
@@ -738,7 +738,7 @@ impl Bft {
         match tminfo.step {
             Step::ProposeWait => {
                 self.change_to_step(Step::Prevote);
-                self.transmit_precommit();
+                self.transmit_prevote();
                 if self.check_prevote() {
                     self.change_to_step(Step::PrevoteWait);
                 }
