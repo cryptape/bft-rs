@@ -119,8 +119,8 @@ impl Bft {
             }
         });
 
-        main_thread.join().unwrap();
-        timer_thread.join().unwrap();
+        // main_thread.join().unwrap();
+        // timer_thread.join().unwrap();
     }
 
     fn initialize(
@@ -153,17 +153,20 @@ impl Bft {
 
     #[inline]
     fn set_timer(&self, duration: Duration, step: Step) {
-        let _ = self.timer_seter.send(TimeoutInfo {
-            timeval: Instant::now() + duration,
-            height: self.height,
-            round: self.round,
-            step,
-        });
+        let _ = self
+            .timer_seter
+            .send(TimeoutInfo {
+                timeval: Instant::now() + duration,
+                height: self.height,
+                round: self.round,
+                step,
+            })
+            .unwrap();
     }
 
     #[inline]
     fn send_bft_msg(&self, msg: BftMsg) {
-        let _ = self.msg_sender.send(msg);
+        let _ = self.msg_sender.send(msg).unwrap();
     }
 
     #[inline]
@@ -234,7 +237,7 @@ impl Bft {
     }
 
     fn determine_proposer(&self) -> bool {
-        let count = if self.authority_list.is_empty() {
+        let count = if !self.authority_list.is_empty() {
             self.authority_list.len()
         } else {
             error!("The Authority List is Empty!");
@@ -264,7 +267,7 @@ impl Bft {
         false
     }
 
-    fn try_transmit_proposal(&self) -> bool {
+    fn try_transmit_proposal(&mut self) -> bool {
         if self.lock_status.is_none()
             && (self.feed.is_none() || self.feed.clone().unwrap().height != self.height)
         {
@@ -302,17 +305,18 @@ impl Bft {
             })
         } else {
             // if is not locked, transmit the cached proposal
+            self.proposal = Some(self.feed.clone().unwrap().proposal);
             trace!(
                 "Proposal at height {:?}, round {:?}, is {:?}",
                 self.height,
                 self.round,
-                self.feed.clone().unwrap().proposal
+                self.proposal.clone().unwrap()
             );
 
             BftMsg::Proposal(Proposal {
                 height: self.height,
                 round: self.round,
-                content: self.feed.clone().unwrap().proposal,
+                content: self.proposal.clone().unwrap(),
                 lock_round: None,
                 lock_votes: None,
                 proposer: self.params.address.clone(),
