@@ -19,6 +19,7 @@ use bft::*;
 use crossbeam::Sender;
 use rand::{thread_rng, Rng};
 
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use std::vec;
@@ -26,8 +27,9 @@ use std::vec;
 use start_process;
 
 const INIT_HEIGHT: usize = 1;
-const MAX_TEST_HEIGHT: usize = 100;
+const MAX_TEST_HEIGHT: usize = 50;
 
+#[derive(Clone, Debug)]
 struct Node {
     height: usize,
     result: Vec<(usize, Target)>,
@@ -63,7 +65,6 @@ impl Node {
             BftMsg::Commit(commit) => {
                 self.result.push((commit.height, commit.proposal));
                 self.height = commit.height;
-
                 s_self
                     .send(BftMsg::RichStatus(RichStatus {
                         height: commit.height,
@@ -78,10 +79,10 @@ impl Node {
                     commit.height,
                     Instant::now() - self.ins
                 );
+
                 self.ins = Instant::now();
                 thread::sleep(Duration::from_micros(20));
                 self.height += 1;
-
                 s_self
                     .send(BftMsg::Feed(Feed {
                         height: commit.height + 1,
@@ -105,7 +106,6 @@ fn generate_proposal() -> Target {
     for ii in proposal.iter_mut() {
         *ii = rng.gen();
     }
-
     proposal
 }
 
@@ -144,6 +144,29 @@ fn transmit_genesis(
     s_4.send(feed).unwrap();
 }
 
+fn is_result_consistent(
+    a: (usize, Target),
+    b: (usize, Target),
+    c: (usize, Target),
+    d: (usize, Target),
+) -> bool {
+    if a.1 == b.1 {
+        if b.1 == c.1 {
+            if c.1 == d.1 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn output_node_result(node_id: usize, height: usize, output: Target) {
+    println!(
+        "The node {} at height {} output {:?}",
+        node_id, height, output
+    );
+}
+
 #[test]
 fn test_bft() {
     let (send_node_0, recv_node_0) = start_process(vec![0]);
@@ -164,11 +187,12 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
-    let mut node_0 = Node::new();
+    let node_0 = Arc::new(Mutex::new(Node::new()));
+    let node_0_clone = node_0.clone();
 
     thread::spawn(move || loop {
         if let Ok(recv) = recv_node_0.recv() {
-            node_0.handle_message(
+            node_0_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
                 0,
@@ -177,10 +201,10 @@ fn test_bft() {
                 send_3.clone(),
                 send_0.clone(),
             );
-            println!("{:?}", node_0.height);
+            // println!("{:?}", node_0.height);
         }
 
-        if node_0.height == MAX_TEST_HEIGHT {
+        if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
     });
@@ -190,11 +214,12 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
-    let mut node_1 = Node::new();
+    let node_1 = Arc::new(Mutex::new(Node::new()));
+    let node_1_clone = node_1.clone();
 
     thread::spawn(move || loop {
         if let Ok(recv) = recv_node_1.recv() {
-            node_1.handle_message(
+            node_1_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
                 0,
@@ -204,7 +229,7 @@ fn test_bft() {
                 send_1.clone(),
             );
         }
-        if node_1.height == MAX_TEST_HEIGHT {
+        if node_1_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
     });
@@ -214,11 +239,12 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
-    let mut node_2 = Node::new();
+    let node_2 = Arc::new(Mutex::new(Node::new()));
+    let node_2_clone = node_2.clone();
 
     thread::spawn(move || loop {
         if let Ok(recv) = recv_node_2.recv() {
-            node_2.handle_message(
+            node_2_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
                 0,
@@ -229,7 +255,7 @@ fn test_bft() {
             );
         }
 
-        if node_2.height == MAX_TEST_HEIGHT {
+        if node_2_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
     });
@@ -239,11 +265,12 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
-    let mut node_3 = Node::new();
+    let node_3 = Arc::new(Mutex::new(Node::new()));
+    let node_3_clone = node_3.clone();
 
     thread::spawn(move || loop {
         if let Ok(recv) = recv_node_3.recv() {
-            node_3.handle_message(
+            node_3_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
                 0,
@@ -254,8 +281,46 @@ fn test_bft() {
             );
         }
 
-        if node_3.height == MAX_TEST_HEIGHT {
+        if node_3_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
     });
+
+    let result_0 = node_0.lock().unwrap().clone().result;
+    let result_1 = node_1.lock().unwrap().clone().result;
+    let result_2 = node_2.lock().unwrap().clone().result;
+    let result_3 = node_3.lock().unwrap().clone().result;
+
+    thread::sleep(Duration::from_secs(120));
+
+    for ii in 0..999 {
+        
+        if !is_result_consistent(
+            result_0[ii].clone(),
+            result_1[ii].clone(),
+            result_2[ii].clone(),
+            result_3[ii].clone(),
+        ) {
+            output_node_result(
+                0,
+                result_0[ii].clone().0,
+                result_0[ii].clone().1,
+            );
+            output_node_result(
+                1,
+                result_1[ii].clone().0,
+                result_1[ii].clone().1,
+            );
+            output_node_result(
+                2,
+                result_2[ii].clone().0,
+                result_2[ii].clone().1,
+            );
+            output_node_result(
+                3,
+                result_3[ii].clone().0,
+                result_3[ii].clone().1,
+            );
+        }
+    }
 }
