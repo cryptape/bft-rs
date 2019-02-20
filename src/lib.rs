@@ -46,7 +46,7 @@ pub enum BftMsg {
     Proposal(Proposal),
     Vote(Vote),
     Feed(Feed),
-    RichStatus(RichStatus),
+    Status(Status),
     Commit(Commit),
 }
 
@@ -90,7 +90,7 @@ pub struct Commit {
 }
 
 #[derive(Clone, Debug)]
-pub struct RichStatus {
+pub struct Status {
     pub height: usize,
     pub interval: Option<u64>,
     pub authority_list: Vec<Address>,
