@@ -30,6 +30,10 @@ use super::*;
 const INIT_HEIGHT: usize = 1;
 const INIT_ROUND: usize = 0;
 const PROPOSAL_TIMES_COEF: usize = 10;
+const PRECOMMIT_BELOW_TWO_THIRD: i8 = 0;
+const PRECOMMIT_ON_NOTHING: i8 = 1;
+const PRECOMMIT_ON_NIL: i8 = 2;
+const PRECOMMIT_ON_PROPOSAL: i8 = 3;
 const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
@@ -153,8 +157,7 @@ impl Bft {
 
     #[inline]
     fn set_timer(&self, duration: Duration, step: Step) {
-        let _ = self
-            .timer_seter
+        self.timer_seter
             .send(TimeoutInfo {
                 timeval: Instant::now() + duration,
                 height: self.height,
@@ -166,7 +169,8 @@ impl Bft {
 
     #[inline]
     fn send_bft_msg(&self, msg: BftMsg) {
-        let _ = self.msg_sender.send(msg).unwrap();
+        println!("{:?}", msg);
+        self.msg_sender.send(msg).unwrap();
     }
 
     #[inline]
@@ -389,7 +393,7 @@ impl Bft {
         }
     }
 
-    fn transmit_prevote(&self) {
+    fn transmit_prevote(&mut self) {
         let prevote = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
         } else if let Some(proposal) = self.proposal.clone() {
@@ -404,14 +408,16 @@ impl Bft {
             self.round
         );
 
-        let msg = BftMsg::Vote(Vote {
+        let vote = Vote {
             vote_type: Step::Prevote,
             height: self.height,
             round: self.round,
             proposal: prevote.clone(),
             voter: self.params.address.clone(),
-        });
+        };
 
+        let _ = self.votes.add(vote.clone());
+        let msg = BftMsg::Vote(vote);
         debug!("Prevote to {:?}", prevote);
         self.send_bft_msg(msg);
         self.set_timer(
@@ -483,13 +489,18 @@ impl Bft {
                             // receive +2/3 prevote to nil, clean lock info
                             trace!("Receive over 2/3 prevote to nil");
                             self.clean_polc();
-                            tv = Duration::new(0, 0);
                         } else {
-                            // receive a new PoLC, update lock info
+                            // receive a newer PoLC, update lock info
                             self.set_polc(&hash, &prevote_set, Step::Prevote);
-                            tv = Duration::new(0, 0);
                         }
                     }
+                    if self.lock_status.is_none() {
+                        if !hash.is_empty() {
+                            // receive a PoLC, lock the proposal
+                            self.set_polc(&hash, &prevote_set, Step::Prevote);
+                        }
+                    }
+                    tv = Duration::new(0, 0);
                     break;
                 }
             }
@@ -501,7 +512,7 @@ impl Bft {
         false
     }
 
-    fn transmit_precommit(&self) {
+    fn transmit_precommit(&mut self) {
         let precommit = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
         } else if let Some(proposal) = self.proposal.clone() {
@@ -516,14 +527,16 @@ impl Bft {
             self.round
         );
 
-        let msg = BftMsg::Vote(Vote {
+        let vote = Vote {
             vote_type: Step::Precommit,
             height: self.height,
             round: self.round,
             proposal: precommit.clone(),
             voter: self.params.address.clone(),
-        });
+        };
 
+        let _ = self.votes.add(vote.clone());
+        let msg = BftMsg::Vote(vote);
         debug!("Precommit proposal is {:?}", precommit);
         self.send_bft_msg(msg);
         self.set_timer(
@@ -532,7 +545,7 @@ impl Bft {
         );
     }
 
-    fn check_precommit(&mut self) -> bool {
+    fn check_precommit(&mut self) -> i8 {
         if let Some(precommit_set) =
             self.votes
                 .get_voteset(self.height, self.round, Step::Precommit)
@@ -542,8 +555,9 @@ impl Bft {
             } else {
                 self.params.timer.get_precommit()
             };
+
             if !self.cal_above_threshold(precommit_set.count) {
-                return false;
+                return PRECOMMIT_BELOW_TWO_THIRD;
             }
 
             info!(
@@ -556,25 +570,19 @@ impl Bft {
                     if hash.is_empty() {
                         // if get +2/3 precommits to nil, goto new round directly
                         info!("Reach nil consensus, goto next round {:?}", self.round + 1);
-                        if self.lock_status.is_none() {
-                            self.proposal = None;
-                        }
-                        self.goto_next_round();
-                        self.new_round_start();
-                        return false;
+                        return PRECOMMIT_ON_NIL;
                     } else {
                         self.set_polc(&hash, &precommit_set, Step::Precommit);
-                        tv = Duration::new(0, 0);
+                        return PRECOMMIT_ON_PROPOSAL;
                     }
-                    break;
                 }
             }
             if self.step == Step::Precommit {
                 self.set_timer(tv, Step::PrecommitWait);
             }
-            return true;
+            // return PRECOMMIT_ON_NOTHING;
         }
-        false
+        PRECOMMIT_ON_NOTHING
     }
 
     fn proc_commit(&mut self) -> bool {
@@ -625,7 +633,7 @@ impl Bft {
         );
     }
 
-    fn try_handle_status(&mut self, rich_status: RichStatus) -> bool {
+    fn try_handle_status(&mut self, rich_status: Status) -> bool {
         // receive a rich status that height ge self.height is the only way to go to new height
         if rich_status.height >= self.height {
             // goto new height directly and update authorty list
@@ -702,8 +710,24 @@ impl Bft {
                     }
                     if self.step == Step::Precommit || self.step == Step::PrecommitWait {
                         let _ = self.try_save_vote(vote);
-                        if self.check_precommit() {
+                        let precommit_result = self.check_precommit();
+                        if precommit_result == PRECOMMIT_ON_NOTHING {
+                            // only receive +2/3 precommits might lead BFT to PrecommitWait
                             self.change_to_step(Step::PrecommitWait);
+                        }
+                        if precommit_result == PRECOMMIT_ON_NIL {
+                            // receive +2/3 on nil, goto next round directly
+                            if self.lock_status.is_none() {
+                                self.proposal = None;
+                            }
+                            self.goto_next_round();
+                            self.new_round_start();
+                        }
+                        if precommit_result == PRECOMMIT_ON_PROPOSAL {
+                            // receive +2/3 on a proposal, try to commit
+                            self.change_to_step(Step::Commit);
+                            self.proc_commit();
+                            self.change_to_step(Step::CommitWait);
                         }
                     }
                 } else {
@@ -715,7 +739,7 @@ impl Bft {
                     self.new_round_start();
                 }
             }
-            BftMsg::RichStatus(rich_status) => {
+            BftMsg::Status(rich_status) => {
                 if self.try_handle_status(rich_status) {
                     self.new_round_start();
                 }
@@ -749,8 +773,21 @@ impl Bft {
             Step::PrevoteWait => {
                 self.change_to_step(Step::Precommit);
                 self.transmit_precommit();
-                if self.check_precommit() {
+                let precommit_result = self.check_precommit();
+                if precommit_result == PRECOMMIT_ON_NOTHING {
                     self.change_to_step(Step::PrecommitWait);
+                }
+                if precommit_result == PRECOMMIT_ON_NIL {
+                    if self.lock_status.is_none() {
+                        self.proposal = None;
+                    }
+                    self.goto_next_round();
+                    self.new_round_start();
+                }
+                if precommit_result == PRECOMMIT_ON_PROPOSAL {
+                    self.change_to_step(Step::Commit);
+                    self.proc_commit();
+                    self.change_to_step(Step::CommitWait);
                 }
             }
             Step::Precommit => {
@@ -758,9 +795,12 @@ impl Bft {
                 self.transmit_precommit();
             }
             Step::PrecommitWait => {
-                self.change_to_step(Step::Commit);
-                self.proc_commit();
-                self.change_to_step(Step::CommitWait);
+                // receive +2/3 precommits however no proposal reach +2/3
+                if self.lock_status.is_none() {
+                    self.proposal = None;
+                }
+                self.goto_next_round();
+                self.new_round_start();
             }
             _ => error!("Invalid Timeout Info!"),
         }

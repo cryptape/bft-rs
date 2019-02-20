@@ -15,10 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use bft::*;
-// use bft::algorithm::Bft;
 use crossbeam::Sender;
 use rand::{thread_rng, Rng};
 
+use std::error::Error;
+use std::io::prelude::*;
+use std::fs::File;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use std::vec;
@@ -26,8 +30,9 @@ use std::vec;
 use start_process;
 
 const INIT_HEIGHT: usize = 1;
-const MAX_TEST_HEIGHT: usize = 100;
+const MAX_TEST_HEIGHT: usize = 50;
 
+#[derive(Clone, Debug)]
 struct Node {
     height: usize,
     result: Vec<(usize, Target)>,
@@ -63,9 +68,8 @@ impl Node {
             BftMsg::Commit(commit) => {
                 self.result.push((commit.height, commit.proposal));
                 self.height = commit.height;
-
                 s_self
-                    .send(BftMsg::RichStatus(RichStatus {
+                    .send(BftMsg::Status(Status {
                         height: commit.height,
                         interval: None,
                         authority_list: auth_list,
@@ -78,10 +82,10 @@ impl Node {
                     commit.height,
                     Instant::now() - self.ins
                 );
-                self.ins = Instant::now();
-                thread::sleep(Duration::from_micros(20));
-                self.height += 1;
 
+                self.ins = Instant::now();
+                // thread::sleep(Duration::from_micros(10));
+                self.height += 1;
                 s_self
                     .send(BftMsg::Feed(Feed {
                         height: commit.height + 1,
@@ -105,7 +109,6 @@ fn generate_proposal() -> Target {
     for ii in proposal.iter_mut() {
         *ii = rng.gen();
     }
-
     proposal
 }
 
@@ -121,7 +124,7 @@ fn transmit_genesis(
     s_3: Sender<BftMsg>,
     s_4: Sender<BftMsg>,
 ) {
-    let msg = BftMsg::RichStatus(RichStatus {
+    let msg = BftMsg::Status(Status {
         height: INIT_HEIGHT,
         interval: None,
         authority_list: generate_auth_list(),
@@ -144,6 +147,22 @@ fn transmit_genesis(
     s_4.send(feed).unwrap();
 }
 
+fn is_result_consistent(
+    a: (usize, Target),
+    b: (usize, Target),
+    c: (usize, Target),
+    d: (usize, Target),
+) -> bool {
+    if a.1 == b.1 {
+        if b.1 == c.1 {
+            if c.1 == d.1 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 #[test]
 fn test_bft() {
     let (send_node_0, recv_node_0) = start_process(vec![0]);
@@ -164,11 +183,12 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
-    let mut node_0 = Node::new();
+    let node_0 = Arc::new(Mutex::new(Node::new()));
+    let node_0_clone = node_0.clone();
 
     thread::spawn(move || loop {
         if let Ok(recv) = recv_node_0.recv() {
-            node_0.handle_message(
+            node_0_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
                 0,
@@ -177,10 +197,9 @@ fn test_bft() {
                 send_3.clone(),
                 send_0.clone(),
             );
-            println!("{:?}", node_0.height);
+            // println!("{:?}", node_0.lock().unwrap().height);
         }
-
-        if node_0.height == MAX_TEST_HEIGHT {
+        if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
     });
@@ -190,21 +209,22 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
-    let mut node_1 = Node::new();
+    let node_1 = Arc::new(Mutex::new(Node::new()));
+    let node_1_clone = node_1.clone();
 
     thread::spawn(move || loop {
         if let Ok(recv) = recv_node_1.recv() {
-            node_1.handle_message(
+            node_1_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
-                0,
+                1,
                 send_0.clone(),
                 send_2.clone(),
                 send_3.clone(),
                 send_1.clone(),
             );
         }
-        if node_1.height == MAX_TEST_HEIGHT {
+        if node_1_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
     });
@@ -214,14 +234,15 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
-    let mut node_2 = Node::new();
+    let node_2 = Arc::new(Mutex::new(Node::new()));
+    let node_2_clone = node_2.clone();
 
     thread::spawn(move || loop {
         if let Ok(recv) = recv_node_2.recv() {
-            node_2.handle_message(
+            node_2_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
-                0,
+                2,
                 send_1.clone(),
                 send_0.clone(),
                 send_3.clone(),
@@ -229,7 +250,7 @@ fn test_bft() {
             );
         }
 
-        if node_2.height == MAX_TEST_HEIGHT {
+        if node_2_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
     });
@@ -239,14 +260,15 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
-    let mut node_3 = Node::new();
+    let node_3 = Arc::new(Mutex::new(Node::new()));
+    let node_3_clone = node_3.clone();
 
     thread::spawn(move || loop {
         if let Ok(recv) = recv_node_3.recv() {
-            node_3.handle_message(
+            node_3_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
-                0,
+                3,
                 send_1.clone(),
                 send_2.clone(),
                 send_0.clone(),
@@ -254,8 +276,10 @@ fn test_bft() {
             );
         }
 
-        if node_3.height == MAX_TEST_HEIGHT {
+        if node_3_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
-    });
+    }); 
+
+    thread::sleep(Duration::from_secs(120));
 }
