@@ -15,10 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use bft::*;
-// use bft::algorithm::Bft;
 use crossbeam::Sender;
 use rand::{thread_rng, Rng};
 
+use std::error::Error;
+use std::io::prelude::*;
+use std::fs::File;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -66,7 +69,7 @@ impl Node {
                 self.result.push((commit.height, commit.proposal));
                 self.height = commit.height;
                 s_self
-                    .send(BftMsg::RichStatus(RichStatus {
+                    .send(BftMsg::Status(Status {
                         height: commit.height,
                         interval: None,
                         authority_list: auth_list,
@@ -81,7 +84,7 @@ impl Node {
                 );
 
                 self.ins = Instant::now();
-                thread::sleep(Duration::from_micros(20));
+                // thread::sleep(Duration::from_micros(10));
                 self.height += 1;
                 s_self
                     .send(BftMsg::Feed(Feed {
@@ -121,7 +124,7 @@ fn transmit_genesis(
     s_3: Sender<BftMsg>,
     s_4: Sender<BftMsg>,
 ) {
-    let msg = BftMsg::RichStatus(RichStatus {
+    let msg = BftMsg::Status(Status {
         height: INIT_HEIGHT,
         interval: None,
         authority_list: generate_auth_list(),
@@ -160,13 +163,6 @@ fn is_result_consistent(
     false
 }
 
-fn output_node_result(node_id: usize, height: usize, output: Target) {
-    println!(
-        "The node {} at height {} output {:?}",
-        node_id, height, output
-    );
-}
-
 #[test]
 fn test_bft() {
     let (send_node_0, recv_node_0) = start_process(vec![0]);
@@ -201,9 +197,8 @@ fn test_bft() {
                 send_3.clone(),
                 send_0.clone(),
             );
-            // println!("{:?}", node_0.height);
+            // println!("{:?}", node_0.lock().unwrap().height);
         }
-
         if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
@@ -222,7 +217,7 @@ fn test_bft() {
             node_1_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
-                0,
+                1,
                 send_0.clone(),
                 send_2.clone(),
                 send_3.clone(),
@@ -247,7 +242,7 @@ fn test_bft() {
             node_2_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
-                0,
+                2,
                 send_1.clone(),
                 send_0.clone(),
                 send_3.clone(),
@@ -273,7 +268,7 @@ fn test_bft() {
             node_3_clone.lock().unwrap().handle_message(
                 recv,
                 generate_auth_list(),
-                0,
+                3,
                 send_1.clone(),
                 send_2.clone(),
                 send_0.clone(),
@@ -284,43 +279,7 @@ fn test_bft() {
         if node_3_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             break;
         }
-    });
-
-    let result_0 = node_0.lock().unwrap().clone().result;
-    let result_1 = node_1.lock().unwrap().clone().result;
-    let result_2 = node_2.lock().unwrap().clone().result;
-    let result_3 = node_3.lock().unwrap().clone().result;
+    }); 
 
     thread::sleep(Duration::from_secs(120));
-
-    for ii in 0..999 {
-        
-        if !is_result_consistent(
-            result_0[ii].clone(),
-            result_1[ii].clone(),
-            result_2[ii].clone(),
-            result_3[ii].clone(),
-        ) {
-            output_node_result(
-                0,
-                result_0[ii].clone().0,
-                result_0[ii].clone().1,
-            );
-            output_node_result(
-                1,
-                result_1[ii].clone().0,
-                result_1[ii].clone().1,
-            );
-            output_node_result(
-                2,
-                result_2[ii].clone().0,
-                result_2[ii].clone().1,
-            );
-            output_node_result(
-                3,
-                result_3[ii].clone().0,
-                result_3[ii].clone().1,
-            );
-        }
-    }
 }
