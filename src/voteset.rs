@@ -19,7 +19,6 @@ use algorithm::Step;
 use lru_cache::LruCache;
 
 use std::collections::HashMap;
-// use std::io::prelude::*;
 
 /// BFT vote collector
 #[derive(Debug)]
@@ -39,7 +38,7 @@ impl VoteCollector {
         }
     }
 
-    /// A function try to add a vote, return `bool`. 
+    /// A function try to add a vote, return `bool`.
     pub fn add(&mut self, vote: Vote) -> bool {
         let height = vote.height;
         let round = vote.round;
@@ -159,22 +158,24 @@ impl VoteSet {
     }
 }
 
-/// A round vote collector.
+/// BFT round vote collector.
 // round -> step collector
 #[derive(Debug)]
 pub struct RoundCollector {
-    round_votes: LruCache<usize, StepCollector>,
+    /// A LruCache to store step collect of a round.
+    pub round_votes: LruCache<usize, StepCollector>,
 }
 
 impl RoundCollector {
     /// A function to create a new round collector.
-    fn new() -> Self {
+    pub fn new() -> Self {
         RoundCollector {
             round_votes: LruCache::new(16),
         }
     }
 
-    fn add(&mut self, round: usize, vote_type: Step, sender: Address, vote: Target) -> bool {
+    /// A function try to add a vote to a round collector.
+    pub fn add(&mut self, round: usize, vote_type: Step, sender: Address, vote: Target) -> bool {
         if self.round_votes.contains_key(&round) {
             self.round_votes
                 .get_mut(&round)
@@ -188,34 +189,40 @@ impl RoundCollector {
         }
     }
 
-    fn get_voteset(&mut self, round: usize, vote_type: Step) -> Option<VoteSet> {
+    /// A functionto get the vote set of the round, and the vote type.
+    pub fn get_voteset(&mut self, round: usize, vote_type: Step) -> Option<VoteSet> {
         self.round_votes
             .get_mut(&round)
             .and_then(|sc| sc.get_voteset(vote_type))
     }
 }
 
+/// BFT step collector.
 // step -> voteset
 #[derive(Debug, Default)]
-struct StepCollector {
-    step_votes: HashMap<Step, VoteSet>,
+pub struct StepCollector {
+    /// A HashMap that K is step, V is the vote set
+    pub step_votes: HashMap<Step, VoteSet>,
 }
 
 impl StepCollector {
-    fn new() -> Self {
+    /// A function to create a new step collector.
+    pub fn new() -> Self {
         StepCollector {
             step_votes: HashMap::new(),
         }
     }
 
-    fn add(&mut self, vote_type: Step, sender: Address, vote: Target) -> bool {
+    /// A function to add a vote to the step collector.
+    pub fn add(&mut self, vote_type: Step, sender: Address, vote: Target) -> bool {
         self.step_votes
             .entry(vote_type)
             .or_insert_with(VoteSet::new)
             .add(sender, vote)
     }
 
-    fn get_voteset(&self, vote_type: Step) -> Option<VoteSet> {
+    /// A function to get voteset of the vote type
+    pub fn get_voteset(&self, vote_type: Step) -> Option<VoteSet> {
         self.step_votes.get(&vote_type).cloned()
     }
 }

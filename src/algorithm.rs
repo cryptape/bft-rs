@@ -52,7 +52,7 @@ pub enum Step {
     PrecommitWait,
     /// A step to do commit.
     Commit,
-    /// A step to wait for rich status. 
+    /// A step to wait for rich status.
     CommitWait,
 }
 

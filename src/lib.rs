@@ -67,8 +67,8 @@ pub enum BftMsg {
 }
 
 /// Something need to be consensus in a round.
-/// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes` 
-/// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of 
+/// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
+/// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
 /// the proposal. Therefore, these must have same variant of `Option`.
 #[derive(Clone, Debug)]
 pub struct Proposal {
