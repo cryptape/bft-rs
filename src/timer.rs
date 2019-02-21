@@ -23,21 +23,27 @@ use std::time::{Duration, Instant};
 
 use algorithm::Step;
 
+/// Timer infomation.
 #[derive(Debug, Clone)]
 pub struct TimeoutInfo {
+    /// A timeval of a timer.
     pub timeval: Instant,
+    /// The height of the timer.
     pub height: usize,
+    /// The round of the timer.
     pub round: usize,
+    /// The step of the timer.
     pub step: Step,
 }
 
-// define a waittimer channel
+/// Sender and receiver of a timeout infomation channel.
 pub struct WaitTimer {
     timer_seter: Receiver<TimeoutInfo>,
     timer_notify: Sender<TimeoutInfo>,
 }
 
 impl WaitTimer {
+    /// A function to create a new timeout infomation channel.
     pub fn new(ts: Sender<TimeoutInfo>, rs: Receiver<TimeoutInfo>) -> WaitTimer {
         WaitTimer {
             timer_notify: ts,
@@ -45,6 +51,7 @@ impl WaitTimer {
         }
     }
 
+    /// A function to start a timer.
     pub fn start(&self) {
         let mut timer_heap = MinMaxHeap::new();
         let mut timeout_info = HashMap::new();
