@@ -123,8 +123,8 @@ impl Bft {
             }
         });
 
-        // main_thread.join().unwrap();
-        // timer_thread.join().unwrap();
+        main_thread.join().unwrap();
+        timer_thread.join().unwrap();
     }
 
     fn initialize(
@@ -169,7 +169,6 @@ impl Bft {
 
     #[inline]
     fn send_bft_msg(&self, msg: BftMsg) {
-        println!("{:?}", msg);
         self.msg_sender.send(msg).unwrap();
     }
 
@@ -568,7 +567,6 @@ impl Bft {
             for (hash, count) in &precommit_set.votes_by_proposal {
                 if self.cal_above_threshold(*count) {
                     if hash.is_empty() {
-                        // if get +2/3 precommits to nil, goto new round directly
                         info!("Reach nil consensus, goto next round {:?}", self.round + 1);
                         return PRECOMMIT_ON_NIL;
                     } else {
