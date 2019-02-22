@@ -15,29 +15,35 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use crossbeam::crossbeam_channel::{Receiver, Sender};
 use min_max_heap::MinMaxHeap;
 
 use std::collections::HashMap;
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use algorithm::Step;
 
+/// Timer infomation.
 #[derive(Debug, Clone)]
 pub struct TimeoutInfo {
+    /// A timeval of a timer.
     pub timeval: Instant,
+    /// The height of the timer.
     pub height: usize,
+    /// The round of the timer.
     pub round: usize,
+    /// The step of the timer.
     pub step: Step,
 }
 
-// define a waittimer channel
+/// Sender and receiver of a timeout infomation channel.
 pub struct WaitTimer {
     timer_seter: Receiver<TimeoutInfo>,
     timer_notify: Sender<TimeoutInfo>,
 }
 
 impl WaitTimer {
+    /// A function to create a new timeout infomation channel.
     pub fn new(ts: Sender<TimeoutInfo>, rs: Receiver<TimeoutInfo>) -> WaitTimer {
         WaitTimer {
             timer_notify: ts,
@@ -45,6 +51,7 @@ impl WaitTimer {
         }
     }
 
+    /// A function to start a timer.
     pub fn start(&self) {
         let mut timer_heap = MinMaxHeap::new();
         let mut timeout_info = HashMap::new();

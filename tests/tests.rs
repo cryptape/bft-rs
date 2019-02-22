@@ -1,5 +1,5 @@
 // CITA
-// Copyright 2016-2017 Cryptape Technologies LLC.
+// Copyright 2016-2019 Cryptape Technologies LLC.
 
 // This program is free software: you can redistribute it
 // and/or modify it under the terms of the GNU General Public
@@ -14,6 +14,19 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+extern crate bft_rs as bft;
+extern crate crossbeam;
+extern crate rand;
 
-mod test_with_nil;
-mod test_without_proposer;
+use bft::algorithm::Bft;
+use bft::*;
+use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
+
+pub fn start_process(address: Address) -> (Sender<BftMsg>, Receiver<BftMsg>) {
+    let (main2bft, bft4main) = unbounded();
+    let (bft2main, main4bft) = unbounded();
+    Bft::start(bft2main, bft4main, address);
+    (main2bft, main4bft)
+}
+
+mod integration_cases;
