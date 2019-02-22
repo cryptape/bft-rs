@@ -19,15 +19,18 @@ use algorithm::Step;
 use lru_cache::LruCache;
 
 use std::collections::HashMap;
-use std::io::prelude::*;
 
+/// BFT vote collector
 #[derive(Debug)]
 pub struct VoteCollector {
+    /// A LruCache to store vote collect of each round.
     pub votes: LruCache<usize, RoundCollector>,
+    /// A HashMap to record prevote count of each round.
     pub prevote_count: HashMap<usize, usize>,
 }
 
 impl VoteCollector {
+    /// A function to create a new BFT vote collector.
     pub fn new() -> Self {
         VoteCollector {
             votes: LruCache::new(16),
@@ -35,6 +38,7 @@ impl VoteCollector {
         }
     }
 
+    /// A function try to add a vote, return `bool`.
     pub fn add(&mut self, vote: Vote) -> bool {
         let height = vote.height;
         let round = vote.round;
@@ -80,26 +84,33 @@ impl VoteCollector {
         }
     }
 
+    /// A function to get the vote set of the height, the round, and the vote type.
     pub fn get_voteset(&mut self, height: usize, round: usize, vote_type: Step) -> Option<VoteSet> {
         self.votes
             .get_mut(&height)
             .and_then(|rc| rc.get_voteset(round, vote_type))
     }
 
+    /// A function to clean prevote count HashMap at the begining of a height.
     pub fn clear_prevote_count(&mut self) {
         self.prevote_count.clear();
     }
 }
 
+/// BFT vote set
 // 1. sender's vote message  2. proposal's hash  3. count
 #[derive(Clone, Debug)]
 pub struct VoteSet {
+    /// A HashMap that K is voter, V is proposal.
     pub votes_by_sender: HashMap<Address, Target>,
+    /// A HashMap that K is proposal V is count of the proposal.
     pub votes_by_proposal: HashMap<Target, usize>,
+    /// Count of vote set.
     pub count: usize,
 }
 
 impl VoteSet {
+    /// A function to create a new vote set.
     pub fn new() -> Self {
         VoteSet {
             votes_by_sender: HashMap::new(),
@@ -108,7 +119,7 @@ impl VoteSet {
         }
     }
 
-    // just add, not check
+    /// A function to add a vote to the vote set.
     pub fn add(&mut self, sender: Address, vote: Target) -> bool {
         let mut is_add = false;
         self.votes_by_sender.entry(sender).or_insert_with(|| {
@@ -122,6 +133,7 @@ impl VoteSet {
         is_add
     }
 
+    /// A function to abstract the PoLC of the round.
     pub fn abstract_polc(
         &self,
         height: usize,
@@ -146,19 +158,23 @@ impl VoteSet {
     }
 }
 
+/// BFT round vote collector.
 // round -> step collector
 #[derive(Debug)]
 pub struct RoundCollector {
+    /// A LruCache to store step collect of a round.
     pub round_votes: LruCache<usize, StepCollector>,
 }
 
 impl RoundCollector {
+    /// A function to create a new round collector.
     pub fn new() -> Self {
         RoundCollector {
             round_votes: LruCache::new(16),
         }
     }
 
+    /// A function try to add a vote to a round collector.
     pub fn add(&mut self, round: usize, vote_type: Step, sender: Address, vote: Target) -> bool {
         if self.round_votes.contains_key(&round) {
             self.round_votes
@@ -173,6 +189,7 @@ impl RoundCollector {
         }
     }
 
+    /// A functionto get the vote set of the round, and the vote type.
     pub fn get_voteset(&mut self, round: usize, vote_type: Step) -> Option<VoteSet> {
         self.round_votes
             .get_mut(&round)
@@ -180,19 +197,23 @@ impl RoundCollector {
     }
 }
 
+/// BFT step collector.
 // step -> voteset
 #[derive(Debug, Default)]
 pub struct StepCollector {
+    /// A HashMap that K is step, V is the vote set
     pub step_votes: HashMap<Step, VoteSet>,
 }
 
 impl StepCollector {
+    /// A function to create a new step collector.
     pub fn new() -> Self {
         StepCollector {
             step_votes: HashMap::new(),
         }
     }
 
+    /// A function to add a vote to the step collector.
     pub fn add(&mut self, vote_type: Step, sender: Address, vote: Target) -> bool {
         self.step_votes
             .entry(vote_type)
@@ -200,6 +221,7 @@ impl StepCollector {
             .add(sender, vote)
     }
 
+    /// A function to get voteset of the vote type
     pub fn get_voteset(&self, vote_type: Step) -> Option<VoteSet> {
         self.step_votes.get(&vote_type).cloned()
     }

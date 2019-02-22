@@ -18,13 +18,17 @@ use super::{Address, Target};
 use std::cell::Cell;
 use std::time::Duration;
 
+/// BFT params.
 #[derive(Clone, Debug)]
 pub struct BftParams {
+    /// The local address.
     pub address: Address,
+    /// A set of BFT timer setting.
     pub timer: BftTimer,
 }
 
 impl BftParams {
+    /// A function to create a new BFT params.
     pub fn new(local_address: Target) -> Self {
         BftParams {
             address: local_address,
@@ -33,6 +37,7 @@ impl BftParams {
     }
 }
 
+/// A set of BFT timer.
 #[derive(Debug, Clone)]
 pub struct BftTimer {
     // in milliseconds.
@@ -57,22 +62,27 @@ impl Default for BftTimer {
 }
 
 impl BftTimer {
+    /// A function to set total interval.
     pub fn set_total_duration(&self, duration: u64) {
         self.total_duration.set(duration);
     }
 
+    /// A function to get propose wait duration.
     pub fn get_propose(&self) -> Duration {
         Duration::from_millis(self.total_duration.get() * self.propose.0 / self.propose.1)
     }
 
+    /// A function to get prevote wait duration.
     pub fn get_prevote(&self) -> Duration {
         Duration::from_millis(self.total_duration.get() * self.prevote.0 / self.prevote.1)
     }
 
+    /// A function to get precommit wait duration.
     pub fn get_precommit(&self) -> Duration {
         Duration::from_millis(self.total_duration.get() * self.precommit.0 / self.precommit.1)
     }
 
+    /// [Deprecated]A function to get commit wait duration.
     pub fn get_commit(&self) -> Duration {
         Duration::from_millis(self.total_duration.get() * self.commit.0 / self.commit.1)
     }

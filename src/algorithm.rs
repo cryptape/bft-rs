@@ -19,7 +19,6 @@ use log;
 use params::BftParams;
 use timer::{TimeoutInfo, WaitTimer};
 use voteset::{VoteCollector, VoteSet};
-use wal::Wal;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::thread;
@@ -36,15 +35,24 @@ const PRECOMMIT_ON_NIL: i8 = 2;
 const PRECOMMIT_ON_PROPOSAL: i8 = 3;
 const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
 
+/// BFT step
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
 pub enum Step {
+    /// A step to determine proposer and proposer publish a proposal.
     Propose,
+    /// A step to wait for proposal or feed.
     ProposeWait,
+    /// A step to transmit prevote and check prevote count.
     Prevote,
+    /// A step to wait for more prevote if none of them reach 2/3.
     PrevoteWait,
+    /// A step to transmit precommit and check precommit count.
     Precommit,
+    /// A step to wait for more prevote if none of them reach 2/3.
     PrecommitWait,
+    /// A step to do commit.
     Commit,
+    /// A step to wait for rich status.
     CommitWait,
 }
 
@@ -70,6 +78,7 @@ impl From<u8> for Step {
     }
 }
 
+/// BFT state message.
 pub struct Bft {
     msg_sender: Sender<BftMsg>,
     msg_receiver: Receiver<BftMsg>,
@@ -92,18 +101,19 @@ pub struct Bft {
 }
 
 impl Bft {
+    /// A function to start a BFT state machine.
     pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
 
-        // start timer module
+        // start timer module.
         let timer_thread = thread::spawn(move || {
             let timer = WaitTimer::new(timer2bft, timer4bft);
             timer.start();
         });
 
-        // start main loop module
+        // start main loop module.
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
         let main_thread = thread::spawn(move || loop {
             let mut get_timer_msg = Err(RecvError);
