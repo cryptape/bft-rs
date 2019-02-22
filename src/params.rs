@@ -1,5 +1,5 @@
 // CITA
-// Copyright 2016-2017 Cryptape Technologies LLC.
+// Copyright 2016-2019 Cryptape Technologies LLC.
 
 // This program is free software: you can redistribute it
 // and/or modify it under the terms of the GNU General Public
@@ -23,7 +23,7 @@ use std::time::Duration;
 pub struct BftParams {
     /// The local address.
     pub address: Address,
-    /// A set of BFT timer setting.
+    /// A set of BFT timer settings.
     pub timer: BftTimer,
 }
 
@@ -46,7 +46,6 @@ pub struct BftTimer {
     propose: (u64, u64),
     prevote: (u64, u64),
     precommit: (u64, u64),
-    commit: (u64, u64),
 }
 
 impl Default for BftTimer {
@@ -56,7 +55,6 @@ impl Default for BftTimer {
             propose: (24, 30),
             prevote: (1, 30),
             precommit: (1, 30),
-            commit: (4, 30),
         }
     }
 }
@@ -80,10 +78,5 @@ impl BftTimer {
     /// A function to get precommit wait duration.
     pub fn get_precommit(&self) -> Duration {
         Duration::from_millis(self.total_duration.get() * self.precommit.0 / self.precommit.1)
-    }
-
-    /// [Deprecated]A function to get commit wait duration.
-    pub fn get_commit(&self) -> Duration {
-        Duration::from_millis(self.total_duration.get() * self.commit.0 / self.commit.1)
     }
 }
