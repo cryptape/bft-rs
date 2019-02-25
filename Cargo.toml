@@ -6,6 +6,7 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 [dependencies]
 bincode = "0.8.0"
 crossbeam = "0.7"
+csv = "1.0"
 lru-cache = "0.1"
 log = "0.4.3"
 log4rs = "0.8.1"

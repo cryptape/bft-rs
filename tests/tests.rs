@@ -1,32 +1,41 @@
-// CITA
-// Copyright 2016-2019 Cryptape Technologies LLC.
-
-// This program is free software: you can redistribute it
-// and/or modify it under the terms of the GNU General Public
-// License as published by the Free Software Foundation,
-// either version 3 of the License, or (at your option) any
-// later version.
-
-// This program is distributed in the hope that it will be
-// useful, but WITHOUT ANY WARRANTY; without even the implied
-// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-// PURPOSE. See the GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 extern crate bft_rs as bft;
 extern crate crossbeam;
+extern crate csv;
 extern crate rand;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 
 use bft::algorithm::Bft;
 use bft::*;
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
+use rand::{thread_rng, Rng};
 
-pub fn start_process(address: Address) -> (Sender<BftMsg>, Receiver<BftMsg>) {
+fn start_process(address: Address) -> (Sender<BftMsg>, Receiver<BftMsg>) {
     let (main2bft, bft4main) = unbounded();
     let (bft2main, main4bft) = unbounded();
     Bft::start(bft2main, bft4main, address);
     (main2bft, main4bft)
+}
+
+fn generate_auth_list() -> Vec<Address> {
+    vec![vec![0], vec![1], vec![2], vec![3]]
+}
+
+fn generate_proposal() -> Target {
+    let mut proposal = vec![1, 2, 3];
+    let mut rng = thread_rng();
+
+    for ii in proposal.iter_mut() {
+        *ii = rng.gen();
+    }
+    proposal
+}
+
+fn transmit_msg(msg: BftMsg, s_1: Sender<BftMsg>, s_2: Sender<BftMsg>, s_3: Sender<BftMsg>) {
+    s_1.send(msg.clone()).unwrap();
+    s_2.send(msg.clone()).unwrap();
+    s_3.send(msg).unwrap();
 }
 
 mod integration_cases;
