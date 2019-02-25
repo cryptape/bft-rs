@@ -16,23 +16,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use bft::*;
 use crossbeam::Sender;
-use rand::{thread_rng, Rng};
 
-use std::error::Error;
-use std::io::prelude::*;
-use std::fs::File;
-use std::path::Path;
+use crate::*;
+
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use std::vec;
 
-use start_process;
-
 const INIT_HEIGHT: usize = 1;
 const MAX_TEST_HEIGHT: usize = 50;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Node {
     height: usize,
     result: Vec<(usize, Target)>,
@@ -60,13 +55,15 @@ impl Node {
     ) {
         match msg {
             BftMsg::Proposal(proposal) => {
+                println!("Node {:?} proposal {:?}", proposal.proposer, proposal.content);
                 transmit_msg(BftMsg::Proposal(proposal), s_1, s_2, s_3);
             }
             BftMsg::Vote(vote) => {
+                println!("Node {:?} vote {:?}", vote.voter, vote.proposal);
                 transmit_msg(BftMsg::Vote(vote), s_1, s_2, s_3);
             }
             BftMsg::Commit(commit) => {
-                self.result.push((commit.height, commit.proposal));
+                self.result.push((commit.clone().height, commit.clone().proposal));
                 self.height = commit.height;
                 s_self
                     .send(BftMsg::Status(Status {
@@ -77,9 +74,10 @@ impl Node {
                     .unwrap();
 
                 println!(
-                    "Node {:?}, height {:?}, consensus time {:?}",
+                    "Node {:?}, height {:?}, result {:?}, consensus time {:?}",
                     address,
-                    commit.height,
+                    commit.clone().height,
+                    commit.proposal,
                     Instant::now() - self.ins
                 );
 
@@ -96,26 +94,6 @@ impl Node {
             _ => println!("Invalid Message Type!"),
         }
     }
-}
-
-fn generate_auth_list() -> Vec<Address> {
-    vec![vec![0], vec![1], vec![2], vec![3]]
-}
-
-fn generate_proposal() -> Target {
-    let mut proposal = vec![1, 2, 3];
-    let mut rng = thread_rng();
-
-    for ii in proposal.iter_mut() {
-        *ii = rng.gen();
-    }
-    proposal
-}
-
-fn transmit_msg(msg: BftMsg, s_1: Sender<BftMsg>, s_2: Sender<BftMsg>, s_3: Sender<BftMsg>) {
-    s_1.send(msg.clone()).unwrap();
-    s_2.send(msg.clone()).unwrap();
-    s_3.send(msg).unwrap();
 }
 
 fn transmit_genesis(
@@ -147,22 +125,6 @@ fn transmit_genesis(
     s_4.send(feed).unwrap();
 }
 
-fn is_result_consistent(
-    a: (usize, Target),
-    b: (usize, Target),
-    c: (usize, Target),
-    d: (usize, Target),
-) -> bool {
-    if a.1 == b.1 {
-        if b.1 == c.1 {
-            if c.1 == d.1 {
-                return true;
-            }
-        }
-    }
-    false
-}
-
 #[test]
 fn test_bft() {
     let (send_node_0, recv_node_0) = start_process(vec![0]);
@@ -186,7 +148,7 @@ fn test_bft() {
     let node_0 = Arc::new(Mutex::new(Node::new()));
     let node_0_clone = node_0.clone();
 
-    thread::spawn(move || loop {
+    let thread_0 = thread::spawn(move || loop {
         if let Ok(recv) = recv_node_0.recv() {
             node_0_clone.lock().unwrap().handle_message(
                 recv,
@@ -200,7 +162,7 @@ fn test_bft() {
             // println!("{:?}", node_0.lock().unwrap().height);
         }
         if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
-            break;
+            ::std::process::exit(0);
         }
     });
 
@@ -212,7 +174,7 @@ fn test_bft() {
     let node_1 = Arc::new(Mutex::new(Node::new()));
     let node_1_clone = node_1.clone();
 
-    thread::spawn(move || loop {
+    let thread_1 = thread::spawn(move || loop {
         if let Ok(recv) = recv_node_1.recv() {
             node_1_clone.lock().unwrap().handle_message(
                 recv,
@@ -225,7 +187,7 @@ fn test_bft() {
             );
         }
         if node_1_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
-            break;
+            ::std::process::exit(0);
         }
     });
 
@@ -237,7 +199,7 @@ fn test_bft() {
     let node_2 = Arc::new(Mutex::new(Node::new()));
     let node_2_clone = node_2.clone();
 
-    thread::spawn(move || loop {
+    let thread_2 = thread::spawn(move || loop {
         if let Ok(recv) = recv_node_2.recv() {
             node_2_clone.lock().unwrap().handle_message(
                 recv,
@@ -251,7 +213,7 @@ fn test_bft() {
         }
 
         if node_2_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
-            break;
+            ::std::process::exit(0);
         }
     });
 
@@ -263,7 +225,7 @@ fn test_bft() {
     let node_3 = Arc::new(Mutex::new(Node::new()));
     let node_3_clone = node_3.clone();
 
-    thread::spawn(move || loop {
+    let thread_3 = thread::spawn(move || loop {
         if let Ok(recv) = recv_node_3.recv() {
             node_3_clone.lock().unwrap().handle_message(
                 recv,
@@ -277,9 +239,12 @@ fn test_bft() {
         }
 
         if node_3_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
-            break;
+            ::std::process::exit(0);
         }
-    }); 
+    });
 
-    thread::sleep(Duration::from_secs(120));
+    thread_0.join();
+    thread_1.join();
+    thread_2.join();
+    thread_3.join();
 }

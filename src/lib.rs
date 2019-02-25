@@ -53,30 +53,44 @@ pub enum BftMsg {
 /// the proposal. Therefore, these must have same variant of `Option`.
 #[derive(Clone, Debug)]
 pub struct Proposal {
-    height: usize,
-    round: usize,
-    content: Target,
-    lock_round: Option<usize>,
+    /// The height of proposal.
+    pub height: usize,
+    /// The round of proposal.
+    pub round: usize,
+    /// The proposal content.
+    pub content: Target,
+    /// A lock round of the proposal.
+    pub lock_round: Option<usize>,
+    /// The lock votes of the proposal.
     lock_votes: Option<Vec<Vote>>,
-    proposer: Address,
+    /// The address of proposer.
+    pub proposer: Address,
 }
 
 /// A PoLC.
 #[derive(Clone, Debug)]
 pub struct LockStatus {
-    proposal: Target,
-    round: usize,
-    votes: Vec<Vote>,
+    /// The lock proposal
+    pub proposal: Target,
+    /// The lock round
+    pub round: usize,
+    /// The lock votes.
+    pub votes: Vec<Vote>,
 }
 
 /// A vote to a proposal.
 #[derive(Clone, Debug)]
 pub struct Vote {
-    vote_type: Step,
-    height: usize,
-    round: usize,
-    proposal: Target,
-    voter: Address,
+    /// Prevote vote or precommit vote
+    pub vote_type: Step,
+    /// The height of vote
+    pub height: usize,
+    /// The round of vote
+    pub round: usize,
+    /// The vote proposal
+    pub proposal: Target,
+    /// The address of voter
+    pub voter: Address,
 }
 
 /// A proposal for a height.
