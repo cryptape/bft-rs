@@ -7,8 +7,6 @@
 #![allow(unused_results)]
 
 #[macro_use]
-extern crate bincode;
-#[macro_use]
 extern crate crossbeam;
 #[macro_use]
 extern crate log;
