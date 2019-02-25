@@ -491,7 +491,6 @@ impl Bft {
                     if self.lock_status.is_none() && !hash.is_empty() {
                             // receive a PoLC, lock the proposal
                             self.set_polc(&hash, &prevote_set, Step::Prevote);
-                        }
                     }
                     tv = Duration::new(0, 0);
                     break;
