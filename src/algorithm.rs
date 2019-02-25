@@ -76,12 +76,13 @@ pub struct Bft {
     proposal: Option<Target>,
     votes: VoteCollector,
     lock_status: Option<LockStatus>,
-    // wal_log: Wal,
     last_commit_round: Option<usize>,
     last_commit_proposal: Option<Target>,
     authority_list: Vec<Address>,
     htime: Instant,
     params: BftParams,
+    #[cfg(verify_req)]
+    verify_flag: bool,
 }
 
 impl Bft {
@@ -117,8 +118,8 @@ impl Bft {
             }
         });
 
-        // main_thread.join().unwrap();
-        // timer_thread.join().unwrap();
+        main_thread.join().unwrap();
+        timer_thread.join().unwrap();
     }
 
     fn initialize(
@@ -487,8 +488,7 @@ impl Bft {
                             self.set_polc(&hash, &prevote_set, Step::Prevote);
                         }
                     }
-                    if self.lock_status.is_none() {
-                        if !hash.is_empty() {
+                    if self.lock_status.is_none() && !hash.is_empty() {
                             // receive a PoLC, lock the proposal
                             self.set_polc(&hash, &prevote_set, Step::Prevote);
                         }
