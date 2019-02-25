@@ -95,6 +95,8 @@ pub struct Feed {
 pub struct Commit {
     /// The height of result.
     pub height: usize,
+    /// The round of result.
+    pub round: usize,
     /// Consensus result
     pub proposal: Target,
     /// Vote for generate proof.

@@ -581,6 +581,7 @@ impl Bft {
         if let Some(result) = self.lock_status.clone() {
             self.send_bft_msg(BftMsg::Commit(Commit {
                 height: self.height,
+                round: self.round,
                 proposal: result.clone().proposal,
                 lock_votes: self.lock_status.clone().unwrap().votes,
             }));
