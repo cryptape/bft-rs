@@ -2,9 +2,6 @@ extern crate bft_rs as bft;
 extern crate crossbeam;
 extern crate csv;
 extern crate rand;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
 
 use bft::algorithm::Bft;
 use bft::*;
