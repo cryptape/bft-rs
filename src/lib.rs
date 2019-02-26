@@ -62,7 +62,7 @@ pub struct Proposal {
     /// A lock round of the proposal.
     pub lock_round: Option<usize>,
     /// The lock votes of the proposal.
-    lock_votes: Option<Vec<Vote>>,
+    pub lock_votes: Option<Vec<Vote>>,
     /// The address of proposer.
     pub proposer: Address,
 }
@@ -79,7 +79,7 @@ pub struct LockStatus {
 }
 
 /// A vote to a proposal.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Vote {
     /// Prevote vote or precommit vote
     pub vote_type: Step,
@@ -113,6 +113,8 @@ pub struct Commit {
     pub proposal: Target,
     /// Vote for generate proof.
     pub lock_votes: Vec<Vote>,
+    /// Node address.
+    pub address: Address,
 }
 
 /// Necessary messages for a height.
