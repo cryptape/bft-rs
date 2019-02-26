@@ -18,6 +18,7 @@ const PRECOMMIT_ON_NOTHING: i8 = 1;
 const PRECOMMIT_ON_NIL: i8 = 2;
 const PRECOMMIT_ON_PROPOSAL: i8 = 3;
 const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
+const TIMEOUT_LOW_ROUND_MESSAGE_MULTIPLE: u32 = 30;
 
 /// BFT step
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
@@ -78,6 +79,7 @@ pub struct Bft {
     lock_status: Option<LockStatus>,
     last_commit_round: Option<usize>,
     last_commit_proposal: Option<Target>,
+    send_filter: HashMap<Address, Instant>,
     authority_list: Vec<Address>,
     htime: Instant,
     params: BftParams,
@@ -118,8 +120,8 @@ impl Bft {
             }
         });
 
-        main_thread.join().unwrap();
-        timer_thread.join().unwrap();
+        // main_thread.join().unwrap();
+        // timer_thread.join().unwrap();
     }
 
     fn initialize(
@@ -146,6 +148,7 @@ impl Bft {
             last_commit_proposal: None,
             authority_list: Vec::new(),
             htime: Instant::now(),
+            send_filter: HashMap::new(),
             params: BftParams::new(local_address),
         }
     }
@@ -489,8 +492,8 @@ impl Bft {
                         }
                     }
                     if self.lock_status.is_none() && !hash.is_empty() {
-                            // receive a PoLC, lock the proposal
-                            self.set_polc(&hash, &prevote_set, Step::Prevote);
+                        // receive a PoLC, lock the proposal
+                        self.set_polc(&hash, &prevote_set, Step::Prevote);
                     }
                     tv = Duration::new(0, 0);
                     break;
@@ -583,6 +586,7 @@ impl Bft {
                 round: self.round,
                 proposal: result.clone().proposal,
                 lock_votes: self.lock_status.clone().unwrap().votes,
+                address: self.params.clone().address,
             }));
 
             info!(
