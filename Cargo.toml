@@ -1,6 +1,6 @@
 [package]
 name = "bft-rs"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 license = "MIT"
 readme = "README.md"
