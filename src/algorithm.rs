@@ -13,12 +13,13 @@ use super::*;
 const INIT_HEIGHT: usize = 1;
 const INIT_ROUND: usize = 0;
 const PROPOSAL_TIMES_COEF: usize = 10;
-const PRECOMMIT_BELOW_TWO_THIRD: i8 = 0;
+const PRECOMMIT_BELOW_TWO_THIRDS: i8 = 0;
 const PRECOMMIT_ON_NOTHING: i8 = 1;
 const PRECOMMIT_ON_NIL: i8 = 2;
 const PRECOMMIT_ON_PROPOSAL: i8 = 3;
 const TIMEOUT_RETRANSE_MULTIPLE: u32 = 15;
-const TIMEOUT_LOW_ROUND_MESSAGE_MULTIPLE: u32 = 30;
+const TIMEOUT_LOW_HEIGHT_MESSAGE_MULTIPLE: u32 = 300;
+const TIMEOUT_LOW_ROUND_MESSAGE_MULTIPLE: u32 = 300;
 
 /// BFT step
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
@@ -79,7 +80,8 @@ pub struct Bft {
     lock_status: Option<LockStatus>,
     last_commit_round: Option<usize>,
     last_commit_proposal: Option<Target>,
-    send_filter: HashMap<Address, Instant>,
+    height_filter: HashMap<Address, Instant>,
+    round_filter: HashMap<Address, Instant>,
     authority_list: Vec<Address>,
     htime: Instant,
     params: BftParams,
@@ -148,7 +150,8 @@ impl Bft {
             last_commit_proposal: None,
             authority_list: Vec::new(),
             htime: Instant::now(),
-            send_filter: HashMap::new(),
+            height_filter: HashMap::new(),
+            round_filter: HashMap::new(),
             params: BftParams::new(local_address),
         }
     }
@@ -186,14 +189,22 @@ impl Bft {
     }
 
     #[inline]
+    fn clean_filter(&mut self) {
+        self.height_filter.clear();
+        self.round_filter.clear();
+    }
+
+    #[inline]
     fn goto_next_round(&mut self) {
         trace!("Goto next round {:?}", self.round + 1);
+        self.round_filter.clear();
         self.round += 1;
     }
 
     #[inline]
     fn goto_new_height(&mut self, new_height: usize) {
         self.clean_save_info();
+        self.clean_filter();
         self.height = new_height;
         self.round = 0;
         self.htime = Instant::now();
@@ -235,6 +246,44 @@ impl Bft {
             proposal: self.last_commit_proposal.clone().unwrap(),
             voter: self.params.clone().address,
         }));
+    }
+
+    fn determine_height_filter(&self, sender: Address) -> (bool, bool) {
+        let mut add_flag = false;
+        let mut trans_flag = false;
+
+        if let Some(ins) = self.height_filter.get(&sender) {
+            // had received retransmit message from the address
+            if (Instant::now() - *ins)
+                > self.params.timer.get_prevote() * TIMEOUT_LOW_HEIGHT_MESSAGE_MULTIPLE
+            {
+                trans_flag = true;
+            }
+        } else {
+            // never recvive retransmit message from the address
+            add_flag = true;
+            trans_flag = true;
+        }
+        (add_flag, trans_flag)
+    }
+
+    fn determine_round_filter(&self, sender: Address) -> (bool, bool) {
+        let mut add_flag = false;
+        let mut trans_flag = false;
+
+        if let Some(ins) = self.round_filter.get(&sender) {
+            // had received retransmit message from the address
+            if (Instant::now() - *ins)
+                > self.params.timer.get_prevote() * TIMEOUT_LOW_ROUND_MESSAGE_MULTIPLE
+            {
+                trans_flag = true;
+            }
+        } else {
+            // never recvive retransmit message from the address
+            add_flag = true;
+            trans_flag = true;
+        }
+        (add_flag, trans_flag)
     }
 
     fn determine_proposer(&self) -> bool {
@@ -426,18 +475,34 @@ impl Bft {
     fn try_save_vote(&mut self, vote: Vote) -> bool {
         if vote.height == self.height - 1 && Some(vote.round) >= self.last_commit_round {
             // deal with height fall behind one, round ge last commit round
-            self.retransmit_vote(vote.round);
+            let sender = vote.voter.clone();
+            let (add_flag, trans_flag) = self.determine_height_filter(sender.clone());
+
+            if add_flag {
+                self.height_filter.insert(sender, Instant::now());
+            }
+            if trans_flag {
+                self.retransmit_vote(vote.round);
+            }
             return false;
         } else if vote.height == self.height && self.round != 0 && vote.round == self.round - 1 {
             // deal with equal height, round fall behind
-            info!("Some nodes fall behind, send nil vote to help them pursue");
-            self.send_bft_msg(BftMsg::Vote(Vote {
-                vote_type: Step::Precommit,
-                height: vote.height,
-                round: vote.round,
-                proposal: Vec::new(),
-                voter: self.params.clone().address,
-            }));
+            let sender = vote.voter.clone();
+            let (add_flag, trans_flag) = self.determine_round_filter(sender.clone());
+
+            if add_flag {
+                self.round_filter.insert(sender, Instant::now());
+            }
+            if trans_flag {
+                info!("Some nodes fall behind, send nil vote to help them pursue");
+                self.send_bft_msg(BftMsg::Vote(Vote {
+                    vote_type: Step::Precommit,
+                    height: vote.height,
+                    round: vote.round,
+                    proposal: Vec::new(),
+                    voter: self.params.clone().address,
+                }));
+            }
             return false;
         } else if vote.height == self.height && vote.round >= self.round && self.votes.add(vote) {
             trace!(
@@ -552,7 +617,7 @@ impl Bft {
             };
 
             if !self.cal_above_threshold(precommit_set.count) {
-                return PRECOMMIT_BELOW_TWO_THIRD;
+                return PRECOMMIT_BELOW_TWO_THIRDS;
             }
 
             info!(
