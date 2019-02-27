@@ -1,100 +1,14 @@
-// CITA
-// Copyright 2016-2019 Cryptape Technologies LLC.
-
-// This program is free software: you can redistribute it
-// and/or modify it under the terms of the GNU General Public
-// License as published by the Free Software Foundation,
-// either version 3 of the License, or (at your option) any
-// later version.
-
-// This program is distributed in the hope that it will be
-// useful, but WITHOUT ANY WARRANTY; without even the implied
-// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-// PURPOSE. See the GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use bft::*;
-use crossbeam::Sender;
+use crossbeam::crossbeam_channel::{unbounded, Sender};
 
 use crate::*;
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use std::vec;
 
-const INIT_HEIGHT: usize = 1;
-const MAX_TEST_HEIGHT: usize = 50;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct Node {
-    height: usize,
-    result: Vec<(usize, Target)>,
-    ins: Instant,
-}
-
-impl Node {
-    fn new() -> Self {
-        Node {
-            height: INIT_HEIGHT,
-            result: Vec::new(),
-            ins: Instant::now(),
-        }
-    }
-
-    fn handle_message(
-        &mut self,
-        msg: BftMsg,
-        auth_list: Vec<Address>,
-        address: i8,
-        s_1: Sender<BftMsg>,
-        s_2: Sender<BftMsg>,
-        s_3: Sender<BftMsg>,
-        s_self: Sender<BftMsg>,
-    ) {
-        match msg {
-            BftMsg::Proposal(proposal) => {
-                println!("Node {:?} proposal {:?}", proposal.proposer, proposal.content);
-                transmit_msg(BftMsg::Proposal(proposal), s_1, s_2, s_3);
-            }
-            BftMsg::Vote(vote) => {
-                println!("Node {:?} vote {:?}", vote.voter, vote.proposal);
-                transmit_msg(BftMsg::Vote(vote), s_1, s_2, s_3);
-            }
-            BftMsg::Commit(commit) => {
-                self.result.push((commit.clone().height, commit.clone().proposal));
-                self.height = commit.height;
-                s_self
-                    .send(BftMsg::Status(Status {
-                        height: commit.height,
-                        interval: None,
-                        authority_list: auth_list,
-                    }))
-                    .unwrap();
-
-                println!(
-                    "Node {:?}, height {:?}, result {:?}, consensus time {:?}",
-                    address,
-                    commit.clone().height,
-                    commit.proposal,
-                    Instant::now() - self.ins
-                );
-
-                self.ins = Instant::now();
-                // thread::sleep(Duration::from_micros(10));
-                self.height += 1;
-                s_self
-                    .send(BftMsg::Feed(Feed {
-                        height: commit.height + 1,
-                        proposal: generate_proposal(),
-                    }))
-                    .unwrap();
-            }
-            _ => println!("Invalid Message Type!"),
-        }
-    }
-}
+const MAX_TEST_HEIGHT: usize = 1000;
 
 fn transmit_genesis(
     s_1: Sender<BftMsg>,
@@ -125,12 +39,27 @@ fn transmit_genesis(
     s_4.send(feed).unwrap();
 }
 
+fn is_success(result: Vec<Target>) -> bool {
+    let mut result_hashmap: HashMap<Target, u8> = HashMap::new();
+    for ii in result.into_iter() {
+        let counter = result_hashmap.entry(ii).or_insert(0);
+        *counter += 1;
+    }
+    for (_, count) in result_hashmap.into_iter() {
+        if count >= 3 {
+            return true;
+        }
+    }
+    false
+}
+
 #[test]
 fn test_bft() {
     let (send_node_0, recv_node_0) = start_process(vec![0]);
     let (send_node_1, recv_node_1) = start_process(vec![1]);
     let (send_node_2, recv_node_2) = start_process(vec![2]);
     let (send_node_3, recv_node_3) = start_process(vec![3]);
+    let (send_result, recv_result) = unbounded();
 
     // simulate the message from executor when executed genesis block
     transmit_genesis(
@@ -145,6 +74,7 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
+    let send_r = send_result.clone();
     let node_0 = Arc::new(Mutex::new(Node::new()));
     let node_0_clone = node_0.clone();
 
@@ -152,12 +82,10 @@ fn test_bft() {
         if let Ok(recv) = recv_node_0.recv() {
             node_0_clone.lock().unwrap().handle_message(
                 recv,
-                generate_auth_list(),
-                0,
                 send_1.clone(),
                 send_2.clone(),
                 send_3.clone(),
-                send_0.clone(),
+                send_r.clone(),
             );
             // println!("{:?}", node_0.lock().unwrap().height);
         }
@@ -171,6 +99,7 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
+    let send_r = send_result.clone();
     let node_1 = Arc::new(Mutex::new(Node::new()));
     let node_1_clone = node_1.clone();
 
@@ -178,12 +107,10 @@ fn test_bft() {
         if let Ok(recv) = recv_node_1.recv() {
             node_1_clone.lock().unwrap().handle_message(
                 recv,
-                generate_auth_list(),
-                1,
                 send_0.clone(),
                 send_2.clone(),
                 send_3.clone(),
-                send_1.clone(),
+                send_r.clone(),
             );
         }
         if node_1_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
@@ -196,6 +123,7 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
+    let send_r = send_result.clone();
     let node_2 = Arc::new(Mutex::new(Node::new()));
     let node_2_clone = node_2.clone();
 
@@ -203,12 +131,10 @@ fn test_bft() {
         if let Ok(recv) = recv_node_2.recv() {
             node_2_clone.lock().unwrap().handle_message(
                 recv,
-                generate_auth_list(),
-                2,
                 send_1.clone(),
                 send_0.clone(),
                 send_3.clone(),
-                send_2.clone(),
+                send_r.clone(),
             );
         }
 
@@ -222,6 +148,7 @@ fn test_bft() {
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
+    let send_r = send_result.clone();
     let node_3 = Arc::new(Mutex::new(Node::new()));
     let node_3_clone = node_3.clone();
 
@@ -229,12 +156,10 @@ fn test_bft() {
         if let Ok(recv) = recv_node_3.recv() {
             node_3_clone.lock().unwrap().handle_message(
                 recv,
-                generate_auth_list(),
-                3,
                 send_1.clone(),
                 send_2.clone(),
                 send_0.clone(),
-                send_3.clone(),
+                send_r.clone(),
             );
         }
 
@@ -243,8 +168,128 @@ fn test_bft() {
         }
     });
 
+    let send_0 = send_node_0.clone();
+    let send_1 = send_node_1.clone();
+    let send_2 = send_node_2.clone();
+    let send_3 = send_node_3.clone();
+    let sender = vec![
+        send_0.clone(),
+        send_1.clone(),
+        send_2.clone(),
+        send_3.clone(),
+    ];
+
+    let thread_commit = thread::spawn(move || {
+        let mut chain_height: i64 = 2;
+        let mut result: Vec<Target> = Vec::new();
+        let mut node_0_height = 0;
+        let mut node_1_height = 0;
+        let mut node_2_height = 0;
+        let mut node_3_height = 0;
+        let mut now = Instant::now();
+
+        loop {
+            if let Ok(recv) = recv_result.recv() {
+                if recv.clone().address == vec![0] {
+                    node_0_height = recv.height + 1;
+                } else if recv.clone().address == vec![1] {
+                    node_1_height = recv.height + 1;
+                } else if recv.clone().address == vec![2] {
+                    node_2_height = recv.height + 1;
+                } else if recv.clone().address == vec![3] {
+                    node_3_height = recv.height + 1;
+                } else {
+                    panic!("aaa");
+                }
+
+                if recv.height as i64 == chain_height {
+                    result.push(recv.proposal.clone());
+                }
+
+                println!(
+                    "Node {:?},   Height {:?},  Commit {:?}",
+                    recv.address.clone(),
+                    recv.height.clone(),
+                    recv.proposal.clone(),
+                );
+
+                sender[recv.address[0].clone() as usize]
+                    .send(BftMsg::Status(Status {
+                        height: recv.height.clone(),
+                        interval: None,
+                        authority_list: generate_auth_list(),
+                    }))
+                    .unwrap();
+                sender[recv.address[0].clone() as usize]
+                    .send(BftMsg::Feed(Feed {
+                        height: recv.height.clone() + 1,
+                        proposal: generate_proposal(),
+                    }))
+                    .unwrap();
+            }
+            if result.clone().len() >= 3 {
+                if is_success(result.clone()) {
+                    println!(
+                        "Consensus success at height {:?}, with {:?}",
+                        chain_height,
+                        Instant::now() - now
+                    );
+                    result.clear();
+                    chain_height += 1;
+                    now = Instant::now();
+                } else {
+                    ::std::process::exit(1);
+                    panic!("Consensus fail at height {:?}", chain_height);
+                }
+            }
+
+            // simulate sync proc
+            if (node_0_height as i64) < chain_height - 1 {
+                println!("Sync node 0 to height {:?}", chain_height);
+                send_0
+                    .send(BftMsg::Status(Status {
+                        height: (chain_height - 1) as usize,
+                        interval: None,
+                        authority_list: generate_auth_list(),
+                    }))
+                    .unwrap();
+            }
+            if (node_1_height as i64) < chain_height - 3 {
+                println!("Sync node 1 to height {:?}", chain_height);
+                send_1
+                    .send(BftMsg::Status(Status {
+                        height: (chain_height - 1) as usize,
+                        interval: None,
+                        authority_list: generate_auth_list(),
+                    }))
+                    .unwrap();
+            }
+            if (node_2_height as i64) < chain_height - 3 {
+                println!("Sync node 2 to height {:?}", chain_height);
+                send_2
+                    .send(BftMsg::Status(Status {
+                        height: (chain_height - 1) as usize,
+                        interval: None,
+                        authority_list: generate_auth_list(),
+                    }))
+                    .unwrap();
+            }
+            if (node_3_height as i64) < chain_height - 3 {
+                println!("Sync node 3 to height {:?}", chain_height);
+                send_3
+                    .send(BftMsg::Status(Status {
+                        height: (chain_height - 1) as usize,
+                        interval: None,
+                        authority_list: generate_auth_list(),
+                    }))
+                    .unwrap();
+            }
+        }
+    });
+
     thread_0.join();
     thread_1.join();
     thread_2.join();
     thread_3.join();
+    thread_commit.join();
 }
