@@ -42,8 +42,9 @@ impl WaitTimer {
         loop {
             // take the peek of the min-heap-timer sub now as the sleep time otherwise set timeout as 100
             let timeout = if !timer_heap.is_empty() {
-                if *timer_heap.peek_min().unwrap() > Instant::now() {
-                    *timer_heap.peek_min().unwrap() - Instant::now()
+                let now = Instant::now();
+                if *timer_heap.peek_min().unwrap() > now {
+                    *timer_heap.peek_min().unwrap() - now
                 } else {
                     Duration::new(0, 0)
                 }
