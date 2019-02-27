@@ -1,5 +1,6 @@
 use bft::*;
 use crossbeam::crossbeam_channel::{unbounded, Sender};
+use rand::{thread_rng, Rng};
 
 use crate::*;
 
@@ -8,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-const MAX_TEST_HEIGHT: usize = 10;
+const MAX_TEST_HEIGHT: usize = 1000;
 
 fn transmit_genesis(
     s_1: Sender<BftMsg>,
@@ -39,6 +40,16 @@ fn transmit_genesis(
     s_4.send(feed).unwrap();
 }
 
+fn random_offline() -> bool {
+    let mut rng = thread_rng();
+    let x: f64 = rng.gen_range(0 as f64, 1 as f64);
+    // the offline probablity is 0.01
+    if x < 0.01 {
+        return true;
+    }
+    false
+}
+
 fn is_success(result: Vec<Target>) -> bool {
     let mut result_hashmap: HashMap<Target, u8> = HashMap::new();
     for ii in result.into_iter() {
@@ -54,7 +65,7 @@ fn is_success(result: Vec<Target>) -> bool {
 }
 
 #[test]
-fn test_bft() {
+fn test_random_offline() {
     let (send_node_0, recv_node_0) = start_process(vec![0]);
     let (send_node_1, recv_node_1) = start_process(vec![1]);
     let (send_node_2, recv_node_2) = start_process(vec![2]);
@@ -70,7 +81,6 @@ fn test_bft() {
     );
 
     // this is the thread of node 0
-    let send_0 = send_node_0.clone();
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
@@ -87,8 +97,16 @@ fn test_bft() {
                 send_3.clone(),
                 send_r.clone(),
             );
-            // println!("{:?}", node_0.lock().unwrap().height);
         }
+
+        if random_offline() {
+            let mut rng = thread_rng();
+            // offline for t secends
+            let t: u64 = rng.gen_range(5, 30);
+            println!("!!! Node 0 offline {:?} sec", t);
+            thread::sleep(Duration::from_secs(t));
+        }
+
         if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             ::std::process::exit(0);
         }
@@ -96,7 +114,6 @@ fn test_bft() {
 
     // this is the thread of node 1
     let send_0 = send_node_0.clone();
-    let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
     let send_r = send_result.clone();
@@ -113,6 +130,15 @@ fn test_bft() {
                 send_r.clone(),
             );
         }
+
+        if random_offline() {
+            let mut rng = thread_rng();
+            // offline for t secends
+            let t: u64 = rng.gen_range(5, 30);
+            println!("!!! Node 1 offline {:?} sec", t);
+            thread::sleep(Duration::from_secs(t));
+        }
+
         if node_1_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             ::std::process::exit(0);
         }
@@ -121,7 +147,6 @@ fn test_bft() {
     // this is the thread of node 2
     let send_0 = send_node_0.clone();
     let send_1 = send_node_1.clone();
-    let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
     let send_r = send_result.clone();
     let node_2 = Arc::new(Mutex::new(Node::new()));
@@ -138,6 +163,14 @@ fn test_bft() {
             );
         }
 
+        if random_offline() {
+            let mut rng = thread_rng();
+            // offline for t secends
+            let t: u64 = rng.gen_range(5, 30);
+            println!("!!! Node 2 offline {:?} sec", t);
+            thread::sleep(Duration::from_secs(t));
+        }
+
         if node_2_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             ::std::process::exit(0);
         }
@@ -147,7 +180,6 @@ fn test_bft() {
     let send_0 = send_node_0.clone();
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
-    let send_3 = send_node_3.clone();
     let send_r = send_result.clone();
     let node_3 = Arc::new(Mutex::new(Node::new()));
     let node_3_clone = node_3.clone();
@@ -161,6 +193,14 @@ fn test_bft() {
                 send_0.clone(),
                 send_r.clone(),
             );
+        }
+
+        if random_offline() {
+            let mut rng = thread_rng();
+            // offline for t secends
+            let t: u64 = rng.gen_range(5, 30);
+            println!("!!! Node 3 offline {:?} sec", t);
+            thread::sleep(Duration::from_secs(t));
         }
 
         if node_3_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
@@ -239,7 +279,6 @@ fn test_bft() {
                     now = Instant::now();
                 } else {
                     ::std::process::exit(1);
-                    panic!("Consensus fail at height {:?}", chain_height);
                 }
             }
 
