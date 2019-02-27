@@ -11,21 +11,17 @@ An efficent and stable Rust library of BFT protocol for distributed system.
 """
 
 [dependencies]
-bincode = "0.8.0"
-crossbeam = {version = "0.7", optional = true}
-lru-cache = {version = "0.1", optional = true}
-log = {version = "0.4.3", optional = true}
-log4rs = {version = "0.8.1", optional = true}
-min-max-heap = {version = "1.2.0", optional = true}
-serde = {version = "1.0", optional = true}
-serde_derive = {version = "1.0", optional = true}
-time = {version = "0.1.36", optional = true}
+bincode = {version = "0.8.0"}
+crossbeam = {version = "0.7"}
+lru-cache = {version = "0.1"}
+log = {version = "0.4.3"}
+log4rs = {version = "0.8.1"}
+min-max-heap = {version = "1.2.0"}
+serde = {version = "1.0"}
+serde_derive = {version = "1.0"}
+time = {version = "0.1.36"}
 
 [dev-dependencies]
 csv = "1.0"
 env_logger = "0.6.0"
 rand = "0.5.5"
-
-[features]
-default = ["crossbeam", "lru-cache", "log", "log4rs", "min-max-heap", "serde", "serde_derive", "time"]
-verify-req = ["crossbeam", "lru-cache", "log", "log4rs", "min-max-heap", "serde", "serde_derive", "time"]
