@@ -97,14 +97,14 @@ impl Bft {
         let (timer2bft, bft4timer) = unbounded();
 
         // start timer module.
-        let timer_thread = thread::spawn(move || {
+        let _timer_thread = thread::spawn(move || {
             let timer = WaitTimer::new(timer2bft, timer4bft);
             timer.start();
         });
 
         // start main loop module.
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
-        let main_thread = thread::spawn(move || loop {
+        let _main_thread = thread::spawn(move || loop {
             let mut get_timer_msg = Err(RecvError);
             let mut get_msg = Err(RecvError);
 
@@ -121,9 +121,6 @@ impl Bft {
                 engine.process(ok_msg);
             }
         });
-
-        // main_thread.join().unwrap();
-        // timer_thread.join().unwrap();
     }
 
     fn initialize(
@@ -505,7 +502,10 @@ impl Bft {
                 }));
             }
             return false;
-        } else if vote.height == self.height && vote.round >= self.round && self.votes.add(vote.clone()) {
+        } else if vote.height == self.height
+            && vote.round >= self.round
+            && self.votes.add(vote.clone())
+        {
             trace!(
                 "Receive a vote at height {:?}, round {:?}, from {:?}",
                 self.height,
@@ -768,27 +768,27 @@ impl Bft {
                     if self.step < Step::Precommit {
                         let _ = self.try_save_vote(vote.clone());
                     }
-                    if self.step == Step::Precommit || self.step == Step::PrecommitWait {
-                        if self.try_save_vote(vote) {
-                            let precommit_result = self.check_precommit();
-                            if precommit_result == PRECOMMIT_ON_NOTHING {
-                                // only receive +2/3 precommits might lead BFT to PrecommitWait
-                                self.change_to_step(Step::PrecommitWait);
+                    if (self.step == Step::Precommit || self.step == Step::PrecommitWait)
+                        && self.try_save_vote(vote)
+                    {
+                        let precommit_result = self.check_precommit();
+                        if precommit_result == PRECOMMIT_ON_NOTHING {
+                            // only receive +2/3 precommits might lead BFT to PrecommitWait
+                            self.change_to_step(Step::PrecommitWait);
+                        }
+                        if precommit_result == PRECOMMIT_ON_NIL {
+                            // receive +2/3 on nil, goto next round directly
+                            if self.lock_status.is_none() {
+                                self.proposal = None;
                             }
-                            if precommit_result == PRECOMMIT_ON_NIL {
-                                // receive +2/3 on nil, goto next round directly
-                                if self.lock_status.is_none() {
-                                    self.proposal = None;
-                                }
-                                self.goto_next_round();
-                                self.new_round_start();
-                            }
-                            if precommit_result == PRECOMMIT_ON_PROPOSAL {
-                                // receive +2/3 on a proposal, try to commit
-                                self.change_to_step(Step::Commit);
-                                self.proc_commit();
-                                self.change_to_step(Step::CommitWait);
-                            }
+                            self.goto_next_round();
+                            self.new_round_start();
+                        }
+                        if precommit_result == PRECOMMIT_ON_PROPOSAL {
+                            // receive +2/3 on a proposal, try to commit
+                            self.change_to_step(Step::Commit);
+                            self.proc_commit();
+                            self.change_to_step(Step::CommitWait);
                         }
                     }
                 } else {

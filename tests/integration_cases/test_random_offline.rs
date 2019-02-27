@@ -1,6 +1,6 @@
 use bft::*;
-use env_logger;
 use crossbeam::crossbeam_channel::{unbounded, Sender};
+use env_logger;
 use rand::{thread_rng, Rng};
 
 use crate::*;
@@ -68,7 +68,7 @@ fn is_success(result: Vec<Target>) -> bool {
 #[test]
 fn test_random_offline() {
     env_logger::init();
-    
+
     let (send_node_0, recv_node_0) = start_process(vec![0]);
     let (send_node_1, recv_node_1) = start_process(vec![1]);
     let (send_node_2, recv_node_2) = start_process(vec![2]);
