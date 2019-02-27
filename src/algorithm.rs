@@ -526,7 +526,6 @@ impl Bft {
         if !flag {
             return false;
         }
-
         info!(
             "Receive over 2/3 prevote at height {:?}, round {:?}",
             self.height, self.round
@@ -552,7 +551,7 @@ impl Bft {
                             trace!("Receive over 2/3 prevote to nil");
                             self.clean_polc();
                         } else {
-                            // receive a newer PoLC, update lock info
+                            // receive a later PoLC, update lock info
                             self.set_polc(&hash, &prevote_set, Step::Prevote);
                         }
                     }
@@ -615,7 +614,6 @@ impl Bft {
             } else {
                 self.params.timer.get_precommit()
             };
-
             if !self.cal_above_threshold(precommit_set.count) {
                 return PRECOMMIT_BELOW_TWO_THIRDS;
             }
@@ -639,7 +637,6 @@ impl Bft {
             if self.step == Step::Precommit {
                 self.set_timer(tv, Step::PrecommitWait);
             }
-            // return PRECOMMIT_ON_NOTHING;
         }
         PRECOMMIT_ON_NOTHING
     }
@@ -770,25 +767,26 @@ impl Bft {
                         let _ = self.try_save_vote(vote.clone());
                     }
                     if self.step == Step::Precommit || self.step == Step::PrecommitWait {
-                        let _ = self.try_save_vote(vote);
-                        let precommit_result = self.check_precommit();
-                        if precommit_result == PRECOMMIT_ON_NOTHING {
-                            // only receive +2/3 precommits might lead BFT to PrecommitWait
-                            self.change_to_step(Step::PrecommitWait);
-                        }
-                        if precommit_result == PRECOMMIT_ON_NIL {
-                            // receive +2/3 on nil, goto next round directly
-                            if self.lock_status.is_none() {
-                                self.proposal = None;
+                        if self.try_save_vote(vote) {
+                            let precommit_result = self.check_precommit();
+                            if precommit_result == PRECOMMIT_ON_NOTHING {
+                                // only receive +2/3 precommits might lead BFT to PrecommitWait
+                                self.change_to_step(Step::PrecommitWait);
                             }
-                            self.goto_next_round();
-                            self.new_round_start();
-                        }
-                        if precommit_result == PRECOMMIT_ON_PROPOSAL {
-                            // receive +2/3 on a proposal, try to commit
-                            self.change_to_step(Step::Commit);
-                            self.proc_commit();
-                            self.change_to_step(Step::CommitWait);
+                            if precommit_result == PRECOMMIT_ON_NIL {
+                                // receive +2/3 on nil, goto next round directly
+                                if self.lock_status.is_none() {
+                                    self.proposal = None;
+                                }
+                                self.goto_next_round();
+                                self.new_round_start();
+                            }
+                            if precommit_result == PRECOMMIT_ON_PROPOSAL {
+                                // receive +2/3 on a proposal, try to commit
+                                self.change_to_step(Step::Commit);
+                                self.proc_commit();
+                                self.change_to_step(Step::CommitWait);
+                            }
                         }
                     }
                 } else {
@@ -857,6 +855,7 @@ impl Bft {
             }
             Step::PrecommitWait => {
                 // receive +2/3 precommits however no proposal reach +2/3
+                // then goto next round directly
                 if self.lock_status.is_none() {
                     self.proposal = None;
                 }
