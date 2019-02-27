@@ -1,4 +1,5 @@
 use bft::*;
+use env_logger;
 use crossbeam::crossbeam_channel::{unbounded, Sender};
 use rand::{thread_rng, Rng};
 
@@ -66,6 +67,8 @@ fn is_success(result: Vec<Target>) -> bool {
 
 #[test]
 fn test_random_offline() {
+    env_logger::init();
+    
     let (send_node_0, recv_node_0) = start_process(vec![0]);
     let (send_node_1, recv_node_1) = start_process(vec![1]);
     let (send_node_2, recv_node_2) = start_process(vec![2]);
@@ -102,7 +105,7 @@ fn test_random_offline() {
         if random_offline() {
             let mut rng = thread_rng();
             // offline for t secends
-            let t: u64 = rng.gen_range(5, 30);
+            let t: u64 = rng.gen_range(1, 10);
             println!("!!! Node 0 offline {:?} sec", t);
             thread::sleep(Duration::from_secs(t));
         }
@@ -246,12 +249,12 @@ fn test_random_offline() {
                     result.push(recv.proposal.clone());
                 }
 
-                println!(
-                    "Node {:?},   Height {:?},  Commit {:?}",
-                    recv.address.clone(),
-                    recv.height.clone(),
-                    recv.proposal.clone(),
-                );
+                // println!(
+                //     "Node {:?},   Height {:?},  Commit {:?}",
+                //     recv.address.clone(),
+                //     recv.height.clone(),
+                //     recv.proposal.clone(),
+                // );
 
                 sender[recv.address[0].clone() as usize]
                     .send(BftMsg::Status(Status {

@@ -399,9 +399,10 @@ impl Bft {
 
     fn save_proposal(&mut self, proposal: Proposal) {
         trace!(
-            "Receive a proposal at height {:?}, round {:?}",
+            "Receive a proposal at height {:?}, round {:?}, from {:?}",
             self.height,
-            self.round
+            proposal.round,
+            proposal.proposer
         );
 
         if proposal.lock_round.is_some()
@@ -504,11 +505,12 @@ impl Bft {
                 }));
             }
             return false;
-        } else if vote.height == self.height && vote.round >= self.round && self.votes.add(vote) {
+        } else if vote.height == self.height && vote.round >= self.round && self.votes.add(vote.clone()) {
             trace!(
-                "Receive a vote at height {:?}, round {:?}",
+                "Receive a vote at height {:?}, round {:?}, from {:?}",
                 self.height,
-                self.round
+                vote.round,
+                vote.voter
             );
             return true;
         }

@@ -10,7 +10,6 @@
 extern crate crossbeam;
 #[macro_use]
 extern crate log;
-extern crate log4rs;
 extern crate lru_cache;
 extern crate min_max_heap;
 #[macro_use]
