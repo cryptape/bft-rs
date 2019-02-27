@@ -1,5 +1,6 @@
 use bft::*;
 use crossbeam::crossbeam_channel::{unbounded, Sender};
+use env_logger;
 
 use crate::*;
 
@@ -55,6 +56,8 @@ fn is_success(result: Vec<Target>) -> bool {
 
 #[test]
 fn test_bft() {
+    env_logger::init();
+
     let (send_node_0, recv_node_0) = start_process(vec![0]);
     let (send_node_1, recv_node_1) = start_process(vec![1]);
     let (send_node_2, recv_node_2) = start_process(vec![2]);
@@ -70,7 +73,6 @@ fn test_bft() {
     );
 
     // this is the thread of node 0
-    let send_0 = send_node_0.clone();
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
@@ -96,7 +98,6 @@ fn test_bft() {
 
     // this is the thread of node 1
     let send_0 = send_node_0.clone();
-    let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
     let send_r = send_result.clone();
@@ -121,7 +122,6 @@ fn test_bft() {
     // this is the thread of node 2
     let send_0 = send_node_0.clone();
     let send_1 = send_node_1.clone();
-    let send_2 = send_node_2.clone();
     let send_3 = send_node_3.clone();
     let send_r = send_result.clone();
     let node_2 = Arc::new(Mutex::new(Node::new()));
@@ -147,7 +147,6 @@ fn test_bft() {
     let send_0 = send_node_0.clone();
     let send_1 = send_node_1.clone();
     let send_2 = send_node_2.clone();
-    let send_3 = send_node_3.clone();
     let send_r = send_result.clone();
     let node_3 = Arc::new(Mutex::new(Node::new()));
     let node_3_clone = node_3.clone();
@@ -239,7 +238,6 @@ fn test_bft() {
                     now = Instant::now();
                 } else {
                     ::std::process::exit(1);
-                    panic!("Consensus fail at height {:?}", chain_height);
                 }
             }
 

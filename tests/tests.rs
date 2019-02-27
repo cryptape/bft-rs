@@ -1,6 +1,6 @@
 extern crate bft_rs as bft;
 extern crate crossbeam;
-extern crate csv;
+extern crate env_logger;
 extern crate rand;
 
 use bft::algorithm::Bft;
@@ -34,17 +34,17 @@ impl Node {
     ) {
         match msg {
             BftMsg::Proposal(proposal) => {
-                println!(
-                    "Node {:?} proposal {:?}",
-                    proposal.proposer, proposal.content
-                );
+                // println!(
+                //     "Node {:?} proposal {:?} at height {:?}",
+                //     proposal.proposer, proposal.content, proposal.height
+                // );
                 transmit_msg(BftMsg::Proposal(proposal), s_1, s_2, s_3);
             }
             BftMsg::Vote(vote) => {
-                println!(
-                    "Node {:?}, height {:?}, round {:?}, {:?} vote {:?}",
-                    vote.voter, vote.height, vote.round, vote.vote_type, vote.proposal
-                );
+                // println!(
+                //     "Node {:?}, height {:?}, round {:?}, {:?} vote {:?}",
+                //     vote.voter, vote.height, vote.round, vote.vote_type, vote.proposal
+                // );
                 transmit_msg(BftMsg::Vote(vote), s_1, s_2, s_3);
             }
             BftMsg::Commit(commit) => {
