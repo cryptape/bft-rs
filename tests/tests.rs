@@ -1,6 +1,7 @@
 extern crate bft_rs as bft;
 extern crate crossbeam;
 extern crate env_logger;
+extern crate log;
 extern crate rand;
 
 use bft::algorithm::Bft;
