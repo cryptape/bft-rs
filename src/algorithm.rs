@@ -97,30 +97,34 @@ impl Bft {
         let (timer2bft, bft4timer) = unbounded();
 
         // start timer module.
-        let _timer_thread = thread::spawn(move || {
-            let timer = WaitTimer::new(timer2bft, timer4bft);
-            timer.start();
-        });
+        let _timer_thread = thread::Builder::new()
+            .name("bft_timer".to_string())
+            .spawn(move || {
+                let timer = WaitTimer::new(timer2bft, timer4bft);
+                timer.start();
+            });
 
         // start main loop module.
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
-        let _main_thread = thread::spawn(move || loop {
-            let mut get_timer_msg = Err(RecvError);
-            let mut get_msg = Err(RecvError);
+        let _main_thread = thread::Builder::new()
+            .name("bft_state_machine".to_string())
+            .spawn(move || loop {
+                let mut get_timer_msg = Err(RecvError);
+                let mut get_msg = Err(RecvError);
 
-            select! {
-                recv(engine.timer_notity) -> msg => get_timer_msg = msg,
-                recv(engine.msg_receiver) -> msg => get_msg = msg,
-            }
+                select! {
+                    recv(engine.timer_notity) -> msg => get_timer_msg = msg,
+                    recv(engine.msg_receiver) -> msg => get_msg = msg,
+                }
 
-            if let Ok(ok_timer) = get_timer_msg {
-                engine.timeout_process(&ok_timer);
-            }
+                if let Ok(ok_timer) = get_timer_msg {
+                    engine.timeout_process(&ok_timer);
+                }
 
-            if let Ok(ok_msg) = get_msg {
-                engine.process(ok_msg);
-            }
-        });
+                if let Ok(ok_msg) = get_msg {
+                    engine.process(ok_msg);
+                }
+            });
     }
 
     fn initialize(

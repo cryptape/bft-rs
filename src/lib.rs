@@ -6,6 +6,7 @@
 #![allow(unused_imports)]
 #![allow(unused_results)]
 
+extern crate bincode;
 #[macro_use]
 extern crate crossbeam;
 #[macro_use]
@@ -32,7 +33,7 @@ pub type Address = Vec<u8>;
 pub type Target = Vec<u8>;
 
 /// BFT message.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum BftMsg {
     /// Proposal message.
     Proposal(Proposal),
@@ -50,7 +51,7 @@ pub enum BftMsg {
 /// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
 /// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
 /// the proposal. Therefore, these must have same variant of `Option`.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Proposal {
     /// The height of proposal.
     pub height: usize,
@@ -67,7 +68,7 @@ pub struct Proposal {
 }
 
 /// A PoLC.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LockStatus {
     /// The lock proposal
     pub proposal: Target,
@@ -78,7 +79,7 @@ pub struct LockStatus {
 }
 
 /// A vote to a proposal.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Vote {
     /// Prevote vote or precommit vote
     pub vote_type: Step,
@@ -93,7 +94,7 @@ pub struct Vote {
 }
 
 /// A proposal for a height.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Feed {
     /// The height of the proposal.
     pub height: usize,
@@ -102,7 +103,7 @@ pub struct Feed {
 }
 
 /// A result of a height.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Commit {
     /// The height of result.
     pub height: usize,
@@ -117,7 +118,7 @@ pub struct Commit {
 }
 
 /// Necessary messages for a height.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Status {
     /// The height of rich status.
     pub height: usize,

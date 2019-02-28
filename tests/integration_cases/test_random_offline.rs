@@ -1,11 +1,13 @@
 use bft::*;
 use crossbeam::crossbeam_channel::{unbounded, Sender};
-use env_logger;
+use env_logger::Builder;
+use log::LevelFilter;
 use rand::{thread_rng, Rng};
 
 use crate::*;
 
 use std::collections::HashMap;
+use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -67,7 +69,18 @@ fn is_success(result: Vec<Target>) -> bool {
 
 #[test]
 fn test_random_offline() {
-    env_logger::init();
+    Builder::new()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{} - {} - {}",
+                thread::current().name().clone().unwrap(),
+                record.level(),
+                record.args()
+            )
+        })
+        .filter(None, LevelFilter::Debug)
+        .init();
 
     let (send_node_0, recv_node_0) = start_process(vec![0]);
     let (send_node_1, recv_node_1) = start_process(vec![1]);
@@ -91,29 +104,32 @@ fn test_random_offline() {
     let node_0 = Arc::new(Mutex::new(Node::new()));
     let node_0_clone = node_0.clone();
 
-    let thread_0 = thread::spawn(move || loop {
-        if let Ok(recv) = recv_node_0.recv() {
-            node_0_clone.lock().unwrap().handle_message(
-                recv,
-                send_1.clone(),
-                send_2.clone(),
-                send_3.clone(),
-                send_r.clone(),
-            );
-        }
+    let thread_0 = thread::Builder::new()
+        .name("node_0".to_string())
+        .spawn(move || loop {
+            if let Ok(recv) = recv_node_0.recv() {
+                node_0_clone.lock().unwrap().handle_message(
+                    recv,
+                    send_1.clone(),
+                    send_2.clone(),
+                    send_3.clone(),
+                    send_r.clone(),
+                );
+            }
 
-        if random_offline() {
-            let mut rng = thread_rng();
-            // offline for t secends
-            let t: u64 = rng.gen_range(1, 10);
-            println!("!!! Node 0 offline {:?} sec", t);
-            thread::sleep(Duration::from_secs(t));
-        }
+            if random_offline() {
+                let mut rng = thread_rng();
+                // offline for t secends
+                let t: u64 = rng.gen_range(500, 3000);
+                println!("!!! Node 0 offline {:?} sec", t as f64 / 1000 as f64);
+                thread::sleep(Duration::from_millis(t));
+            }
 
-        if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
-            ::std::process::exit(0);
-        }
-    });
+            if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
+                ::std::process::exit(0);
+            }
+        })
+        .unwrap();
 
     // this is the thread of node 1
     let send_0 = send_node_0.clone();
@@ -123,29 +139,32 @@ fn test_random_offline() {
     let node_1 = Arc::new(Mutex::new(Node::new()));
     let node_1_clone = node_1.clone();
 
-    let thread_1 = thread::spawn(move || loop {
-        if let Ok(recv) = recv_node_1.recv() {
-            node_1_clone.lock().unwrap().handle_message(
-                recv,
-                send_0.clone(),
-                send_2.clone(),
-                send_3.clone(),
-                send_r.clone(),
-            );
-        }
+    let thread_1 = thread::Builder::new()
+        .name("node_1".to_string())
+        .spawn(move || loop {
+            if let Ok(recv) = recv_node_1.recv() {
+                node_1_clone.lock().unwrap().handle_message(
+                    recv,
+                    send_0.clone(),
+                    send_2.clone(),
+                    send_3.clone(),
+                    send_r.clone(),
+                );
+            }
 
-        if random_offline() {
-            let mut rng = thread_rng();
-            // offline for t secends
-            let t: u64 = rng.gen_range(5, 30);
-            println!("!!! Node 1 offline {:?} sec", t);
-            thread::sleep(Duration::from_secs(t));
-        }
+            if random_offline() {
+                let mut rng = thread_rng();
+                // offline for t secends
+                let t: u64 = rng.gen_range(500, 3000);
+                println!("!!! Node 1 offline {:?} sec", t as f64 / 1000 as f64);
+                thread::sleep(Duration::from_millis(t));
+            }
 
-        if node_1_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
-            ::std::process::exit(0);
-        }
-    });
+            if node_1_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
+                ::std::process::exit(0);
+            }
+        })
+        .unwrap();
 
     // this is the thread of node 2
     let send_0 = send_node_0.clone();
@@ -155,29 +174,32 @@ fn test_random_offline() {
     let node_2 = Arc::new(Mutex::new(Node::new()));
     let node_2_clone = node_2.clone();
 
-    let thread_2 = thread::spawn(move || loop {
-        if let Ok(recv) = recv_node_2.recv() {
-            node_2_clone.lock().unwrap().handle_message(
-                recv,
-                send_1.clone(),
-                send_0.clone(),
-                send_3.clone(),
-                send_r.clone(),
-            );
-        }
+    let thread_2 = thread::Builder::new()
+        .name("node_2".to_string())
+        .spawn(move || loop {
+            if let Ok(recv) = recv_node_2.recv() {
+                node_2_clone.lock().unwrap().handle_message(
+                    recv,
+                    send_1.clone(),
+                    send_0.clone(),
+                    send_3.clone(),
+                    send_r.clone(),
+                );
+            }
 
-        if random_offline() {
-            let mut rng = thread_rng();
-            // offline for t secends
-            let t: u64 = rng.gen_range(5, 30);
-            println!("!!! Node 2 offline {:?} sec", t);
-            thread::sleep(Duration::from_secs(t));
-        }
+            if random_offline() {
+                let mut rng = thread_rng();
+                // offline for t secends
+                let t: u64 = rng.gen_range(500, 3000);
+                println!("!!! Node 2 offline {:?} sec", t as f64 / 1000 as f64);
+                thread::sleep(Duration::from_millis(t));
+            }
 
-        if node_2_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
-            ::std::process::exit(0);
-        }
-    });
+            if node_2_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
+                ::std::process::exit(0);
+            }
+        })
+        .unwrap();
 
     // this is the thread of node 3
     let send_0 = send_node_0.clone();
@@ -187,29 +209,32 @@ fn test_random_offline() {
     let node_3 = Arc::new(Mutex::new(Node::new()));
     let node_3_clone = node_3.clone();
 
-    let thread_3 = thread::spawn(move || loop {
-        if let Ok(recv) = recv_node_3.recv() {
-            node_3_clone.lock().unwrap().handle_message(
-                recv,
-                send_1.clone(),
-                send_2.clone(),
-                send_0.clone(),
-                send_r.clone(),
-            );
-        }
+    let thread_3 = thread::Builder::new()
+        .name("node_3".to_string())
+        .spawn(move || loop {
+            if let Ok(recv) = recv_node_3.recv() {
+                node_3_clone.lock().unwrap().handle_message(
+                    recv,
+                    send_1.clone(),
+                    send_2.clone(),
+                    send_0.clone(),
+                    send_r.clone(),
+                );
+            }
 
-        if random_offline() {
-            let mut rng = thread_rng();
-            // offline for t secends
-            let t: u64 = rng.gen_range(5, 30);
-            println!("!!! Node 3 offline {:?} sec", t);
-            thread::sleep(Duration::from_secs(t));
-        }
+            if random_offline() {
+                let mut rng = thread_rng();
+                // offline for t secends
+                let t: u64 = rng.gen_range(500, 3000);
+                println!("!!! Node 3 offline {:?} sec", t as f64 / 1000 as f64);
+                thread::sleep(Duration::from_millis(t));
+            }
 
-        if node_3_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
-            ::std::process::exit(0);
-        }
-    });
+            if node_3_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
+                ::std::process::exit(0);
+            }
+        })
+        .unwrap();
 
     let send_0 = send_node_0.clone();
     let send_1 = send_node_1.clone();
@@ -222,112 +247,115 @@ fn test_random_offline() {
         send_3.clone(),
     ];
 
-    let thread_commit = thread::spawn(move || {
-        let mut chain_height: i64 = 2;
-        let mut result: Vec<Target> = Vec::new();
-        let mut node_0_height = 0;
-        let mut node_1_height = 0;
-        let mut node_2_height = 0;
-        let mut node_3_height = 0;
-        let mut now = Instant::now();
+    let thread_commit = thread::Builder::new()
+        .name("commit_thread".to_string())
+        .spawn(move || {
+            let mut chain_height: i64 = 2;
+            let mut result: Vec<Target> = Vec::new();
+            let mut node_0_height = 0;
+            let mut node_1_height = 0;
+            let mut node_2_height = 0;
+            let mut node_3_height = 0;
+            let mut now = Instant::now();
 
-        loop {
-            if let Ok(recv) = recv_result.recv() {
-                if recv.clone().address == vec![0] {
-                    node_0_height = recv.height + 1;
-                } else if recv.clone().address == vec![1] {
-                    node_1_height = recv.height + 1;
-                } else if recv.clone().address == vec![2] {
-                    node_2_height = recv.height + 1;
-                } else if recv.clone().address == vec![3] {
-                    node_3_height = recv.height + 1;
-                } else {
-                    panic!("aaa");
+            loop {
+                if let Ok(recv) = recv_result.recv() {
+                    if recv.clone().address == vec![0] {
+                        node_0_height = recv.height + 1;
+                    } else if recv.clone().address == vec![1] {
+                        node_1_height = recv.height + 1;
+                    } else if recv.clone().address == vec![2] {
+                        node_2_height = recv.height + 1;
+                    } else if recv.clone().address == vec![3] {
+                        node_3_height = recv.height + 1;
+                    } else {
+                        panic!("aaa");
+                    }
+
+                    if recv.height as i64 == chain_height {
+                        result.push(recv.proposal.clone());
+                    }
+
+                    // println!(
+                    //     "Node {:?},   Height {:?},  Commit {:?}",
+                    //     recv.address.clone(),
+                    //     recv.height.clone(),
+                    //     recv.proposal.clone(),
+                    // );
+
+                    sender[recv.address[0].clone() as usize]
+                        .send(BftMsg::Status(Status {
+                            height: recv.height.clone(),
+                            interval: None,
+                            authority_list: generate_auth_list(),
+                        }))
+                        .unwrap();
+                    sender[recv.address[0].clone() as usize]
+                        .send(BftMsg::Feed(Feed {
+                            height: recv.height.clone() + 1,
+                            proposal: generate_proposal(),
+                        }))
+                        .unwrap();
+                }
+                if result.clone().len() >= 3 {
+                    if is_success(result.clone()) {
+                        println!(
+                            "Consensus success at height {:?}, with {:?}",
+                            chain_height,
+                            Instant::now() - now
+                        );
+                        result.clear();
+                        chain_height += 1;
+                        now = Instant::now();
+                    } else {
+                        ::std::process::exit(1);
+                    }
                 }
 
-                if recv.height as i64 == chain_height {
-                    result.push(recv.proposal.clone());
+                // simulate sync proc
+                if (node_0_height as i64) < chain_height - 1 {
+                    println!("Sync node 0 to height {:?}", chain_height);
+                    send_0
+                        .send(BftMsg::Status(Status {
+                            height: (chain_height - 1) as usize,
+                            interval: None,
+                            authority_list: generate_auth_list(),
+                        }))
+                        .unwrap();
                 }
-
-                // println!(
-                //     "Node {:?},   Height {:?},  Commit {:?}",
-                //     recv.address.clone(),
-                //     recv.height.clone(),
-                //     recv.proposal.clone(),
-                // );
-
-                sender[recv.address[0].clone() as usize]
-                    .send(BftMsg::Status(Status {
-                        height: recv.height.clone(),
-                        interval: None,
-                        authority_list: generate_auth_list(),
-                    }))
-                    .unwrap();
-                sender[recv.address[0].clone() as usize]
-                    .send(BftMsg::Feed(Feed {
-                        height: recv.height.clone() + 1,
-                        proposal: generate_proposal(),
-                    }))
-                    .unwrap();
-            }
-            if result.clone().len() >= 3 {
-                if is_success(result.clone()) {
-                    println!(
-                        "Consensus success at height {:?}, with {:?}",
-                        chain_height,
-                        Instant::now() - now
-                    );
-                    result.clear();
-                    chain_height += 1;
-                    now = Instant::now();
-                } else {
-                    ::std::process::exit(1);
+                if (node_1_height as i64) < chain_height - 3 {
+                    println!("Sync node 1 to height {:?}", chain_height);
+                    send_1
+                        .send(BftMsg::Status(Status {
+                            height: (chain_height - 1) as usize,
+                            interval: None,
+                            authority_list: generate_auth_list(),
+                        }))
+                        .unwrap();
+                }
+                if (node_2_height as i64) < chain_height - 3 {
+                    println!("Sync node 2 to height {:?}", chain_height);
+                    send_2
+                        .send(BftMsg::Status(Status {
+                            height: (chain_height - 1) as usize,
+                            interval: None,
+                            authority_list: generate_auth_list(),
+                        }))
+                        .unwrap();
+                }
+                if (node_3_height as i64) < chain_height - 3 {
+                    println!("Sync node 3 to height {:?}", chain_height);
+                    send_3
+                        .send(BftMsg::Status(Status {
+                            height: (chain_height - 1) as usize,
+                            interval: None,
+                            authority_list: generate_auth_list(),
+                        }))
+                        .unwrap();
                 }
             }
-
-            // simulate sync proc
-            if (node_0_height as i64) < chain_height - 1 {
-                println!("Sync node 0 to height {:?}", chain_height);
-                send_0
-                    .send(BftMsg::Status(Status {
-                        height: (chain_height - 1) as usize,
-                        interval: None,
-                        authority_list: generate_auth_list(),
-                    }))
-                    .unwrap();
-            }
-            if (node_1_height as i64) < chain_height - 3 {
-                println!("Sync node 1 to height {:?}", chain_height);
-                send_1
-                    .send(BftMsg::Status(Status {
-                        height: (chain_height - 1) as usize,
-                        interval: None,
-                        authority_list: generate_auth_list(),
-                    }))
-                    .unwrap();
-            }
-            if (node_2_height as i64) < chain_height - 3 {
-                println!("Sync node 2 to height {:?}", chain_height);
-                send_2
-                    .send(BftMsg::Status(Status {
-                        height: (chain_height - 1) as usize,
-                        interval: None,
-                        authority_list: generate_auth_list(),
-                    }))
-                    .unwrap();
-            }
-            if (node_3_height as i64) < chain_height - 3 {
-                println!("Sync node 3 to height {:?}", chain_height);
-                send_3
-                    .send(BftMsg::Status(Status {
-                        height: (chain_height - 1) as usize,
-                        interval: None,
-                        authority_list: generate_auth_list(),
-                    }))
-                    .unwrap();
-            }
-        }
-    });
+        })
+        .unwrap();
 
     thread_0.join();
     thread_1.join();

@@ -6,3 +6,6 @@
 **/*.rs.bk
 
 /Cargo.lock
+
+# These are integration test logs
+/tests/test_log/
