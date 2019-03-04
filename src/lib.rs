@@ -27,10 +27,13 @@ pub mod timer;
 /// BFT vote set.
 pub mod voteset;
 
-/// The type for node address.
+/// Type for node address.
 pub type Address = Vec<u8>;
-/// The type for proposal.
+/// Type for proposal.
 pub type Target = Vec<u8>;
+
+/// Signal of going on running BFT state machine.
+pub const CONTINUE_SIGNAL: u16 = 190304;
 
 /// BFT message.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -45,6 +48,8 @@ pub enum BftMsg {
     Status(Status),
     /// Commit message.
     Commit(Commit),
+    /// Pause BFT state machine.
+    Pause,
 }
 
 /// Something need to be consensus in a round.
@@ -111,9 +116,9 @@ pub struct Commit {
     pub round: usize,
     /// Consensus result
     pub proposal: Target,
-    /// Vote for generate proof.
+    /// Votes for generate proof.
     pub lock_votes: Vec<Vote>,
-    /// Node address.
+    /// The node address.
     pub address: Address,
 }
 
