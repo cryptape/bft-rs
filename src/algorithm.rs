@@ -91,7 +91,12 @@ pub struct Bft {
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
+    pub fn start(
+        s: Sender<BftMsg>,
+        r: Receiver<BftMsg>,
+        r_c: Receiver<u16>,
+        local_address: Address,
+    ) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
@@ -102,25 +107,37 @@ impl Bft {
             .spawn(move || {
                 let timer = WaitTimer::new(timer2bft, timer4bft);
                 timer.start();
-            });
+            })
+            .unwrap();
 
         // start main loop module.
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
-        let _main_thread = thread::Builder::new().spawn(move || loop {
-            let mut get_timer_msg = Err(RecvError);
-            let mut get_msg = Err(RecvError);
+        let main_thread = thread::Builder::new()
+            .name("bft_main".to_string())
+            .spawn(move || loop {
+                let mut get_timer_msg = Err(RecvError);
+                let mut get_msg = Err(RecvError);
 
-            select! {
-                recv(engine.timer_notity) -> msg => get_timer_msg = msg,
-                recv(engine.msg_receiver) -> msg => get_msg = msg,
-            }
+                select! {
+                    recv(engine.timer_notity) -> msg => get_timer_msg = msg,
+                    recv(engine.msg_receiver) -> msg => get_msg = msg,
+                }
 
-            if let Ok(ok_timer) = get_timer_msg {
-                engine.timeout_process(&ok_timer);
-            }
+                if let Ok(ok_timer) = get_timer_msg {
+                    engine.timeout_process(&ok_timer);
+                }
 
-            if let Ok(ok_msg) = get_msg {
-                engine.process(ok_msg);
+                if let Ok(ok_msg) = get_msg {
+                    engine.process(ok_msg);
+                }
+            })
+            .unwrap();
+
+        thread::spawn(move || loop {
+            if let Ok(signal) = r_c.recv() {
+                if signal == CONTINUE_SIGNAL {
+                    main_thread.thread().unpark();
+                }
             }
         });
     }
@@ -475,7 +492,7 @@ impl Bft {
 
     fn try_save_vote(&mut self, vote: Vote) -> bool {
         trace!(
-            "Receive a {:?} vote of height {:?}, round{:?}, to {:?}, from {:?}",
+            "Receive a {:?} vote of height {:?}, round {:?}, to {:?}, from {:?}",
             vote.vote_type,
             vote.height,
             vote.round,
@@ -819,6 +836,10 @@ impl Bft {
                     self.new_round_start();
                 }
             }
+            BftMsg::Pause => {
+                thread::park();
+            }
+
             _ => error!("Invalid Message!"),
         }
     }
