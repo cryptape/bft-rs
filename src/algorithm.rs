@@ -106,25 +106,23 @@ impl Bft {
 
         // start main loop module.
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
-        let _main_thread = thread::Builder::new()
-            .name("bft_state_machine".to_string())
-            .spawn(move || loop {
-                let mut get_timer_msg = Err(RecvError);
-                let mut get_msg = Err(RecvError);
+        let _main_thread = thread::Builder::new().spawn(move || loop {
+            let mut get_timer_msg = Err(RecvError);
+            let mut get_msg = Err(RecvError);
 
-                select! {
-                    recv(engine.timer_notity) -> msg => get_timer_msg = msg,
-                    recv(engine.msg_receiver) -> msg => get_msg = msg,
-                }
+            select! {
+                recv(engine.timer_notity) -> msg => get_timer_msg = msg,
+                recv(engine.msg_receiver) -> msg => get_msg = msg,
+            }
 
-                if let Ok(ok_timer) = get_timer_msg {
-                    engine.timeout_process(&ok_timer);
-                }
+            if let Ok(ok_timer) = get_timer_msg {
+                engine.timeout_process(&ok_timer);
+            }
 
-                if let Ok(ok_msg) = get_msg {
-                    engine.process(ok_msg);
-                }
-            });
+            if let Ok(ok_msg) = get_msg {
+                engine.process(ok_msg);
+            }
+        });
     }
 
     fn initialize(
@@ -159,6 +157,7 @@ impl Bft {
 
     #[inline]
     fn set_timer(&self, duration: Duration, step: Step) {
+        trace!("Set {:?} timer for {:?} secs", step, duration);
         self.timer_seter
             .send(TimeoutInfo {
                 timeval: Instant::now() + duration,
@@ -475,6 +474,15 @@ impl Bft {
     }
 
     fn try_save_vote(&mut self, vote: Vote) -> bool {
+        trace!(
+            "Receive a {:?} vote of height {:?}, round{:?}, to {:?}, from {:?}",
+            vote.vote_type,
+            vote.height,
+            vote.round,
+            vote.proposal,
+            vote.voter
+        );
+
         if vote.height == self.height - 1 && Some(vote.round) >= self.last_commit_round {
             // deal with height fall behind one, round ge last commit round
             let sender = vote.voter.clone();
@@ -510,14 +518,10 @@ impl Bft {
             && vote.round >= self.round
             && self.votes.add(vote.clone())
         {
-            trace!(
-                "Receive a vote at height {:?}, round {:?}, from {:?}",
-                self.height,
-                vote.round,
-                vote.voter
-            );
+            trace!("Add the vote successfully");
             return true;
         }
+        trace!("Receive a saved vote");
         false
     }
 
@@ -554,8 +558,13 @@ impl Bft {
                     {
                         if hash.is_empty() {
                             // receive +2/3 prevote to nil, clean lock info
-                            trace!("Receive over 2/3 prevote to nil");
+                            trace!(
+                                "Receive over 2/3 prevote to nil at height {:?}, round {:?}",
+                                self.height,
+                                self.round
+                            );
                             self.clean_polc();
+                            self.proposal = None;
                         } else {
                             // receive a later PoLC, update lock info
                             self.set_polc(&hash, &prevote_set, Step::Prevote);
@@ -580,14 +589,13 @@ impl Bft {
     fn transmit_precommit(&mut self) {
         let precommit = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
-        } else if let Some(proposal) = self.proposal.clone() {
-            proposal
         } else {
+            self.proposal = None;
             Vec::new()
         };
 
         trace!(
-            "Transmit precommit at height {:?}, round{:?}",
+            "Transmit precommit at height {:?}, round {:?}",
             self.height,
             self.round
         );
@@ -602,7 +610,7 @@ impl Bft {
 
         let _ = self.votes.add(vote.clone());
         let msg = BftMsg::Vote(vote);
-        debug!("Precommit proposal is {:?}", precommit);
+        debug!("Precommit to {:?}", precommit);
         self.send_bft_msg(msg);
         self.set_timer(
             self.params.timer.get_precommit() * TIMEOUT_RETRANSE_MULTIPLE,
@@ -731,7 +739,9 @@ impl Bft {
     }
 
     fn new_round_start(&mut self) {
-        info!("Start height {:?}, round{:?}", self.height, self.round);
+        if self.step != Step::ProposeWait {
+            info!("Start height {:?}, round{:?}", self.height, self.round);
+        }
         if self.determine_proposer() {
             if self.try_transmit_proposal() {
                 self.transmit_prevote();
