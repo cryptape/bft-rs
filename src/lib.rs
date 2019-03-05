@@ -33,7 +33,7 @@ pub type Address = Vec<u8>;
 pub type Target = Vec<u8>;
 
 /// Signal of going on running BFT state machine.
-pub const CONTINUE_SIGNAL: u16 = 190304;
+pub const CONTINUE_SIGNAL: u16 = 1903;
 
 /// BFT message.
 #[derive(Serialize, Deserialize, Clone, Debug)]

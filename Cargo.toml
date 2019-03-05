@@ -15,7 +15,6 @@ bincode = {version = "0.8.0"}
 crossbeam = {version = "0.7"}
 lru-cache = {version = "0.1"}
 log = {version = "0.4.3"}
-log4rs = {version = "0.8.1"}
 min-max-heap = {version = "1.2.0"}
 serde = {version = "1.0"}
 serde_derive = {version = "1.0"}
