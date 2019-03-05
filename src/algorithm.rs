@@ -701,7 +701,7 @@ impl Bft {
         self.lock_status = Some(LockStatus {
             proposal: hash.to_owned(),
             round: self.round,
-            votes: voteset.abstract_polc(self.height, self.round, vote_type, &hash),
+            votes: voteset.extract_polc(self.height, self.round, vote_type, &hash),
         });
 
         info!(
@@ -725,6 +725,11 @@ impl Bft {
     fn try_handle_status(&mut self, rich_status: Status) -> bool {
         // receive a rich status that height ge self.height is the only way to go to new height
         if rich_status.height >= self.height {
+            if rich_status.height > self.height {
+                // recvive higher status, clean last commit info then go to new height 
+                self.last_commit_proposal = None;
+                self.last_commit_round = None;
+            }
             // goto new height directly and update authorty list
             self.goto_new_height(rich_status.height + 1);
             self.authority_list = rich_status.authority_list;

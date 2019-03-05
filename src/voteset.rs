@@ -118,7 +118,7 @@ impl VoteSet {
     }
 
     /// A function to abstract the PoLC of the round.
-    pub fn abstract_polc(
+    pub fn extract_polc(
         &self,
         height: usize,
         round: usize,
