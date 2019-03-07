@@ -85,8 +85,6 @@ pub struct Bft {
     authority_list: Vec<Address>,
     htime: Instant,
     params: BftParams,
-    #[cfg(verify_req)]
-    verify_flag: bool,
 }
 
 impl Bft {
@@ -398,10 +396,13 @@ impl Bft {
     }
 
     fn handle_proposal(&self, proposal: Proposal) -> Option<Proposal> {
-        if proposal.height == self.height - 1 && Some(proposal.round) >= self.last_commit_round {
-            // deal with height fall behind one, round ge last commit round
-            self.retransmit_vote(proposal.round);
-            None
+        if proposal.height == self.height - 1 {
+            if self.last_commit_round.is_some() && proposal.round >= self.last_commit_round.unwrap()
+            {
+                // deal with height fall behind one, round ge last commit round
+                self.retransmit_vote(proposal.round);
+            }
+            return None;
         } else if proposal.height != self.height || proposal.round < self.round {
             // bft-rs lib only handle the proposals with same round, the proposals of
             // higher round should be saved outside
@@ -504,17 +505,19 @@ impl Bft {
             vote.voter
         );
 
-        if vote.height == self.height - 1 && Some(vote.round) >= self.last_commit_round {
-            // deal with height fall behind one, round ge last commit round
-            let sender = vote.voter.clone();
-            let (add_flag, trans_flag) = self.determine_height_filter(sender.clone());
+        if vote.height == self.height - 1 {
+            if self.last_commit_round.is_some() && vote.round >= self.last_commit_round.unwrap() {
+                // deal with height fall behind one, round ge last commit round
+                let sender = vote.voter.clone();
+                let (add_flag, trans_flag) = self.determine_height_filter(sender.clone());
 
-            if add_flag {
-                self.height_filter.insert(sender, Instant::now());
-            }
-            if trans_flag {
-                self.retransmit_vote(vote.round);
-            }
+                if add_flag {
+                    self.height_filter.insert(sender, Instant::now());
+                }
+                if trans_flag {
+                    self.retransmit_vote(vote.round);
+                }
+            }           
             return false;
         } else if vote.height == self.height && self.round != 0 && vote.round == self.round - 1 {
             // deal with equal height, round fall behind
@@ -876,6 +879,11 @@ impl Bft {
                 self.transmit_prevote();
             }
             Step::PrevoteWait => {
+                // if there is no lock, clear the proposal
+                if self.lock_status.is_none() {
+                    self.proposal = None;
+                }
+                // next do precommit
                 self.change_to_step(Step::Precommit);
                 self.transmit_precommit();
                 let precommit_result = self.check_precommit_count();
@@ -902,9 +910,6 @@ impl Bft {
             Step::PrecommitWait => {
                 // receive +2/3 precommits however no proposal reach +2/3
                 // then goto next round directly
-                if self.lock_status.is_none() {
-                    self.proposal = None;
-                }
                 self.goto_next_round();
                 self.new_round_start();
             }
