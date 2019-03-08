@@ -2,8 +2,8 @@ use lru_cache::LruCache;
 
 use std::collections::HashMap;
 
-use algorithm::Step;
 use crate::{Address, Target, Vote};
+use algorithm::Step;
 
 /// BFT vote collector
 #[derive(Debug)]

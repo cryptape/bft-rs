@@ -7,7 +7,7 @@ use log4rs::encode::pattern::PatternEncoder;
 pub fn initialize_log_config(log_path: &str, log_level: LevelFilter) -> Config {
     // fileappender config
     let requests = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
+        .encoder(Box::new(PatternEncoder::new("{d} - {l} - {m}{n}")))
         .build(log_path)
         .unwrap();
     // log4rs config
@@ -15,7 +15,7 @@ pub fn initialize_log_config(log_path: &str, log_level: LevelFilter) -> Config {
         .appender(Appender::builder().build("requests", Box::new(requests)))
         .logger(
             Logger::builder()
-                .appender("request")
+                .appender("requests")
                 .additive(false)
                 .build("BFT_Log", log_level),
         )
