@@ -1,6 +1,7 @@
-use super::{Address, Target};
 use std::cell::Cell;
 use std::time::Duration;
+
+use crate::{Address, Target};
 
 /// BFT params.
 #[derive(Clone, Debug)]
