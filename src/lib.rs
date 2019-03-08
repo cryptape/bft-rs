@@ -32,11 +32,8 @@ pub type Address = Vec<u8>;
 /// Type for proposal.
 pub type Target = Vec<u8>;
 
-/// Signal of going on running BFT state machine.
-pub const CONTINUE_SIGNAL: u16 = 1903;
-
 /// BFT message.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum BftMsg {
     /// Proposal message.
     Proposal(Proposal),
@@ -50,13 +47,15 @@ pub enum BftMsg {
     Commit(Commit),
     /// Pause BFT state machine.
     Pause,
+    /// Go on running BFT state machine.
+    Continue,
 }
 
 /// Something need to be consensus in a round.
 /// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
 /// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
 /// the proposal. Therefore, these must have same variant of `Option`.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal {
     /// The height of proposal.
     pub height: usize,
@@ -99,7 +98,7 @@ pub struct Vote {
 }
 
 /// A proposal for a height.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Feed {
     /// The height of the proposal.
     pub height: usize,
@@ -108,7 +107,7 @@ pub struct Feed {
 }
 
 /// A result of a height.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Commit {
     /// The height of result.
     pub height: usize,
@@ -123,7 +122,7 @@ pub struct Commit {
 }
 
 /// Necessary messages for a height.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Status {
     /// The height of rich status.
     pub height: usize,

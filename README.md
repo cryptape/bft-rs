@@ -70,6 +70,7 @@ enum BftMsg {
     Status(Status),
     Commit(Commit),
     Pause,
+    Continue,
 }
 ```
 
@@ -101,9 +102,8 @@ Third, start a BFT state machine:
 ```rust
 let (main_to_bft, bft_from_main) = unbounded();
 let (bft_to_main, main_from_bft) = unbounded();
-let (send_continue, recv_continue) = unbounded();
 
-BFT::start(bft_to_mian, bft_from_main, recv_countinue, address);
+BFT::start(bft_to_mian, bft_from_main, address);
 ```
 
 *The `address` here is the address of this node with type `Vec<u8>`.*
