@@ -3,14 +3,13 @@
 //!
 
 #![deny(missing_docs)]
-#![allow(unused_imports)]
-#![allow(unused_results)]
 
 extern crate bincode;
 #[macro_use]
 extern crate crossbeam;
 #[macro_use]
 extern crate log;
+extern crate log4rs;
 extern crate lru_cache;
 extern crate min_max_heap;
 #[macro_use]
@@ -26,6 +25,8 @@ pub mod params;
 pub mod timer;
 /// BFT vote set.
 pub mod voteset;
+/// BFT log config
+pub mod wal;
 
 /// Type for node address.
 pub type Address = Vec<u8>;
