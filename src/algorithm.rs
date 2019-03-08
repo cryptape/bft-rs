@@ -89,12 +89,7 @@ pub struct Bft {
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(
-        s: Sender<BftMsg>,
-        r: Receiver<BftMsg>,
-        r_c: Receiver<u16>,
-        local_address: Address,
-    ) {
+    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
@@ -110,34 +105,41 @@ impl Bft {
 
         // start main loop module.
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
-        let main_thread = thread::Builder::new()
-            .name("bft_main".to_string())
-            .spawn(move || loop {
-                let mut get_timer_msg = Err(RecvError);
-                let mut get_msg = Err(RecvError);
+        let _main_thread = thread::Builder::new()
+            .name("main_loop".to_string())
+            .spawn(move || {
+                let mut process_flag = true;
+                loop {
+                    let mut get_timer_msg = Err(RecvError);
+                    let mut get_msg = Err(RecvError);
 
-                select! {
-                    recv(engine.timer_notity) -> msg => get_timer_msg = msg,
-                    recv(engine.msg_receiver) -> msg => get_msg = msg,
-                }
+                    select! {
+                        recv(engine.timer_notity) -> msg => get_timer_msg = msg,
+                        recv(engine.msg_receiver) -> msg => get_msg = msg,
+                    }
 
-                if let Ok(ok_timer) = get_timer_msg {
-                    engine.timeout_process(&ok_timer);
-                }
+                    if process_flag {
+                        if let Ok(ok_timer) = get_timer_msg {
+                            engine.timeout_process(&ok_timer);
+                        }
 
-                if let Ok(ok_msg) = get_msg {
-                    engine.process(ok_msg);
+                        if let Ok(ok_msg) = get_msg {
+                            if ok_msg == BftMsg::Pause {
+                                info!("BFT pause");
+                                process_flag = false;
+                            } else {
+                                engine.process(ok_msg);
+                            }
+                        }
+                    } else if let Ok(ok_msg) = get_msg {
+                        if ok_msg == BftMsg::Continue {
+                            info!("BFT go on running");
+                            process_flag = true;
+                        }
+                    }
                 }
             })
             .unwrap();
-
-        thread::spawn(move || loop {
-            if let Ok(signal) = r_c.recv() {
-                if signal == CONTINUE_SIGNAL {
-                    main_thread.thread().unpark();
-                }
-            }
-        });
     }
 
     fn initialize(
@@ -172,7 +174,7 @@ impl Bft {
 
     #[inline]
     fn set_timer(&self, duration: Duration, step: Step) {
-        trace!("Set {:?} timer for {:?} secs", step, duration);
+        trace!("Set {:?} timer for {:?}", step, duration);
         self.timer_seter
             .send(TimeoutInfo {
                 timeval: Instant::now() + duration,
@@ -402,7 +404,7 @@ impl Bft {
                 // deal with height fall behind one, round ge last commit round
                 self.retransmit_vote(proposal.round);
             }
-            return None;
+            None
         } else if proposal.height != self.height || proposal.round < self.round {
             // bft-rs lib only handle the proposals with same round, the proposals of
             // higher round should be saved outside
@@ -517,7 +519,7 @@ impl Bft {
                 if trans_flag {
                     self.retransmit_vote(vote.round);
                 }
-            }           
+            }
             return false;
         } else if vote.height == self.height && self.round != 0 && vote.round == self.round - 1 {
             // deal with equal height, round fall behind
@@ -693,7 +695,7 @@ impl Bft {
         }));
 
         info!(
-            "Commit {:?} at height {:?}, consensus time {:?}.",
+            "Commit {:?} at height {:?}, consensus time {:?}",
             result.clone().proposal,
             self.height,
             Instant::now() - self.htime
@@ -848,10 +850,6 @@ impl Bft {
                     self.new_round_start();
                 }
             }
-            BftMsg::Pause => {
-                thread::park();
-            }
-
             _ => error!("Invalid Message!"),
         }
     }
