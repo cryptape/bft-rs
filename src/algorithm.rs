@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::*;
+use super::*;
 use params::BftParams;
 use timer::{TimeoutInfo, WaitTimer};
 use voteset::{VoteCollector, VoteSet};
