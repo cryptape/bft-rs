@@ -11,7 +11,7 @@ pub fn initialize_log_config(log_path: &str, log_level: LevelFilter) -> Config {
         .build(log_path)
         .unwrap();
     // log4rs config
-    let config = Config::builder()
+    Config::builder()
         .appender(Appender::builder().build("requests", Box::new(requests)))
         .logger(
             Logger::builder()
@@ -20,7 +20,5 @@ pub fn initialize_log_config(log_path: &str, log_level: LevelFilter) -> Config {
                 .build("BFT_Log", log_level),
         )
         .build(Root::builder().appender("requests").build(log_level))
-        .unwrap();
-
-    config
+        .expect("Initalize log config failed")
 }
