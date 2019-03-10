@@ -11,7 +11,7 @@ use timer::{TimeoutInfo, WaitTimer};
 use voteset::{VoteCollector, VoteSet};
 use wal::initialize_log_config;
 
-const INIT_HEIGHT: usize = 1;
+const INIT_HEIGHT: usize = 0;
 const INIT_ROUND: usize = 0;
 const PROPOSAL_TIMES_COEF: usize = 10;
 const PRECOMMIT_BELOW_TWO_THIRDS: i8 = 0;
@@ -846,7 +846,7 @@ impl Bft {
                 }
             }
             BftMsg::Feed(feed) => {
-                if self.try_handle_feed(feed) && self.step <= Step::ProposeWait {
+                if self.try_handle_feed(feed) && self.step == Step::ProposeWait {
                     self.new_round_start();
                 }
             }
