@@ -1,0 +1,30 @@
+#!/bin/echo Warning: this file should be sourced!
+
+DOCKER_IMAGE="cita/cita-build:ubuntu-18.04-20180820"
+CARGO_HOME="/opt/.cargo"
+
+LOCAL_CARGO_HOME="${HOME}/.cargo"
+SRCDIR=$(readlink -f $(dirname ${SCRIPT_PATH})/..)
+cd ${SRCDIR}
+
+WORKDIR=/workdir
+
+function pull_docker () {
+    docker pull "${DOCKER_IMAGE}"
+}
+
+function run_in_docker () {
+    docker run --rm \
+        --volume "${SRCDIR}:${WORKDIR}" \
+        --volume "${LOCAL_CARGO_HOME}/registry:${CARGO_HOME}/registry" \
+        --volume "${LOCAL_CARGO_HOME}/git:${CARGO_HOME}/git" \
+        --env USER_ID=`id -u $USER` \
+        --env RUSTFLAGS='-F warnings' \
+        --workdir "${WORKDIR}" \
+        "${DOCKER_IMAGE}" \
+        "$@"
+}
+
+function cargo_run_in_docker () {
+    run_in_docker cargo "$@"
+}

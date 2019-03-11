@@ -11,7 +11,7 @@ use timer::{TimeoutInfo, WaitTimer};
 use voteset::{VoteCollector, VoteSet};
 use wal::initialize_log_config;
 
-const INIT_HEIGHT: usize = 1;
+const INIT_HEIGHT: usize = 0;
 const INIT_ROUND: usize = 0;
 const PROPOSAL_TIMES_COEF: usize = 10;
 const PRECOMMIT_BELOW_TWO_THIRDS: i8 = 0;
@@ -90,14 +90,21 @@ pub struct Bft {
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address, log_path: &str) {
+    pub fn start(
+        s: Sender<BftMsg>,
+        r: Receiver<BftMsg>,
+        local_address: Address,
+        log_path: Option<&str>,
+    ) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
 
-        // initialize log4rs
-        let log_config = initialize_log_config(log_path, LevelFilter::Trace);
-        log4rs::init_config(log_config).unwrap();
+        // initialize log4rs if log path is some
+        if let Some(path) = log_path {
+            let log_config = initialize_log_config(path, LevelFilter::Trace);
+            log4rs::init_config(log_config).unwrap();
+        }
 
         // start timer module.
         let _timer_thread = thread::Builder::new()
@@ -113,7 +120,7 @@ impl Bft {
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
             .spawn(move || {
-                let mut process_flag = true;
+                let mut process_flag = false;
                 loop {
                     let mut get_timer_msg = Err(RecvError);
                     let mut get_msg = Err(RecvError);
