@@ -1,0 +1,25 @@
+language: generic
+sudo: required
+cache:
+  timeout: 600
+  directories:
+    - $TRAVIS_BUILD_DIR/target
+    - $HOME/.cargo/git
+    - $HOME/.cargo/registry
+services:
+  - docker
+git:
+  depth: 1
+install:
+  - bash '.ci-scripts/install-env'
+stages:
+  - Format
+  - Test
+jobs:
+  include:
+    - stage: Format
+      script: bash '.ci-scripts/format'
+    - stage: Test
+      name: Clippy
+      env: CACHE_NAME=Clippy
+      script: bash '.ci-scripts/clippy'
