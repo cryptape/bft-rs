@@ -90,14 +90,21 @@ pub struct Bft {
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address, log_path: &str) {
+    pub fn start(
+        s: Sender<BftMsg>,
+        r: Receiver<BftMsg>,
+        local_address: Address,
+        log_path: Option<&str>,
+    ) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
 
-        // initialize log4rs
-        let log_config = initialize_log_config(log_path, LevelFilter::Trace);
-        log4rs::init_config(log_config).unwrap();
+        // initialize log4rs if log path is some
+        if let Some(path) = log_path {
+            let log_config = initialize_log_config(path, LevelFilter::Trace);
+            log4rs::init_config(log_config).unwrap();
+        }
 
         // start timer module.
         let _timer_thread = thread::Builder::new()
