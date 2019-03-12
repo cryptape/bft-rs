@@ -63,7 +63,7 @@ impl Node {
 fn start_process(address: Address) -> (Sender<BftMsg>, Receiver<BftMsg>) {
     let (main2bft, bft4main) = unbounded();
     let (bft2main, main4bft) = unbounded();
-    Bft::start(bft2main, bft4main, address, None);
+    Bft::start(bft2main, bft4main, address);
     (main2bft, main4bft)
 }
 
