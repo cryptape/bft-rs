@@ -144,7 +144,7 @@ impl Bft {
                             }
                         }
                     } else if let Ok(ok_msg) = get_msg {
-                        if ok_msg == BftMsg::Continue {
+                        if ok_msg == BftMsg::Start {
                             info!("BFT go on running");
                             process_flag = true;
                         }
@@ -161,6 +161,7 @@ impl Bft {
         tn: Receiver<TimeoutInfo>,
         local_address: Target,
     ) -> Self {
+        info!("BFT State Machine Launched.");
         Bft {
             msg_sender: s,
             msg_receiver: r,

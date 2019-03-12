@@ -48,8 +48,8 @@ pub enum BftMsg {
     Commit(Commit),
     /// Pause BFT state machine.
     Pause,
-    /// Go on running BFT state machine.
-    Continue,
+    /// Start running BFT state machine.
+    Start,
 }
 
 /// Something need to be consensus in a round.

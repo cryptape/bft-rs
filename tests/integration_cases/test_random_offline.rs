@@ -129,7 +129,7 @@ fn test_random_offline() {
 
                 send_0.send(BftMsg::Pause).unwrap();
                 thread::sleep(Duration::from_millis(t));
-                send_0.send(BftMsg::Continue).unwrap();
+                send_0.send(BftMsg::Start).unwrap();
             }
 
             if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
@@ -168,7 +168,7 @@ fn test_random_offline() {
 
                 send_1.send(BftMsg::Pause).unwrap();
                 thread::sleep(Duration::from_millis(t));
-                send_1.send(BftMsg::Continue).unwrap();
+                send_1.send(BftMsg::Start).unwrap();
             }
 
             if node_1_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
@@ -207,7 +207,7 @@ fn test_random_offline() {
 
                 send_2.send(BftMsg::Pause).unwrap();
                 thread::sleep(Duration::from_millis(t));
-                send_2.send(BftMsg::Continue).unwrap();
+                send_2.send(BftMsg::Start).unwrap();
             }
 
             if node_2_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
@@ -246,7 +246,7 @@ fn test_random_offline() {
 
                 send_3.send(BftMsg::Pause).unwrap();
                 thread::sleep(Duration::from_millis(t));
-                send_3.send(BftMsg::Continue).unwrap();
+                send_3.send(BftMsg::Start).unwrap();
             }
 
             if node_3_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
