@@ -1,25 +1,20 @@
-language: generic
-sudo: required
-cache:
-  timeout: 600
-  directories:
-    - $TRAVIS_BUILD_DIR/target
-    - $HOME/.cargo/git
-    - $HOME/.cargo/registry
-services:
-  - docker
-git:
-  depth: 1
-install:
-  - bash '.ci-scripts/install-env'
+language: rust
+rust: 
+  - stable
+before_script:
+  - rustup component add rustfmt
+  - rustup component add clippy
+script:
+  - RUSTFLAGS='-F warnings' cargo build --all
 stages:
   - Format
   - Test
 jobs:
   include:
     - stage: Format
-      script: bash '.ci-scripts/format'
+      script:
+        - cargo fmt --all -- --check
     - stage: Test
       name: Clippy
-      env: CACHE_NAME=Clippy
-      script: bash '.ci-scripts/clippy'
+      script:
+        - cargo clippy --all
