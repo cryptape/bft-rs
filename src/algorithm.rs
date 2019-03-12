@@ -1,5 +1,4 @@
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
-use log::LevelFilter;
 
 use std::collections::HashMap;
 use std::thread;
@@ -9,7 +8,6 @@ use super::*;
 use params::BftParams;
 use timer::{TimeoutInfo, WaitTimer};
 use voteset::{VoteCollector, VoteSet};
-use wal::initialize_log_config;
 
 const INIT_HEIGHT: usize = 0;
 const INIT_ROUND: usize = 0;
@@ -18,6 +16,8 @@ const PRECOMMIT_BELOW_TWO_THIRDS: i8 = 0;
 const PRECOMMIT_ON_NOTHING: i8 = 1;
 const PRECOMMIT_ON_NIL: i8 = 2;
 const PRECOMMIT_ON_PROPOSAL: i8 = 3;
+#[cfg(feature = "verify_req")]
+const PRECOMMIT_WITHOUT_VERIFY: i8 = 4;
 const TIMEOUT_RETRANSE_COEF: u32 = 15;
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 300;
 const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 300;
@@ -86,25 +86,17 @@ pub struct Bft {
     authority_list: Vec<Address>,
     htime: Instant,
     params: BftParams,
+
+    #[cfg(feature = "verify_req")]
+    verify_result: HashMap<Target, bool>,
 }
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(
-        s: Sender<BftMsg>,
-        r: Receiver<BftMsg>,
-        local_address: Address,
-        log_path: Option<&str>,
-    ) {
+    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
-
-        // initialize log4rs if log path is some
-        if let Some(path) = log_path {
-            let log_config = initialize_log_config(path, LevelFilter::Trace);
-            log4rs::init_config(log_config).unwrap();
-        }
 
         // start timer module.
         let _timer_thread = thread::Builder::new()
@@ -154,6 +146,7 @@ impl Bft {
             .unwrap();
     }
 
+    #[cfg(not(feature = "verify_req"))]
     fn initialize(
         s: Sender<BftMsg>,
         r: Receiver<BftMsg>,
@@ -182,6 +175,39 @@ impl Bft {
             height_filter: HashMap::new(),
             round_filter: HashMap::new(),
             params: BftParams::new(local_address),
+        }
+    }
+
+    #[cfg(feature = "verify_req")]
+    fn initialize(
+        s: Sender<BftMsg>,
+        r: Receiver<BftMsg>,
+        ts: Sender<TimeoutInfo>,
+        tn: Receiver<TimeoutInfo>,
+        local_address: Target,
+    ) -> Self {
+        info!("BFT State Machine Launched.");
+        Bft {
+            msg_sender: s,
+            msg_receiver: r,
+            timer_seter: ts,
+            timer_notity: tn,
+
+            height: INIT_HEIGHT,
+            round: INIT_ROUND,
+            step: Step::default(),
+            feed: None,
+            proposal: None,
+            votes: VoteCollector::new(),
+            lock_status: None,
+            last_commit_round: None,
+            last_commit_proposal: None,
+            authority_list: Vec::new(),
+            htime: Instant::now(),
+            height_filter: HashMap::new(),
+            round_filter: HashMap::new(),
+            params: BftParams::new(local_address),
+            verify_result: HashMap::new(),
         }
     }
 
@@ -247,6 +273,9 @@ impl Bft {
         self.lock_status = None;
         self.votes.clear_prevote_count();
         self.authority_list = Vec::new();
+
+        #[cfg(feature = "verify_req")]
+        self.verify_result.clear();
     }
 
     fn retransmit_vote(&self, round: usize) {
@@ -660,6 +689,7 @@ impl Bft {
         );
     }
 
+    #[cfg(not(feature = "verify_req"))]
     fn check_precommit_count(&mut self) -> i8 {
         if let Some(precommit_set) =
             self.votes
@@ -692,6 +722,68 @@ impl Bft {
             }
             if self.step == Step::Precommit {
                 self.set_timer(tv, Step::PrecommitWait);
+            }
+        }
+        PRECOMMIT_ON_NOTHING
+    }
+
+    #[cfg(feature = "verify_req")]
+    fn check_precommit_count(&mut self) -> i8 {
+        if let Some(precommit_set) =
+            self.votes
+                .get_voteset(self.height, self.round, Step::Precommit)
+        {
+            let mut tv = if self.cal_all_vote(precommit_set.count) {
+                Duration::new(0, 0)
+            } else {
+                self.params.timer.get_precommit()
+            };
+            if !self.cal_above_threshold(precommit_set.count) {
+                return PRECOMMIT_BELOW_TWO_THIRDS;
+            }
+
+            info!(
+                "Receive over 2/3 precommit at height {:?}, round {:?}",
+                self.height, self.round
+            );
+            let mut pending_flag = false;
+            let mut clean_flag = false;
+
+            for (hash, count) in &precommit_set.votes_by_proposal {
+                if self.cal_above_threshold(*count) {
+                    if hash.is_empty() {
+                        info!("Reach nil consensus, goto next round {:?}", self.round + 1);
+                        return PRECOMMIT_ON_NIL;
+                    } else {
+                        self.set_polc(&hash, &precommit_set, Step::Precommit);
+                        if let Some(is_pass) = self.verify_result.get(hash) {
+                            // check verify result of the proposal
+                            if !is_pass {
+                                // if verified fail, clean PoLC and proposal
+                                info!("The verify result of proposal {:?} is disapproved.", &hash);
+                                clean_flag = true;
+                                self.proposal = None;
+                            } else {
+                                // if verified success, do commit
+                                info!("The verify result of proposal {:?} is approved.", &hash);
+                                return PRECOMMIT_ON_PROPOSAL;
+                            }
+                        } else {
+                            // has not received verify response till now
+                            pending_flag = true;
+                        }
+                    }
+                }
+            }
+
+            if self.step == Step::Precommit {
+                self.set_timer(tv, Step::PrecommitWait);
+            }
+            if clean_flag {
+                self.clean_polc();
+            }
+            if pending_flag {
+                return PRECOMMIT_WITHOUT_VERIFY;
             }
         }
         PRECOMMIT_ON_NOTHING
@@ -782,6 +874,21 @@ impl Bft {
         }
     }
 
+    #[cfg(feature = "verify_req")]
+    fn save_verify_resp(&mut self, verify_result: VerifyResp) {
+        if self.verify_result.contains_key(&verify_result.proposal) {
+            if &verify_result.is_pass != self.verify_result.get(&verify_result.proposal).unwrap() {
+                error!(
+                    "The verify results of {:?} are different!",
+                    verify_result.proposal
+                );
+                return;
+            }
+        }
+        self.verify_result
+            .insert(verify_result.proposal, verify_result.is_pass);
+    }
+
     fn new_round_start(&mut self) {
         if self.step != Step::ProposeWait {
             info!("Start height {:?}, round{:?}", self.height, self.round);
@@ -830,10 +937,26 @@ impl Bft {
                         && self.try_save_vote(vote)
                     {
                         let precommit_result = self.check_precommit_count();
-                        if precommit_result == PRECOMMIT_ON_NOTHING {
-                            // only receive +2/3 precommits might lead BFT to PrecommitWait
-                            self.change_to_step(Step::PrecommitWait);
+
+                        #[cfg(not(feature = "verify_req"))]
+                        {
+                            if precommit_result == PRECOMMIT_ON_NOTHING {
+                                // only receive +2/3 precommits might lead BFT to PrecommitWait
+                                self.change_to_step(Step::PrecommitWait);
+                            }
                         }
+
+                        #[cfg(feature = "verify_req")]
+                        {
+                            if precommit_result == PRECOMMIT_ON_NOTHING
+                                || precommit_result == PRECOMMIT_WITHOUT_VERIFY
+                            {
+                                // receive +2/3 precommits or has not receive verify response
+                                // might lead BFT to PrecommitWait step
+                                self.change_to_step(Step::PrecommitWait);
+                            }
+                        }
+
                         if precommit_result == PRECOMMIT_ON_NIL {
                             // receive +2/3 on nil, goto next round directly
                             if self.lock_status.is_none() {
@@ -863,6 +986,20 @@ impl Bft {
                     self.new_round_start();
                 }
             }
+
+            #[cfg(feature = "verify_req")]
+            BftMsg::VerifyResp(verify_resp) => {
+                self.save_verify_resp(verify_resp);
+                if self.step == Step::PrecommitWait
+                    && self.check_precommit_count() == PRECOMMIT_ON_PROPOSAL
+                {
+                    // receive +2/3 on a proposal, try to commit
+                    self.change_to_step(Step::Commit);
+                    self.proc_commit();
+                    self.change_to_step(Step::CommitWait);
+                }
+            }
+
             _ => error!("Invalid Message!"),
         }
     }
@@ -898,9 +1035,26 @@ impl Bft {
                 self.change_to_step(Step::Precommit);
                 self.transmit_precommit();
                 let precommit_result = self.check_precommit_count();
-                if precommit_result == PRECOMMIT_ON_NOTHING {
-                    self.change_to_step(Step::PrecommitWait);
+
+                #[cfg(not(feature = "verify_req"))]
+                {
+                    if precommit_result == PRECOMMIT_ON_NOTHING {
+                        // only receive +2/3 precommits might lead BFT to PrecommitWait
+                        self.change_to_step(Step::PrecommitWait);
+                    }
                 }
+
+                #[cfg(feature = "verify_req")]
+                {
+                    if precommit_result == PRECOMMIT_ON_NOTHING
+                        || precommit_result == PRECOMMIT_WITHOUT_VERIFY
+                    {
+                        // receive +2/3 precommits or has not receive verify response
+                        // might lead BFT to PrecommitWait step
+                        self.change_to_step(Step::PrecommitWait);
+                    }
+                }
+
                 if precommit_result == PRECOMMIT_ON_NIL {
                     if self.lock_status.is_none() {
                         self.proposal = None;

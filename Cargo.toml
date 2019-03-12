@@ -25,3 +25,7 @@ time = "0.1.36"
 csv = "1.0"
 env_logger = "0.6.0"
 rand = "0.5.5"
+
+[features]
+default = []
+verify_req = []
