@@ -25,8 +25,6 @@ pub mod params;
 pub mod timer;
 /// BFT vote set.
 pub mod voteset;
-/// BFT log config
-pub mod wal;
 
 /// Type for node address.
 pub type Address = Vec<u8>;

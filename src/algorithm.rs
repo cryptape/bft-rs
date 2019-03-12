@@ -1,5 +1,4 @@
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
-use log::LevelFilter;
 
 use std::collections::HashMap;
 use std::thread;
@@ -9,7 +8,6 @@ use super::*;
 use params::BftParams;
 use timer::{TimeoutInfo, WaitTimer};
 use voteset::{VoteCollector, VoteSet};
-use wal::initialize_log_config;
 
 const INIT_HEIGHT: usize = 0;
 const INIT_ROUND: usize = 0;
@@ -90,21 +88,10 @@ pub struct Bft {
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(
-        s: Sender<BftMsg>,
-        r: Receiver<BftMsg>,
-        local_address: Address,
-        log_path: Option<&str>,
-    ) {
+    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
-
-        // initialize log4rs if log path is some
-        if let Some(path) = log_path {
-            let log_config = initialize_log_config(path, LevelFilter::Trace);
-            log4rs::init_config(log_config).unwrap();
-        }
 
         // start timer module.
         let _timer_thread = thread::Builder::new()
