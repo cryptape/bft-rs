@@ -1,5 +1,5 @@
 use bft::*;
-use crossbeam::crossbeam_channel::{unbounded, Sender};
+use crossbeam::crossbeam_channel::unbounded;
 use env_logger;
 
 use crate::*;
@@ -7,38 +7,9 @@ use crate::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 const MAX_TEST_HEIGHT: usize = 10;
-
-fn transmit_genesis(
-    s_1: Sender<BftMsg>,
-    s_2: Sender<BftMsg>,
-    s_3: Sender<BftMsg>,
-    s_4: Sender<BftMsg>,
-) {
-    let msg = BftMsg::Status(Status {
-        height: INIT_HEIGHT,
-        interval: None,
-        authority_list: generate_auth_list(),
-    });
-    let feed = BftMsg::Feed(Feed {
-        height: INIT_HEIGHT + 1,
-        proposal: generate_proposal(),
-    });
-
-    s_1.send(msg.clone()).unwrap();
-    s_2.send(msg.clone()).unwrap();
-    s_3.send(msg.clone()).unwrap();
-    s_4.send(msg).unwrap();
-
-    thread::sleep(Duration::from_micros(50));
-
-    s_1.send(feed.clone()).unwrap();
-    s_2.send(feed.clone()).unwrap();
-    s_3.send(feed.clone()).unwrap();
-    s_4.send(feed).unwrap();
-}
 
 fn is_success(result: Vec<Target>) -> bool {
     let mut result_hashmap: HashMap<Target, u8> = HashMap::new();
