@@ -9,7 +9,6 @@ extern crate bincode;
 extern crate crossbeam;
 #[macro_use]
 extern crate log;
-extern crate log4rs;
 extern crate lru_cache;
 extern crate min_max_heap;
 #[macro_use]
@@ -134,7 +133,8 @@ pub struct Status {
     pub authority_list: Vec<Address>,
 }
 
-///
+/// A verify result of a proposal.
+#[cfg(feature = "verify_req")]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct VerifyResp {
     /// The Response of proposal verify
