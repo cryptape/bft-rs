@@ -19,6 +19,8 @@ const PRECOMMIT_ON_PROPOSAL: i8 = 3;
 #[cfg(feature = "verify_req")]
 const PRECOMMIT_WITHOUT_VERIFY: i8 = 4;
 const TIMEOUT_RETRANSE_COEF: u32 = 15;
+#[cfg(feature = "verify_req")]
+const VERIFY_AWAIT_COEF: u32 = 50;
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 300;
 const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 300;
 
@@ -33,6 +35,9 @@ pub enum Step {
     Prevote,
     /// A step to wait for more prevote if none of them reach 2/3.
     PrevoteWait,
+    /// A step to wait for proposal verify result.
+    #[cfg(feature = "verify_req")]
+    VerifyWait,
     /// A step to transmit precommit and check precommit count.
     Precommit,
     /// A step to wait for more prevote if none of them reach 2/3.
@@ -56,10 +61,12 @@ impl From<u8> for Step {
             1u8 => Step::ProposeWait,
             2u8 => Step::Prevote,
             3u8 => Step::PrevoteWait,
-            4u8 => Step::Precommit,
-            5u8 => Step::PrecommitWait,
-            6u8 => Step::Commit,
-            7u8 => Step::CommitWait,
+            #[cfg(feature = "verify_req")]
+            4u8 => Step::VerifyWait,
+            5u8 => Step::Precommit,
+            6u8 => Step::PrecommitWait,
+            7u8 => Step::Commit,
+            8u8 => Step::CommitWait,
             _ => panic!("Invalid step."),
         }
     }
@@ -771,6 +778,7 @@ impl Bft {
                         } else {
                             // has not received verify response till now
                             pending_flag = true;
+                            
                         }
                     }
                 }
