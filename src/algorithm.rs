@@ -770,6 +770,15 @@ impl Bft {
                                 info!("The verify result of proposal {:?} is disapproved.", &hash);
                                 clean_flag = true;
                                 self.proposal = None;
+                                // if feed's proposal eq the verified failed proposal, clean it
+                                if self.feed
+                                    == Some(Feed {
+                                        height: self.height,
+                                        proposal: hash.to_vec(),
+                                    })
+                                {
+                                    self.feed = None;
+                                }
                             } else {
                                 // if verified success, do commit
                                 info!("The verify result of proposal {:?} is approved.", &hash);
@@ -778,20 +787,21 @@ impl Bft {
                         } else {
                             // has not received verify response till now
                             pending_flag = true;
-                            
                         }
                     }
                 }
-            }
-
-            if self.step == Step::Precommit {
-                self.set_timer(tv, Step::PrecommitWait);
             }
             if clean_flag {
                 self.clean_polc();
             }
             if pending_flag {
+                tv = self.params.timer.get_prevote() * VERIFY_AWAIT_COEF;
+                self.set_timer(tv, Step::VerifyWait);
                 return PRECOMMIT_WITHOUT_VERIFY;
+            }
+
+            if self.step == Step::Precommit {
+                self.set_timer(tv, Step::PrecommitWait);
             }
         }
         PRECOMMIT_ON_NOTHING
@@ -956,12 +966,12 @@ impl Bft {
 
                         #[cfg(feature = "verify_req")]
                         {
-                            if precommit_result == PRECOMMIT_ON_NOTHING
-                                || precommit_result == PRECOMMIT_WITHOUT_VERIFY
-                            {
-                                // receive +2/3 precommits or has not receive verify response
-                                // might lead BFT to PrecommitWait step
+                            if precommit_result == PRECOMMIT_ON_NOTHING {
+                                // receive +2/3 precommits might lead BFT to PrecommitWait step
                                 self.change_to_step(Step::PrecommitWait);
+                            }
+                            if precommit_result == PRECOMMIT_WITHOUT_VERIFY {
+                                self.change_to_step(Step::VerifyWait);
                             }
                         }
 
@@ -1054,12 +1064,12 @@ impl Bft {
 
                 #[cfg(feature = "verify_req")]
                 {
-                    if precommit_result == PRECOMMIT_ON_NOTHING
-                        || precommit_result == PRECOMMIT_WITHOUT_VERIFY
-                    {
-                        // receive +2/3 precommits or has not receive verify response
-                        // might lead BFT to PrecommitWait step
+                    if precommit_result == PRECOMMIT_ON_NOTHING {
+                        // receive +2/3 precommits might lead BFT to PrecommitWait step
                         self.change_to_step(Step::PrecommitWait);
+                    }
+                    if precommit_result == PRECOMMIT_WITHOUT_VERIFY {
+                        self.change_to_step(Step::VerifyWait);
                     }
                 }
 
@@ -1086,6 +1096,16 @@ impl Bft {
                 self.goto_next_round();
                 self.new_round_start();
             }
+
+            #[cfg(feature = "verify_req")]
+            Step::VerifyWait => {
+                // clean save info and goto new round
+                self.lock_status = None;
+                self.proposal = None;
+                self.goto_next_round();
+                self.new_round_start();
+            }
+
             _ => error!("Invalid Timeout Info!"),
         }
     }
