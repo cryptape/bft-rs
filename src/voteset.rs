@@ -2,7 +2,7 @@ use lru_cache::LruCache;
 
 use std::collections::HashMap;
 
-use super::{Address, Target, Vote};
+use super::{Address, Target, VoteType, Vote};
 use algorithm::Step;
 
 /// BFT vote collector
@@ -31,7 +31,7 @@ impl VoteCollector {
         let sender = vote.voter;
         let vote = vote.proposal;
 
-        if vote_type == Step::Prevote {
+        if vote_type == VoteType::Prevote {
             if self.votes.contains_key(&height) {
                 if self
                     .votes
@@ -70,7 +70,7 @@ impl VoteCollector {
     }
 
     /// A function to get the vote set of the height, the round, and the vote type.
-    pub fn get_voteset(&mut self, height: usize, round: usize, vote_type: Step) -> Option<VoteSet> {
+    pub fn get_voteset(&mut self, height: usize, round: usize, vote_type: VoteType) -> Option<VoteSet> {
         self.votes
             .get_mut(&height)
             .and_then(|rc| rc.get_voteset(round, vote_type))
@@ -123,7 +123,7 @@ impl VoteSet {
         &self,
         height: usize,
         round: usize,
-        vote_type: Step,
+        vote_type: VoteType,
         proposal: &Target,
     ) -> Vec<Vote> {
         // abstract the votes for the polc proposal into a vec
@@ -131,7 +131,7 @@ impl VoteSet {
         for (address, vote_proposal) in &self.votes_by_sender {
             if vote_proposal == proposal {
                 polc.push(Vote {
-                    vote_type,
+                    vote_type: vote_type.clone(),
                     height,
                     round,
                     proposal: proposal.clone(),
@@ -160,7 +160,7 @@ impl RoundCollector {
     }
 
     /// A function try to add a vote to a round collector.
-    pub fn add(&mut self, round: usize, vote_type: Step, sender: Address, vote: Target) -> bool {
+    pub fn add(&mut self, round: usize, vote_type: VoteType, sender: Address, vote: Target) -> bool {
         if self.round_votes.contains_key(&round) {
             self.round_votes
                 .get_mut(&round)
@@ -175,7 +175,7 @@ impl RoundCollector {
     }
 
     /// A functionto get the vote set of the round, and the vote type.
-    pub fn get_voteset(&mut self, round: usize, vote_type: Step) -> Option<VoteSet> {
+    pub fn get_voteset(&mut self, round: usize, vote_type: VoteType) -> Option<VoteSet> {
         self.round_votes
             .get_mut(&round)
             .and_then(|sc| sc.get_voteset(vote_type))
@@ -187,7 +187,7 @@ impl RoundCollector {
 #[derive(Debug, Default)]
 pub struct StepCollector {
     /// A HashMap that K is step, V is the vote set
-    pub step_votes: HashMap<Step, VoteSet>,
+    pub step_votes: HashMap<VoteType, VoteSet>,
 }
 
 impl StepCollector {
@@ -199,7 +199,7 @@ impl StepCollector {
     }
 
     /// A function to add a vote to the step collector.
-    pub fn add(&mut self, vote_type: Step, sender: Address, vote: Target) -> bool {
+    pub fn add(&mut self, vote_type: VoteType, sender: Address, vote: Target) -> bool {
         self.step_votes
             .entry(vote_type)
             .or_insert_with(VoteSet::new)
@@ -207,7 +207,7 @@ impl StepCollector {
     }
 
     /// A function to get voteset of the vote type
-    pub fn get_voteset(&self, vote_type: Step) -> Option<VoteSet> {
+    pub fn get_voteset(&self, vote_type: VoteType) -> Option<VoteSet> {
         self.step_votes.get(&vote_type).cloned()
     }
 }

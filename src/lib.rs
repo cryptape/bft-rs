@@ -52,6 +52,15 @@ pub enum BftMsg {
     Start,
 }
 
+/// Bft vote types.
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum VoteType {
+    /// Vote type prevote.
+    Prevote,
+    /// Vote type precommit.
+    Precommit,
+}
+
 /// Something need to be consensus in a round.
 /// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
 /// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
@@ -87,7 +96,7 @@ pub struct LockStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Vote {
     /// Prevote vote or precommit vote
-    pub vote_type: Step,
+    pub vote_type: VoteType,
     /// The height of vote
     pub height: usize,
     /// The round of vote
