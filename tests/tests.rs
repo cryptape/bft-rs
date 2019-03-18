@@ -35,17 +35,9 @@ impl Node {
     ) {
         match msg {
             BftMsg::Proposal(proposal) => {
-                // println!(
-                //     "Node {:?} proposal {:?} at height {:?}",
-                //     proposal.proposer, proposal.content, proposal.height
-                // );
                 transmit_msg(BftMsg::Proposal(proposal), s_1, s_2, s_3);
             }
             BftMsg::Vote(vote) => {
-                // println!(
-                //     "Node {:?}, height {:?}, round {:?}, {:?} vote {:?}",
-                //     vote.voter, vote.height, vote.round, vote.vote_type, vote.proposal
-                // );
                 transmit_msg(BftMsg::Vote(vote), s_1, s_2, s_3);
             }
             BftMsg::Commit(commit) => {
@@ -65,6 +57,40 @@ fn start_process(address: Address) -> (Sender<BftMsg>, Receiver<BftMsg>) {
     let (bft2main, main4bft) = unbounded();
     Bft::start(bft2main, bft4main, address);
     (main2bft, main4bft)
+}
+
+fn transmit_genesis(
+    s_1: Sender<BftMsg>,
+    s_2: Sender<BftMsg>,
+    s_3: Sender<BftMsg>,
+    s_4: Sender<BftMsg>,
+) {
+    s_1.send(BftMsg::Start).unwrap();
+    s_2.send(BftMsg::Start).unwrap();
+    s_3.send(BftMsg::Start).unwrap();
+    s_4.send(BftMsg::Start).unwrap();
+
+    let msg = BftMsg::Status(Status {
+        height: INIT_HEIGHT,
+        interval: None,
+        authority_list: generate_auth_list(),
+    });
+    let feed = BftMsg::Feed(Feed {
+        height: INIT_HEIGHT + 1,
+        proposal: generate_proposal(),
+    });
+
+    s_1.send(msg.clone()).unwrap();
+    s_2.send(msg.clone()).unwrap();
+    s_3.send(msg.clone()).unwrap();
+    s_4.send(msg).unwrap();
+
+    ::std::thread::sleep(::std::time::Duration::from_micros(50));
+
+    s_1.send(feed.clone()).unwrap();
+    s_2.send(feed.clone()).unwrap();
+    s_3.send(feed.clone()).unwrap();
+    s_4.send(feed).unwrap();
 }
 
 fn generate_auth_list() -> Vec<Address> {
