@@ -47,22 +47,6 @@ impl Default for Step {
     }
 }
 
-impl From<u8> for Step {
-    fn from(s: u8) -> Step {
-        match s {
-            0u8 => Step::Propose,
-            1u8 => Step::ProposeWait,
-            2u8 => Step::Prevote,
-            3u8 => Step::PrevoteWait,
-            4u8 => Step::Precommit,
-            5u8 => Step::PrecommitWait,
-            6u8 => Step::Commit,
-            7u8 => Step::CommitWait,
-            _ => panic!("Invalid step."),
-        }
-    }
-}
-
 /// BFT state message.
 pub struct Bft {
     msg_sender: Sender<BftMsg>,
