@@ -60,7 +60,6 @@ fn test_bft() {
                 send_3.clone(),
                 send_r.clone(),
             );
-            // println!("{:?}", node_0.lock().unwrap().height);
         }
         if node_0_clone.lock().unwrap().height == MAX_TEST_HEIGHT {
             ::std::process::exit(0);

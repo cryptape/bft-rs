@@ -14,8 +14,6 @@ extern crate min_max_heap;
 #[macro_use]
 extern crate serde_derive;
 
-use algorithm::Step;
-
 /// BFT state machine.
 pub mod algorithm;
 /// BFT params include time interval and local address.

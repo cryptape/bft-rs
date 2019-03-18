@@ -35,17 +35,9 @@ impl Node {
     ) {
         match msg {
             BftMsg::Proposal(proposal) => {
-                // println!(
-                //     "Node {:?} proposal {:?} at height {:?}",
-                //     proposal.proposer, proposal.content, proposal.height
-                // );
                 transmit_msg(BftMsg::Proposal(proposal), s_1, s_2, s_3);
             }
             BftMsg::Vote(vote) => {
-                // println!(
-                //     "Node {:?}, height {:?}, round {:?}, {:?} vote {:?}",
-                //     vote.voter, vote.height, vote.round, vote.vote_type, vote.proposal
-                // );
                 transmit_msg(BftMsg::Vote(vote), s_1, s_2, s_3);
             }
             BftMsg::Commit(commit) => {
@@ -93,7 +85,8 @@ fn transmit_genesis(
     s_3.send(msg.clone()).unwrap();
     s_4.send(msg).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_micros(50));
+    ::std::thread::sleep(::std::time::Duration::from_micros(50));
+
 
     s_1.send(feed.clone()).unwrap();
     s_2.send(feed.clone()).unwrap();
