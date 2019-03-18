@@ -70,7 +70,7 @@ enum BftMsg {
     Status(Status),
     Commit(Commit),
     Pause,
-    Continue,
+    Start,
 }
 ```
 
@@ -103,12 +103,12 @@ Third, start a BFT state machine:
 let (main_to_bft, bft_from_main) = unbounded();
 let (bft_to_main, main_from_bft) = unbounded();
 
-BFT::start(bft_to_mian, bft_from_main, address, log_path);
+BFT::start(bft_to_mian, bft_from_main, address);
 ```
 
 *The `address` here is the address of this node with type `Vec<u8>`.*
 
-Use `send()` function to send a message to BFT state machine, take `Status` for example:
+What needs to illustrate is that the BFT machine is in stop step, therefore, the first thing is send `BftMsg::Start` message. Use `send()` function to send a message to BFT state machine, take `Status` for example:
 
 ```rust
 main_to_bft.
