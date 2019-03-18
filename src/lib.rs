@@ -14,8 +14,6 @@ extern crate min_max_heap;
 #[macro_use]
 extern crate serde_derive;
 
-use algorithm::Step;
-
 /// BFT state machine.
 pub mod algorithm;
 /// BFT params include time interval and local address.
@@ -50,6 +48,15 @@ pub enum BftMsg {
     Pause,
     /// Start running BFT state machine.
     Start,
+}
+
+/// Bft vote types.
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum VoteType {
+    /// Vote type prevote.
+    Prevote,
+    /// Vote type precommit.
+    Precommit,
 }
 
 /// Something need to be consensus in a round.
@@ -87,7 +94,7 @@ pub struct LockStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Vote {
     /// Prevote vote or precommit vote
-    pub vote_type: Step,
+    pub vote_type: VoteType,
     /// The height of vote
     pub height: usize,
     /// The round of vote
