@@ -1,5 +1,4 @@
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
-use log::LevelFilter;
 
 use std::collections::HashMap;
 use std::thread;
@@ -9,7 +8,6 @@ use super::*;
 use params::BftParams;
 use timer::{TimeoutInfo, WaitTimer};
 use voteset::{VoteCollector, VoteSet};
-use wal::initialize_log_config;
 
 const INIT_HEIGHT: usize = 0;
 const INIT_ROUND: usize = 0;
@@ -49,22 +47,6 @@ impl Default for Step {
     }
 }
 
-impl From<u8> for Step {
-    fn from(s: u8) -> Step {
-        match s {
-            0u8 => Step::Propose,
-            1u8 => Step::ProposeWait,
-            2u8 => Step::Prevote,
-            3u8 => Step::PrevoteWait,
-            4u8 => Step::Precommit,
-            5u8 => Step::PrecommitWait,
-            6u8 => Step::Commit,
-            7u8 => Step::CommitWait,
-            _ => panic!("Invalid step."),
-        }
-    }
-}
-
 /// BFT state message.
 pub struct Bft {
     msg_sender: Sender<BftMsg>,
@@ -90,21 +72,10 @@ pub struct Bft {
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(
-        s: Sender<BftMsg>,
-        r: Receiver<BftMsg>,
-        local_address: Address,
-        log_path: Option<&str>,
-    ) {
+    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
-
-        // initialize log4rs if log path is some
-        if let Some(path) = log_path {
-            let log_config = initialize_log_config(path, LevelFilter::Trace);
-            log4rs::init_config(log_config).unwrap();
-        }
 
         // start timer module.
         let _timer_thread = thread::Builder::new()
@@ -262,7 +233,7 @@ impl Bft {
         );
 
         self.send_bft_msg(BftMsg::Vote(Vote {
-            vote_type: Step::Prevote,
+            vote_type: VoteType::Prevote,
             height: self.height - 1,
             round,
             proposal: self.last_commit_proposal.clone().unwrap(),
@@ -270,7 +241,7 @@ impl Bft {
         }));
 
         self.send_bft_msg(BftMsg::Vote(Vote {
-            vote_type: Step::Precommit,
+            vote_type: VoteType::Precommit,
             height: self.height - 1,
             round,
             proposal: self.last_commit_proposal.clone().unwrap(),
@@ -493,7 +464,7 @@ impl Bft {
         );
 
         let vote = Vote {
-            vote_type: Step::Prevote,
+            vote_type: VoteType::Prevote,
             height: self.height,
             round: self.round,
             proposal: prevote.clone(),
@@ -545,7 +516,7 @@ impl Bft {
             if trans_flag {
                 info!("Some nodes fall behind, send nil vote to help them pursue");
                 self.send_bft_msg(BftMsg::Vote(Vote {
-                    vote_type: Step::Precommit,
+                    vote_type: VoteType::Precommit,
                     height: vote.height,
                     round: vote.round,
                     proposal: Vec::new(),
@@ -583,9 +554,9 @@ impl Bft {
             self.height, self.round
         );
 
-        if let Some(prevote_set) = self
-            .votes
-            .get_voteset(self.height, self.round, Step::Prevote)
+        if let Some(prevote_set) =
+            self.votes
+                .get_voteset(self.height, self.round, VoteType::Prevote)
         {
             let mut tv = if self.cal_all_vote(prevote_set.count) {
                 Duration::new(0, 0)
@@ -609,12 +580,12 @@ impl Bft {
                             self.proposal = None;
                         } else {
                             // receive a later PoLC, update lock info
-                            self.set_polc(&hash, &prevote_set, Step::Prevote);
+                            self.set_polc(&hash, &prevote_set, VoteType::Prevote);
                         }
                     }
                     if self.lock_status.is_none() && !hash.is_empty() {
                         // receive a PoLC, lock the proposal
-                        self.set_polc(&hash, &prevote_set, Step::Prevote);
+                        self.set_polc(&hash, &prevote_set, VoteType::Prevote);
                     }
                     tv = Duration::new(0, 0);
                     break;
@@ -643,7 +614,7 @@ impl Bft {
         );
 
         let vote = Vote {
-            vote_type: Step::Precommit,
+            vote_type: VoteType::Precommit,
             height: self.height,
             round: self.round,
             proposal: precommit.clone(),
@@ -663,7 +634,7 @@ impl Bft {
     fn check_precommit_count(&mut self) -> i8 {
         if let Some(precommit_set) =
             self.votes
-                .get_voteset(self.height, self.round, Step::Precommit)
+                .get_voteset(self.height, self.round, VoteType::Precommit)
         {
             let mut tv = if self.cal_all_vote(precommit_set.count) {
                 Duration::new(0, 0)
@@ -685,7 +656,7 @@ impl Bft {
                         info!("Reach nil consensus, goto next round {:?}", self.round + 1);
                         return PRECOMMIT_ON_NIL;
                     } else {
-                        self.set_polc(&hash, &precommit_set, Step::Precommit);
+                        self.set_polc(&hash, &precommit_set, VoteType::Precommit);
                         return PRECOMMIT_ON_PROPOSAL;
                     }
                 }
@@ -718,7 +689,7 @@ impl Bft {
         self.last_commit_proposal = Some(result.proposal);
     }
 
-    fn set_polc(&mut self, hash: &Target, voteset: &VoteSet, vote_type: Step) {
+    fn set_polc(&mut self, hash: &Target, voteset: &VoteSet, vote_type: VoteType) {
         self.proposal = Some(hash.to_owned());
         self.lock_status = Some(LockStatus {
             proposal: hash.to_owned(),
@@ -815,14 +786,14 @@ impl Bft {
                 }
             }
             BftMsg::Vote(vote) => {
-                if vote.vote_type == Step::Prevote {
+                if vote.vote_type == VoteType::Prevote {
                     if self.step <= Step::PrevoteWait {
                         let _ = self.try_save_vote(vote);
                         if self.step >= Step::Prevote && self.check_prevote_count() {
                             self.change_to_step(Step::PrevoteWait);
                         }
                     }
-                } else if vote.vote_type == Step::Precommit {
+                } else if vote.vote_type == VoteType::Precommit {
                     if self.step < Step::Precommit {
                         let _ = self.try_save_vote(vote.clone());
                     }

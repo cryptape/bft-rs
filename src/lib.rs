@@ -9,13 +9,10 @@ extern crate bincode;
 extern crate crossbeam;
 #[macro_use]
 extern crate log;
-extern crate log4rs;
 extern crate lru_cache;
 extern crate min_max_heap;
 #[macro_use]
 extern crate serde_derive;
-
-use algorithm::Step;
 
 /// BFT state machine.
 pub mod algorithm;
@@ -25,8 +22,6 @@ pub mod params;
 pub mod timer;
 /// BFT vote set.
 pub mod voteset;
-/// BFT log config
-pub mod wal;
 
 /// Type for node address.
 pub type Address = Vec<u8>;
@@ -50,6 +45,15 @@ pub enum BftMsg {
     Pause,
     /// Start running BFT state machine.
     Start,
+}
+
+/// Bft vote types.
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum VoteType {
+    /// Vote type prevote.
+    Prevote,
+    /// Vote type precommit.
+    Precommit,
 }
 
 /// Something need to be consensus in a round.
@@ -87,7 +91,7 @@ pub struct LockStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Vote {
     /// Prevote vote or precommit vote
-    pub vote_type: Step,
+    pub vote_type: VoteType,
     /// The height of vote
     pub height: usize,
     /// The round of vote
