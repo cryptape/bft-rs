@@ -8,26 +8,26 @@ use algorithm::Step;
 
 /// Timer infomation.
 #[derive(Debug, Clone)]
-pub struct TimeoutInfo {
+pub(crate) struct TimeoutInfo {
     /// A timeval of a timer.
-    pub timeval: Instant,
+    pub(crate) timeval: Instant,
     /// The height of the timer.
-    pub height: usize,
+    pub(crate) height: usize,
     /// The round of the timer.
-    pub round: usize,
+    pub(crate) round: usize,
     /// The step of the timer.
-    pub step: Step,
+    pub(crate) step: Step,
 }
 
 /// Sender and receiver of a timeout infomation channel.
-pub struct WaitTimer {
+pub(crate) struct WaitTimer {
     timer_seter: Receiver<TimeoutInfo>,
     timer_notify: Sender<TimeoutInfo>,
 }
 
 impl WaitTimer {
     /// A function to create a new timeout infomation channel.
-    pub fn new(ts: Sender<TimeoutInfo>, rs: Receiver<TimeoutInfo>) -> WaitTimer {
+    pub(crate) fn new(ts: Sender<TimeoutInfo>, rs: Receiver<TimeoutInfo>) -> WaitTimer {
         WaitTimer {
             timer_notify: ts,
             timer_seter: rs,
@@ -35,7 +35,7 @@ impl WaitTimer {
     }
 
     /// A function to start a timer.
-    pub fn start(&self) {
+    pub(crate) fn start(&self) {
         let mut timer_heap = MinMaxHeap::new();
         let mut timeout_info = HashMap::new();
 
