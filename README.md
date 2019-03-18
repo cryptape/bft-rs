@@ -60,7 +60,7 @@ A complete BFT model consists of 4 essential parts:
 
 ## Interface
 
-If bft-rs works correctly, it need to receive 4 types of message: `Proposal`, `Vote`, `Feed`, `Status`. And  bft-rs can send 3 types of message: `Proposal`, `Vote`, `Commit`. These types of messages consist the `enum BftMsg`:
+If bft-rs works correctly, it need to receive 4 types of message: `Proposal`, `Vote`, `Feed`, `Status`. And  bft-rs can send 3 types of message: `Proposal`, `Vote`, `Commit`. Besides, bft-rs also provides `Stop` and `Start` message that can control state machine stop or go on. These types of messages consist the `enum BftMsg`:
 
 ```rust
 enum BftMsg {
@@ -108,7 +108,7 @@ BFT::start(bft_to_mian, bft_from_main, address);
 
 *The `address` here is the address of this node with type `Vec<u8>`.*
 
-What needs to illustrate is that the BFT machine is in stop step, therefore, the first thing is send `BftMsg::Start` message. Use `send()` function to send a message to BFT state machine, take `Status` for example:
+What needs to illustrate is that the BFT machine is in stop step by default, therefore, the first thing is send `BftMsg::Start` message. Use `send()` function to send a message to BFT state machine, take `Status` for example:
 
 ```rust
 main_to_bft.
