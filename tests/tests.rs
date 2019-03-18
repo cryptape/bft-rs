@@ -87,7 +87,6 @@ fn transmit_genesis(
 
     ::std::thread::sleep(::std::time::Duration::from_micros(50));
 
-
     s_1.send(feed.clone()).unwrap();
     s_2.send(feed.clone()).unwrap();
     s_3.send(feed.clone()).unwrap();
