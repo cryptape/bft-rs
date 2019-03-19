@@ -1,20 +1,3 @@
-// CITA
-// Copyright 2016-2017 Cryptape Technologies LLC.
-
-// This program is free software: you can redistribute it
-// and/or modify it under the terms of the GNU General Public
-// License as published by the Free Software Foundation,
-// either version 3 of the License, or (at your option) any
-// later version.
-
-// This program is distributed in the hope that it will be
-// useful, but WITHOUT ANY WARRANTY; without even the implied
-// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-// PURPOSE. See the GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 use crossbeam::crossbeam_channel::{Receiver, Sender};
 use min_max_heap::MinMaxHeap;
 
@@ -25,26 +8,26 @@ use algorithm::Step;
 
 /// Timer infomation.
 #[derive(Debug, Clone)]
-pub struct TimeoutInfo {
+pub(crate) struct TimeoutInfo {
     /// A timeval of a timer.
-    pub timeval: Instant,
+    pub(crate) timeval: Instant,
     /// The height of the timer.
-    pub height: usize,
+    pub(crate) height: usize,
     /// The round of the timer.
-    pub round: usize,
+    pub(crate) round: usize,
     /// The step of the timer.
-    pub step: Step,
+    pub(crate) step: Step,
 }
 
 /// Sender and receiver of a timeout infomation channel.
-pub struct WaitTimer {
+pub(crate) struct WaitTimer {
     timer_seter: Receiver<TimeoutInfo>,
     timer_notify: Sender<TimeoutInfo>,
 }
 
 impl WaitTimer {
     /// A function to create a new timeout infomation channel.
-    pub fn new(ts: Sender<TimeoutInfo>, rs: Receiver<TimeoutInfo>) -> WaitTimer {
+    pub(crate) fn new(ts: Sender<TimeoutInfo>, rs: Receiver<TimeoutInfo>) -> WaitTimer {
         WaitTimer {
             timer_notify: ts,
             timer_seter: rs,
@@ -52,15 +35,16 @@ impl WaitTimer {
     }
 
     /// A function to start a timer.
-    pub fn start(&self) {
+    pub(crate) fn start(&self) {
         let mut timer_heap = MinMaxHeap::new();
         let mut timeout_info = HashMap::new();
 
         loop {
             // take the peek of the min-heap-timer sub now as the sleep time otherwise set timeout as 100
             let timeout = if !timer_heap.is_empty() {
-                if *timer_heap.peek_min().unwrap() > Instant::now() {
-                    *timer_heap.peek_min().unwrap() - Instant::now()
+                let now = Instant::now();
+                if *timer_heap.peek_min().unwrap() > now {
+                    *timer_heap.peek_min().unwrap() - now
                 } else {
                     Duration::new(0, 0)
                 }

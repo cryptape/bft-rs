@@ -1,16 +1,25 @@
 [package]
 name = "bft-rs"
-version = "0.0.1"
-authors = ["Cryptape Technologies <contact@cryptape.com>"]
+version = "0.1.0"
+authors = ["Eason Gao <kaoimin@qq.com>", "Cryptape Technologies <contact@cryptape.com>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/cryptape/bft-rs"
+homepage = "https://github.com/cryptape/bft-rs"
+description = """
+An efficent and stable Rust library of BFT protocol for distributed system.
+"""
 
 [dependencies]
 bincode = "0.8.0"
 crossbeam = "0.7"
 lru-cache = "0.1"
 log = "0.4.3"
-log4rs = "0.8.1"
 min-max-heap = "1.2.0"
-rand = "0.6.5"
 serde = "1.0"
 serde_derive = "1.0"
 time = "0.1.36"
+
+[dev-dependencies]
+env_logger = "0.6.0"
+rand = "0.5.5"

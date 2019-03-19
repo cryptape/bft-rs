@@ -1,0 +1,20 @@
+language: rust
+rust: 
+  - stable
+before_script:
+  - rustup component add rustfmt
+  - rustup component add clippy
+script:
+  - RUSTFLAGS='-F warnings' cargo build --all
+stages:
+  - Format
+  - Test
+jobs:
+  include:
+    - stage: Format
+      script:
+        - cargo fmt --all -- --check
+    - stage: Test
+      name: Clippy
+      script:
+        - cargo clippy --all
