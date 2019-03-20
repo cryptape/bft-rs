@@ -16,8 +16,6 @@ const PRECOMMIT_BELOW_TWO_THIRDS: i8 = 0;
 const PRECOMMIT_ON_NOTHING: i8 = 1;
 const PRECOMMIT_ON_NIL: i8 = 2;
 const PRECOMMIT_ON_PROPOSAL: i8 = 3;
-#[cfg(feature = "verify_req")]
-const PRECOMMIT_WITHOUT_VERIFY: i8 = 4;
 const TIMEOUT_RETRANSE_COEF: u32 = 15;
 #[cfg(feature = "verify_req")]
 const VERIFY_AWAIT_COEF: u32 = 50;
@@ -678,7 +676,6 @@ impl Bft {
         );
     }
 
-    #[cfg(not(feature = "verify_req"))]
     fn check_precommit_count(&mut self) -> i8 {
         if let Some(precommit_set) =
             self.votes
@@ -709,79 +706,6 @@ impl Bft {
                     }
                 }
             }
-            if self.step == Step::Precommit {
-                self.set_timer(tv, Step::PrecommitWait);
-            }
-        }
-        PRECOMMIT_ON_NOTHING
-    }
-
-    #[cfg(feature = "verify_req")]
-    fn check_precommit_count(&mut self) -> i8 {
-        if let Some(precommit_set) =
-            self.votes
-                .get_voteset(self.height, self.round, Step::Precommit)
-        {
-            let mut tv = if self.cal_all_vote(precommit_set.count) {
-                Duration::new(0, 0)
-            } else {
-                self.params.timer.get_precommit()
-            };
-            if !self.cal_above_threshold(precommit_set.count) {
-                return PRECOMMIT_BELOW_TWO_THIRDS;
-            }
-
-            info!(
-                "Receive over 2/3 precommit at height {:?}, round {:?}",
-                self.height, self.round
-            );
-            let mut pending_flag = false;
-            let mut clean_flag = false;
-
-            for (hash, count) in &precommit_set.votes_by_proposal {
-                if self.cal_above_threshold(*count) {
-                    if hash.is_empty() {
-                        info!("Reach nil consensus, goto next round {:?}", self.round + 1);
-                        return PRECOMMIT_ON_NIL;
-                    } else {
-                        self.set_polc(&hash, &precommit_set, Step::Precommit);
-                        if let Some(is_pass) = self.verify_result.get(hash) {
-                            // check verify result of the proposal
-                            if !is_pass {
-                                // if verified fail, clean PoLC and proposal
-                                info!("The verify result of proposal {:?} is disapproved.", &hash);
-                                clean_flag = true;
-                                self.proposal = None;
-                                // if feed's proposal eq the verified failed proposal, clean it
-                                if self.feed
-                                    == Some(Feed {
-                                        height: self.height,
-                                        proposal: hash.to_vec(),
-                                    })
-                                {
-                                    self.feed = None;
-                                }
-                            } else {
-                                // if verified success, do commit
-                                info!("The verify result of proposal {:?} is approved.", &hash);
-                                return PRECOMMIT_ON_PROPOSAL;
-                            }
-                        } else {
-                            // has not received verify response till now
-                            pending_flag = true;
-                        }
-                    }
-                }
-            }
-            if clean_flag {
-                self.clean_polc();
-            }
-            if pending_flag {
-                tv = self.params.timer.get_prevote() * VERIFY_AWAIT_COEF;
-                self.set_timer(tv, Step::VerifyWait);
-                return PRECOMMIT_WITHOUT_VERIFY;
-            }
-
             if self.step == Step::Precommit {
                 self.set_timer(tv, Step::PrecommitWait);
             }
@@ -938,23 +862,9 @@ impl Bft {
                     {
                         let precommit_result = self.check_precommit_count();
 
-                        #[cfg(not(feature = "verify_req"))]
-                        {
-                            if precommit_result == PRECOMMIT_ON_NOTHING {
-                                // only receive +2/3 precommits might lead BFT to PrecommitWait
-                                self.change_to_step(Step::PrecommitWait);
-                            }
-                        }
-
-                        #[cfg(feature = "verify_req")]
-                        {
-                            if precommit_result == PRECOMMIT_ON_NOTHING {
-                                // receive +2/3 precommits might lead BFT to PrecommitWait step
-                                self.change_to_step(Step::PrecommitWait);
-                            }
-                            if precommit_result == PRECOMMIT_WITHOUT_VERIFY {
-                                self.change_to_step(Step::VerifyWait);
-                            }
+                        if precommit_result == PRECOMMIT_ON_NOTHING {
+                            // only receive +2/3 precommits might lead BFT to PrecommitWait
+                            self.change_to_step(Step::PrecommitWait);
                         }
 
                         if precommit_result == PRECOMMIT_ON_NIL {
@@ -1036,23 +946,9 @@ impl Bft {
                 self.transmit_precommit();
                 let precommit_result = self.check_precommit_count();
 
-                #[cfg(not(feature = "verify_req"))]
-                {
-                    if precommit_result == PRECOMMIT_ON_NOTHING {
-                        // only receive +2/3 precommits might lead BFT to PrecommitWait
-                        self.change_to_step(Step::PrecommitWait);
-                    }
-                }
-
-                #[cfg(feature = "verify_req")]
-                {
-                    if precommit_result == PRECOMMIT_ON_NOTHING {
-                        // receive +2/3 precommits might lead BFT to PrecommitWait step
-                        self.change_to_step(Step::PrecommitWait);
-                    }
-                    if precommit_result == PRECOMMIT_WITHOUT_VERIFY {
-                        self.change_to_step(Step::VerifyWait);
-                    }
+                if precommit_result == PRECOMMIT_ON_NOTHING {
+                    // only receive +2/3 precommits might lead BFT to PrecommitWait
+                    self.change_to_step(Step::PrecommitWait);
                 }
 
                 if precommit_result == PRECOMMIT_ON_NIL {
