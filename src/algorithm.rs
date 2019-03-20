@@ -17,10 +17,17 @@ const PRECOMMIT_ON_NOTHING: i8 = 1;
 const PRECOMMIT_ON_NIL: i8 = 2;
 const PRECOMMIT_ON_PROPOSAL: i8 = 3;
 const TIMEOUT_RETRANSE_COEF: u32 = 15;
-#[cfg(feature = "verify_req")]
-const VERIFY_AWAIT_COEF: u32 = 50;
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 300;
 const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 300;
+
+#[cfg(feature = "verify_req")]
+const VERIFY_AWAIT_COEF: u32 = 50;
+#[cfg(feature = "verify_req")]
+const VERIFY_SUCCESS: i8 = -1;
+#[cfg(feature = "verify_req")]
+const VERIFY_FAIL: i8 = -2;
+#[cfg(feature = "verify_req")]
+const VERIFY_UNDETERMINED: i8 = -3;
 
 /// BFT step
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
@@ -644,6 +651,34 @@ impl Bft {
         false
     }
 
+    #[cfg(feature = "verify_req")]
+    fn check_verify(&mut self) -> i8 {
+        if let Some(lock) = self.lock_status.clone() {
+            let prop = lock.proposal;
+            if self.verify_result.contains_key(&prop) {
+                if *self.verify_result.get(&prop).unwrap() {
+                    return VERIFY_SUCCESS;
+                } else {
+                    let prop = self.lock_status.clone().unwrap().proposal;
+                    if let Some(feed) = self.feed.clone() {
+                        // if feed eq proposal, clean it
+                        if prop == feed.proposal {
+                            self.feed = None;
+                        }
+                    }
+                    // clean fsave info
+                    self.clean_polc();
+                    return VERIFY_FAIL;
+                }
+            } else {
+                let tv = self.params.timer.get_prevote() * VERIFY_AWAIT_COEF;
+                self.set_timer(tv, Step::VerifyWait);
+                return VERIFY_UNDETERMINED;
+            }
+        }
+        VERIFY_SUCCESS
+    }
+
     fn transmit_precommit(&mut self) {
         let precommit = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
@@ -900,13 +935,33 @@ impl Bft {
             #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
                 self.save_verify_resp(verify_resp);
-                if self.step == Step::PrecommitWait
-                    && self.check_precommit_count() == PRECOMMIT_ON_PROPOSAL
-                {
-                    // receive +2/3 on a proposal, try to commit
-                    self.change_to_step(Step::Commit);
-                    self.proc_commit();
-                    self.change_to_step(Step::CommitWait);
+                if self.step == Step::VerifyWait {
+                    // next do precommit
+                    self.change_to_step(Step::Precommit);
+                    if self.check_verify() == VERIFY_UNDETERMINED {
+                        self.change_to_step(Step::VerifyWait);
+                        return;
+                    }
+                    self.transmit_precommit();
+                    let precommit_result = self.check_precommit_count();
+
+                    if precommit_result == PRECOMMIT_ON_NOTHING {
+                        // only receive +2/3 precommits might lead BFT to PrecommitWait
+                        self.change_to_step(Step::PrecommitWait);
+                    }
+
+                    if precommit_result == PRECOMMIT_ON_NIL {
+                        if self.lock_status.is_none() {
+                            self.proposal = None;
+                        }
+                        self.goto_next_round();
+                        self.new_round_start();
+                    }
+                    if precommit_result == PRECOMMIT_ON_PROPOSAL {
+                        self.change_to_step(Step::Commit);
+                        self.proc_commit();
+                        self.change_to_step(Step::CommitWait);
+                    }
                 }
             }
 
@@ -943,6 +998,15 @@ impl Bft {
                 }
                 // next do precommit
                 self.change_to_step(Step::Precommit);
+                #[cfg(feature = "verify_req")]
+                {
+                    let verify_result = self.check_verify();
+                    if verify_result == VERIFY_UNDETERMINED {
+                        self.change_to_step(Step::VerifyWait);
+                        return;
+                    }
+                }
+
                 self.transmit_precommit();
                 let precommit_result = self.check_precommit_count();
 
@@ -977,11 +1041,38 @@ impl Bft {
 
             #[cfg(feature = "verify_req")]
             Step::VerifyWait => {
-                // clean save info and goto new round
-                self.lock_status = None;
-                self.proposal = None;
-                self.goto_next_round();
-                self.new_round_start();
+                let prop = self.lock_status.clone().unwrap().proposal;
+                if let Some(feed) = self.feed.clone() {
+                    // if feed eq proposal, clean it
+                    if prop == feed.proposal {
+                        self.feed = None;
+                    }
+                }
+                // clean fsave info
+                self.clean_polc();
+
+                // next do precommit
+                self.change_to_step(Step::Precommit);
+                self.transmit_precommit();
+                let precommit_result = self.check_precommit_count();
+
+                if precommit_result == PRECOMMIT_ON_NOTHING {
+                    // only receive +2/3 precommits might lead BFT to PrecommitWait
+                    self.change_to_step(Step::PrecommitWait);
+                }
+
+                if precommit_result == PRECOMMIT_ON_NIL {
+                    if self.lock_status.is_none() {
+                        self.proposal = None;
+                    }
+                    self.goto_next_round();
+                    self.new_round_start();
+                }
+                if precommit_result == PRECOMMIT_ON_PROPOSAL {
+                    self.change_to_step(Step::Commit);
+                    self.proc_commit();
+                    self.change_to_step(Step::CommitWait);
+                }
             }
 
             _ => error!("Invalid Timeout Info!"),
