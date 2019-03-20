@@ -16,6 +16,8 @@ extern crate serde_derive;
 
 /// BFT state machine.
 pub mod algorithm;
+/// BFT executor.
+pub mod executor;
 /// BFT params include time interval and local address.
 pub mod params;
 /// BFT timer.
