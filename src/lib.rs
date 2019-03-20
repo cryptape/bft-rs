@@ -37,6 +37,9 @@ pub enum BftMsg {
     Vote(Vote),
     /// Feed messge, this is the proposal of the height.
     Feed(Feed),
+    /// Verify response
+    #[cfg(feature = "verify_req")]
+    VerifyResp(VerifyResp),
     /// Status message, rich status.
     Status(Status),
     /// Commit message.
@@ -135,4 +138,14 @@ pub struct Status {
     pub interval: Option<u64>,
     /// A new authority list for next height.
     pub authority_list: Vec<Address>,
+}
+
+/// A verify result of a proposal.
+#[cfg(feature = "verify_req")]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct VerifyResp {
+    /// The Response of proposal verify
+    pub is_pass: bool,
+    /// The verify proposal
+    pub proposal: Target,
 }

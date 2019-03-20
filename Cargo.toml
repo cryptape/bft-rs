@@ -23,3 +23,7 @@ time = "0.1.36"
 [dev-dependencies]
 env_logger = "0.6.0"
 rand = "0.5.5"
+
+[features]
+default = []
+verify_req = []
