@@ -1041,13 +1041,6 @@ impl Bft {
 
             #[cfg(feature = "verify_req")]
             Step::VerifyWait => {
-                let prop = self.lock_status.clone().unwrap().proposal;
-                if let Some(feed) = self.feed.clone() {
-                    // if feed eq proposal, clean it
-                    if prop == feed.proposal {
-                        self.feed = None;
-                    }
-                }
                 // clean fsave info
                 self.clean_polc();
 
