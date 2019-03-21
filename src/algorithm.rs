@@ -22,12 +22,14 @@ const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 300;
 
 #[cfg(feature = "verify_req")]
 const VERIFY_AWAIT_COEF: u32 = 50;
+
 #[cfg(feature = "verify_req")]
-const VERIFY_SUCCESS: i8 = -1;
-#[cfg(feature = "verify_req")]
-const VERIFY_FAIL: i8 = -2;
-#[cfg(feature = "verify_req")]
-const VERIFY_UNDETERMINED: i8 = -3;
+#[derive(Clone, Eq, PartialEq)]
+enum VerifyResult {
+    Approved,
+    Failed,
+    Undetermined,
+}
 
 /// BFT step
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
@@ -454,11 +456,9 @@ impl Bft {
     }
 
     fn set_proposal(&mut self, proposal: Proposal) {
-        trace!(
+        info!(
             "Receive a proposal at height {:?}, round {:?}, from {:?}",
-            self.height,
-            proposal.round,
-            proposal.proposer
+            self.height, proposal.round, proposal.proposer
         );
 
         if proposal.lock_round.is_some()
@@ -534,13 +534,9 @@ impl Bft {
     }
 
     fn try_save_vote(&mut self, vote: Vote) -> bool {
-        trace!(
+        info!(
             "Receive a {:?} vote of height {:?}, round {:?}, to {:?}, from {:?}",
-            vote.vote_type,
-            vote.height,
-            vote.round,
-            vote.proposal,
-            vote.voter
+            vote.vote_type, vote.height, vote.round, vote.proposal, vote.voter
         );
 
         if vote.height == self.height - 1 {
@@ -652,12 +648,12 @@ impl Bft {
     }
 
     #[cfg(feature = "verify_req")]
-    fn check_verify(&mut self) -> i8 {
+    fn check_verify(&mut self) -> VerifyResult {
         if let Some(lock) = self.lock_status.clone() {
             let prop = lock.proposal;
             if self.verify_result.contains_key(&prop) {
                 if *self.verify_result.get(&prop).unwrap() {
-                    return VERIFY_SUCCESS;
+                    return VerifyResult::Approved;
                 } else {
                     let prop = self.lock_status.clone().unwrap().proposal;
                     if let Some(feed) = self.feed.clone() {
@@ -666,17 +662,17 @@ impl Bft {
                             self.feed = None;
                         }
                     }
-                    // clean fsave info
+                    // clean save info
                     self.clean_polc();
-                    return VERIFY_FAIL;
+                    return VerifyResult::Failed;
                 }
             } else {
                 let tv = self.params.timer.get_prevote() * VERIFY_AWAIT_COEF;
                 self.set_timer(tv, Step::VerifyWait);
-                return VERIFY_UNDETERMINED;
+                return VerifyResult::Undetermined;
             }
         }
-        VERIFY_SUCCESS
+        VerifyResult::Approved
     }
 
     fn transmit_precommit(&mut self) {
@@ -844,6 +840,10 @@ impl Bft {
                 return;
             }
         }
+        info!(
+            "Receive verify result of proposal {:?}",
+            verify_result.proposal.clone()
+        );
         self.verify_result
             .insert(verify_result.proposal, verify_result.is_pass);
     }
@@ -938,7 +938,7 @@ impl Bft {
                 if self.step == Step::VerifyWait {
                     // next do precommit
                     self.change_to_step(Step::Precommit);
-                    if self.check_verify() == VERIFY_UNDETERMINED {
+                    if self.check_verify() == VerifyResult::Undetermined {
                         self.change_to_step(Step::VerifyWait);
                         return;
                     }
@@ -1001,7 +1001,7 @@ impl Bft {
                 #[cfg(feature = "verify_req")]
                 {
                     let verify_result = self.check_verify();
-                    if verify_result == VERIFY_UNDETERMINED {
+                    if verify_result == VerifyResult::Undetermined {
                         self.change_to_step(Step::VerifyWait);
                         return;
                     }
