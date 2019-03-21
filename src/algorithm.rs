@@ -24,6 +24,7 @@ const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 300;
 const VERIFY_AWAIT_COEF: u32 = 50;
 
 #[cfg(feature = "verify_req")]
+#[derive(Clone, Eq, PartialEq)]
 enum VerifyResult {
     Approved,
     Failed,
@@ -455,11 +456,9 @@ impl Bft {
     }
 
     fn set_proposal(&mut self, proposal: Proposal) {
-        trace!(
+        info!(
             "Receive a proposal at height {:?}, round {:?}, from {:?}",
-            self.height,
-            proposal.round,
-            proposal.proposer
+            self.height, proposal.round, proposal.proposer
         );
 
         if proposal.lock_round.is_some()
@@ -535,13 +534,9 @@ impl Bft {
     }
 
     fn try_save_vote(&mut self, vote: Vote) -> bool {
-        trace!(
+        info!(
             "Receive a {:?} vote of height {:?}, round {:?}, to {:?}, from {:?}",
-            vote.vote_type,
-            vote.height,
-            vote.round,
-            vote.proposal,
-            vote.voter
+            vote.vote_type, vote.height, vote.round, vote.proposal, vote.voter
         );
 
         if vote.height == self.height - 1 {
@@ -845,6 +840,10 @@ impl Bft {
                 return;
             }
         }
+        info!(
+            "Receive verify result of proposal {:?}",
+            verify_result.proposal.clone()
+        );
         self.verify_result
             .insert(verify_result.proposal, verify_result.is_pass);
     }
