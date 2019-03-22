@@ -377,7 +377,7 @@ impl Bft {
             && (self.feed.is_none() || self.feed.clone().unwrap().height != self.height)
         {
             // if a proposer find there is no proposal nor lock, goto step proposewait
-            warn!("The lock status is none and feed is mismatched!");
+            info!("The lock status is none and feed is mismatched.");
             let coef = if self.round > PROPOSAL_TIMES_COEF {
                 PROPOSAL_TIMES_COEF
             } else {
@@ -444,11 +444,13 @@ impl Bft {
             }
             None
         } else if proposal.height != self.height || proposal.round < self.round {
-            // bft-rs lib only handle the proposals with same round, the proposals of
-            // higher round should be saved outside
-            warn!("Receive mismatched proposal!");
-            warn!("The proposal height is {:?}, round is {:?}, self height is {:?}, round is {:?}, the proposal is {:?} !", 
-                proposal.height, proposal.round, self.height, self.round, proposal.content);
+            // bft-rs lib only handle the proposals with same round, the proposals
+            // with higher round should be saved outside
+            warn!(
+                "Receive mismatched proposal! \nThe proposal height is {:?}, \
+                 round is {:?}, self height is {:?}, round is {:?}, the proposal is {:?} !",
+                proposal.height, proposal.round, self.height, self.round, proposal.content
+            );
             None
         } else {
             Some(proposal)
