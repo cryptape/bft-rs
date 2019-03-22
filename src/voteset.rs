@@ -10,7 +10,7 @@ pub(crate) struct VoteCollector {
     /// A LruCache to store vote collect of each round.
     pub(crate) votes: LruCache<u64, RoundCollector>,
     /// A HashMap to record prevote count of each round.
-    pub(crate) prevote_count: HashMap<u64, u64>,
+    pub(crate) prevote_count: HashMap<u64, usize>,
 }
 
 impl VoteCollector {
@@ -93,9 +93,9 @@ pub(crate) struct VoteSet {
     /// A HashMap that K is voter, V is proposal.
     pub(crate) votes_by_sender: HashMap<Address, Target>,
     /// A HashMap that K is proposal V is count of the proposal.
-    pub(crate) votes_by_proposal: HashMap<Target, u64>,
+    pub(crate) votes_by_proposal: HashMap<Target, usize>,
     /// Count of vote set.
-    pub(crate) count: u64,
+    pub(crate) count: usize,
 }
 
 impl VoteSet {

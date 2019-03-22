@@ -228,13 +228,13 @@ impl Bft {
     }
 
     #[inline]
-    fn cal_above_threshold(&self, count: u64) -> bool {
-        count * 3 > self.authority_list.len() as u64 * 2
+    fn cal_above_threshold(&self, count: usize) -> bool {
+        count * 3 > self.authority_list.len() * 2
     }
 
     #[inline]
-    fn cal_all_vote(&self, count: u64) -> bool {
-        count == self.authority_list.len() as u64
+    fn cal_all_vote(&self, count: usize) -> bool {
+        count == self.authority_list.len()
     }
 
     #[inline]
