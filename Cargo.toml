@@ -2,6 +2,7 @@
 name = "bft-rs"
 version = "0.2.0"
 authors = ["Eason Gao <kaoimin@qq.com>", "Cryptape Technologies <contact@cryptape.com>"]
+edition = "2018"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/cryptape/bft-rs"
