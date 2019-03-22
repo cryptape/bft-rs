@@ -1,10 +1,10 @@
-use crossbeam::crossbeam_channel::{Receiver, Sender};
-use min_max_heap::MinMaxHeap;
+use crate::algorithm::Step;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use algorithm::Step;
+use crossbeam::crossbeam_channel::{Receiver, Sender};
+use min_max_heap::MinMaxHeap;
 
 /// Timer infomation.
 #[derive(Debug, Clone)]

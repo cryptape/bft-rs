@@ -1,13 +1,15 @@
-use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
+use crate::*;
+use crate::{
+    params::BftParams,
+    timer::{TimeoutInfo, WaitTimer},
+    voteset::{VoteCollector, VoteSet},
+};
 
 use std::collections::HashMap;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use super::*;
-use params::BftParams;
-use timer::{TimeoutInfo, WaitTimer};
-use voteset::{VoteCollector, VoteSet};
+use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 
 const INIT_HEIGHT: usize = 0;
 const INIT_ROUND: usize = 0;
@@ -714,7 +716,7 @@ impl Bft {
             self.votes
                 .get_voteset(self.height, self.round, VoteType::Precommit)
         {
-            let mut tv = if self.cal_all_vote(precommit_set.count) {
+            let tv = if self.cal_all_vote(precommit_set.count) {
                 Duration::new(0, 0)
             } else {
                 self.params.timer.get_precommit()
