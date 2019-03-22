@@ -9,12 +9,12 @@ use bft::*;
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
 use rand::{thread_rng, Rng};
 
-const INIT_HEIGHT: usize = 1;
+const INIT_HEIGHT: u64 = 1;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Node {
-    height: usize,
-    result: Vec<(usize, Target)>,
+    height: u64,
+    result: Vec<(u64, Target)>,
 }
 
 impl Node {

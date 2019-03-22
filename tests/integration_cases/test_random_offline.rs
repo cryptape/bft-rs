@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-const MAX_TEST_HEIGHT: usize = 10000;
+const MAX_TEST_HEIGHT: u64 = 10000;
 
 fn random_offline() -> bool {
     let mut rng = thread_rng();
@@ -240,14 +240,14 @@ fn test_random_offline() {
     let thread_commit = thread::Builder::new()
         .name("commit_thread".to_string())
         .spawn(move || {
-            let mut chain_height: usize = 2;
+            let mut chain_height: u64 = 2;
             let mut result: Vec<Target> = Vec::new();
             let mut node_0_height = 0;
             let mut node_1_height = 0;
             let mut node_2_height = 0;
             let mut node_3_height = 0;
             let mut now = Instant::now();
-            let mut height_result: HashMap<usize, Target> = HashMap::new();
+            let mut height_result: HashMap<u64, Target> = HashMap::new();
 
             loop {
                 if let Ok(recv) = recv_result.recv() {

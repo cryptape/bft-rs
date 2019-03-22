@@ -8,9 +8,9 @@ use lru_cache::LruCache;
 #[derive(Debug)]
 pub(crate) struct VoteCollector {
     /// A LruCache to store vote collect of each round.
-    pub(crate) votes: LruCache<usize, RoundCollector>,
+    pub(crate) votes: LruCache<u64, RoundCollector>,
     /// A HashMap to record prevote count of each round.
-    pub(crate) prevote_count: HashMap<usize, usize>,
+    pub(crate) prevote_count: HashMap<u64, u64>,
 }
 
 impl VoteCollector {
@@ -71,8 +71,8 @@ impl VoteCollector {
     /// A function to get the vote set of the height, the round, and the vote type.
     pub(crate) fn get_voteset(
         &mut self,
-        height: usize,
-        round: usize,
+        height: u64,
+        round: u64,
         vote_type: VoteType,
     ) -> Option<VoteSet> {
         self.votes
@@ -93,9 +93,9 @@ pub(crate) struct VoteSet {
     /// A HashMap that K is voter, V is proposal.
     pub(crate) votes_by_sender: HashMap<Address, Target>,
     /// A HashMap that K is proposal V is count of the proposal.
-    pub(crate) votes_by_proposal: HashMap<Target, usize>,
+    pub(crate) votes_by_proposal: HashMap<Target, u64>,
     /// Count of vote set.
-    pub(crate) count: usize,
+    pub(crate) count: u64,
 }
 
 impl VoteSet {
@@ -125,8 +125,8 @@ impl VoteSet {
     /// A function to abstract the PoLC of the round.
     pub(crate) fn extract_polc(
         &self,
-        height: usize,
-        round: usize,
+        height: u64,
+        round: u64,
         vote_type: VoteType,
         proposal: &Target,
     ) -> Vec<Vote> {
@@ -152,7 +152,7 @@ impl VoteSet {
 #[derive(Debug)]
 pub(crate) struct RoundCollector {
     /// A LruCache to store step collect of a round.
-    pub(crate) round_votes: LruCache<usize, StepCollector>,
+    pub(crate) round_votes: LruCache<u64, StepCollector>,
 }
 
 impl RoundCollector {
@@ -166,7 +166,7 @@ impl RoundCollector {
     /// A function try to add a vote to a round collector.
     pub(crate) fn add(
         &mut self,
-        round: usize,
+        round: u64,
         vote_type: VoteType,
         sender: Address,
         vote: Target,
@@ -185,7 +185,7 @@ impl RoundCollector {
     }
 
     /// A functionto get the vote set of the round, and the vote type.
-    pub(crate) fn get_voteset(&mut self, round: usize, vote_type: VoteType) -> Option<VoteSet> {
+    pub(crate) fn get_voteset(&mut self, round: u64, vote_type: VoteType) -> Option<VoteSet> {
         self.round_votes
             .get_mut(&round)
             .and_then(|sc| sc.get_voteset(vote_type))

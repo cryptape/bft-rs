@@ -14,6 +14,8 @@ extern crate min_max_heap;
 #[macro_use]
 extern crate serde_derive;
 
+/// Bft actuator.
+pub mod actuator;
 /// BFT state machine.
 pub mod algorithm;
 /// BFT params include time interval and local address.
@@ -66,13 +68,13 @@ pub enum VoteType {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal {
     /// The height of proposal.
-    pub height: usize,
+    pub height: u64,
     /// The round of proposal.
-    pub round: usize,
+    pub round: u64,
     /// The proposal content.
     pub content: Target,
     /// A lock round of the proposal.
-    pub lock_round: Option<usize>,
+    pub lock_round: Option<u64>,
     /// The lock votes of the proposal.
     pub lock_votes: Option<Vec<Vote>>,
     /// The address of proposer.
@@ -85,7 +87,7 @@ pub struct LockStatus {
     /// The lock proposal
     pub proposal: Target,
     /// The lock round
-    pub round: usize,
+    pub round: u64,
     /// The lock votes.
     pub votes: Vec<Vote>,
 }
@@ -96,9 +98,9 @@ pub struct Vote {
     /// Prevote vote or precommit vote
     pub vote_type: VoteType,
     /// The height of vote
-    pub height: usize,
+    pub height: u64,
     /// The round of vote
-    pub round: usize,
+    pub round: u64,
     /// The vote proposal
     pub proposal: Target,
     /// The address of voter
@@ -109,7 +111,7 @@ pub struct Vote {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Feed {
     /// The height of the proposal.
-    pub height: usize,
+    pub height: u64,
     /// A proposal.
     pub proposal: Target,
 }
@@ -118,9 +120,9 @@ pub struct Feed {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Commit {
     /// The height of result.
-    pub height: usize,
+    pub height: u64,
     /// The round of result.
-    pub round: usize,
+    pub round: u64,
     /// Consensus result
     pub proposal: Target,
     /// Votes for generate proof.
@@ -133,7 +135,7 @@ pub struct Commit {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Status {
     /// The height of rich status.
-    pub height: usize,
+    pub height: u64,
     /// The time interval of next height. If it is none, maintain the old interval.
     pub interval: Option<u64>,
     /// A new authority list for next height.

@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 
-const INIT_HEIGHT: usize = 0;
-const INIT_ROUND: usize = 0;
-const PROPOSAL_TIMES_COEF: usize = 10;
+const INIT_HEIGHT: u64 = 0;
+const INIT_ROUND: u64 = 0;
+const PROPOSAL_TIMES_COEF: u64 = 10;
 const PRECOMMIT_BELOW_TWO_THIRDS: i8 = 0;
 const PRECOMMIT_ON_NOTHING: i8 = 1;
 const PRECOMMIT_ON_NIL: i8 = 2;
@@ -70,14 +70,14 @@ pub struct Bft {
     timer_seter: Sender<TimeoutInfo>,
     timer_notity: Receiver<TimeoutInfo>,
 
-    height: usize,
-    round: usize,
+    height: u64,
+    round: u64,
     step: Step,
     feed: Option<Feed>, // feed means the latest proposal given by auth at this height
     proposal: Option<Target>,
     votes: VoteCollector,
     lock_status: Option<LockStatus>,
-    last_commit_round: Option<usize>,
+    last_commit_round: Option<u64>,
     last_commit_proposal: Option<Target>,
     height_filter: HashMap<Address, Instant>,
     round_filter: HashMap<Address, Instant>,
@@ -228,13 +228,13 @@ impl Bft {
     }
 
     #[inline]
-    fn cal_above_threshold(&self, count: usize) -> bool {
-        count * 3 > self.authority_list.len() * 2
+    fn cal_above_threshold(&self, count: u64) -> bool {
+        count * 3 > self.authority_list.len() as u64 * 2
     }
 
     #[inline]
-    fn cal_all_vote(&self, count: usize) -> bool {
-        count == self.authority_list.len()
+    fn cal_all_vote(&self, count: u64) -> bool {
+        count == self.authority_list.len() as u64
     }
 
     #[inline]
@@ -256,7 +256,7 @@ impl Bft {
     }
 
     #[inline]
-    fn goto_new_height(&mut self, new_height: usize) {
+    fn goto_new_height(&mut self, new_height: u64) {
         self.clean_save_info();
         self.clean_filter();
         self.height = new_height;
@@ -276,7 +276,7 @@ impl Bft {
         self.verify_result.clear();
     }
 
-    fn retransmit_vote(&self, round: usize) {
+    fn retransmit_vote(&self, round: u64) {
         info!(
             "Some nodes are at low height, retransmit votes of height {:?}, round {:?}",
             self.height - 1,
@@ -352,7 +352,7 @@ impl Bft {
         };
 
         let nonce = self.height + self.round;
-        if self.params.address == self.authority_list[nonce % count] {
+        if self.params.address == self.authority_list[(nonce as usize) % count] {
             info!(
                 "Become proposer at height {:?}, round {:?}",
                 self.height, self.round

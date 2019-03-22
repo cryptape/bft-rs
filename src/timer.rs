@@ -12,9 +12,9 @@ pub(crate) struct TimeoutInfo {
     /// A timeval of a timer.
     pub(crate) timeval: Instant,
     /// The height of the timer.
-    pub(crate) height: usize,
+    pub(crate) height: u64,
     /// The round of the timer.
-    pub(crate) round: usize,
+    pub(crate) round: u64,
     /// The step of the timer.
     pub(crate) step: Step,
 }

@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
-const MAX_TEST_HEIGHT: usize = 10;
+const MAX_TEST_HEIGHT: u64 = 10;
 
 fn is_success(result: Vec<Target>) -> bool {
     let mut result_hashmap: HashMap<Target, u8> = HashMap::new();
@@ -216,7 +216,7 @@ fn test_bft() {
                 println!("Sync node 0 to height {:?}", chain_height);
                 send_0
                     .send(BftMsg::Status(Status {
-                        height: (chain_height - 1) as usize,
+                        height: (chain_height - 1) as u64,
                         interval: None,
                         authority_list: generate_auth_list(),
                     }))
@@ -226,7 +226,7 @@ fn test_bft() {
                 println!("Sync node 1 to height {:?}", chain_height);
                 send_1
                     .send(BftMsg::Status(Status {
-                        height: (chain_height - 1) as usize,
+                        height: (chain_height - 1) as u64,
                         interval: None,
                         authority_list: generate_auth_list(),
                     }))
@@ -236,7 +236,7 @@ fn test_bft() {
                 println!("Sync node 2 to height {:?}", chain_height);
                 send_2
                     .send(BftMsg::Status(Status {
-                        height: (chain_height - 1) as usize,
+                        height: (chain_height - 1) as u64,
                         interval: None,
                         authority_list: generate_auth_list(),
                     }))
@@ -246,7 +246,7 @@ fn test_bft() {
                 println!("Sync node 3 to height {:?}", chain_height);
                 send_3
                     .send(BftMsg::Status(Status {
-                        height: (chain_height - 1) as usize,
+                        height: (chain_height - 1) as u64,
                         interval: None,
                         authority_list: generate_auth_list(),
                     }))
