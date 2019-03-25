@@ -18,6 +18,8 @@ extern crate serde_derive;
 pub mod actuator;
 /// BFT state machine.
 pub mod algorithm;
+///
+pub mod error;
 /// BFT params include time interval and local address.
 pub mod params;
 /// BFT timer.
@@ -30,7 +32,7 @@ pub type Address = Vec<u8>;
 /// Type for proposal.
 pub type Target = Vec<u8>;
 
-/// BFT message.
+/// BFT input message.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum BftMsg {
     /// Proposal message.

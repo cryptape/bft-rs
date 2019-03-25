@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 
-const INIT_HEIGHT: u64 = 0;
+pub(crate) const INIT_HEIGHT: u64 = 0;
 const INIT_ROUND: u64 = 0;
 const PROPOSAL_TIMES_COEF: u64 = 10;
 const PRECOMMIT_BELOW_TWO_THIRDS: i8 = 0;
@@ -64,7 +64,7 @@ impl Default for Step {
 }
 
 /// BFT state message.
-pub struct Bft {
+pub(crate) struct Bft {
     msg_sender: Sender<BftMsg>,
     msg_receiver: Receiver<BftMsg>,
     timer_seter: Sender<TimeoutInfo>,
@@ -91,7 +91,7 @@ pub struct Bft {
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
+    pub(crate) fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();

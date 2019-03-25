@@ -83,47 +83,35 @@ First, add bft-rs and crossbeam to your `Cargo.toml`:
 ```rust
 [dependencies]
 bft-rs = { git = "https://github.com/cryptape/bft-rs.git", branch = "develop" }
-crossbeam = "0.7"
 ```
 
 Second, add BFT and channel to your crate as following:
 
 ```rust
 extern crate bft_rs as bft;
-extern crate crossbeam;
 
-use bft::algorithm::BFT;
-use bft::*;
-use crossbeam::crossbeam_channel::unbounded;
+use bft::{actuator::BftActuator as BFT, *};
 ```
 
-Third, start a BFT state machine:
+Third, initialize a BFT actuator:
 
 ```rust
-let (main_to_bft, bft_from_main) = unbounded();
-let (bft_to_main, main_from_bft) = unbounded();
-
-BFT::start(bft_to_mian, bft_from_main, address);
+let actuator = BFT::new(address);
 ```
 
 *The `address` here is the address of this node with type `Vec<u8>`.*
 
-What needs to illustrate is that the BFT machine is in stop step by default, therefore, the first thing is send `BftMsg::Start` message. Use `send()` function to send a message to BFT state machine, take `Status` for example:
+What needs to illustrate is that the BFT machine is in stop step by default, therefore, the first thing is send `BftMsg::Start` message. Use `send_start()` function to send a message to BFT state machine. LikeWise use `send_proposal()`, `send_vote()`, `send_feed()`, `send_status()`, `send_pause()` functions to send `Proposal`, `Vote`, `Feed`, `Status`, `Pause` messages to the BFT actuator, these functions will return a `Result`. take `Status` for example:
 
 ```rust
-main_to_bft.
-      send(BftMsg::Status(Status {
-            height: INIT_HEIGHT,
-            interval: None,
-            authority_list: AUTH_LIST,
-      }))
-      .unwrap();
+actuator.send_start(BftMsg::Start).expect();
+actuator.send_status(BftMsg::Status(status)).expect();
 ```
 
 And use `recv()` function and `match` to receive messages from BFT state machine as following:
 
 ```rust
-if let Ok(msg) = main_from_bft.recv() {
+if let Ok(msg) = actuator.recv() {
       match msg {
             BftMsg::Proposal(proposal) => {}
             BftMsg::Vote(vote) => {}
@@ -131,6 +119,12 @@ if let Ok(msg) = main_from_bft.recv() {
             _ => {}
       }
 }
+```
+
+If you want to use the BFT height to do some verify, use `get_height` function as following:
+
+```rust
+let height: u64 = actuator.get_height();
 ```
 
 ## License
