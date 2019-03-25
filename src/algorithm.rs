@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 
-const INIT_HEIGHT: usize = 0;
-const INIT_ROUND: usize = 0;
-const PROPOSAL_TIMES_COEF: usize = 10;
+pub(crate) const INIT_HEIGHT: u64 = 0;
+const INIT_ROUND: u64 = 0;
+const PROPOSAL_TIMES_COEF: u64 = 10;
 const PRECOMMIT_BELOW_TWO_THIRDS: i8 = 0;
 const PRECOMMIT_ON_NOTHING: i8 = 1;
 const PRECOMMIT_ON_NIL: i8 = 2;
@@ -64,20 +64,20 @@ impl Default for Step {
 }
 
 /// BFT state message.
-pub struct Bft {
+pub(crate) struct Bft {
     msg_sender: Sender<BftMsg>,
     msg_receiver: Receiver<BftMsg>,
     timer_seter: Sender<TimeoutInfo>,
     timer_notity: Receiver<TimeoutInfo>,
 
-    height: usize,
-    round: usize,
+    height: u64,
+    round: u64,
     step: Step,
     feed: Option<Feed>, // feed means the latest proposal given by auth at this height
     proposal: Option<Target>,
     votes: VoteCollector,
     lock_status: Option<LockStatus>,
-    last_commit_round: Option<usize>,
+    last_commit_round: Option<u64>,
     last_commit_proposal: Option<Target>,
     height_filter: HashMap<Address, Instant>,
     round_filter: HashMap<Address, Instant>,
@@ -91,7 +91,7 @@ pub struct Bft {
 
 impl Bft {
     /// A function to start a BFT state machine.
-    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
+    pub(crate) fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
@@ -256,7 +256,7 @@ impl Bft {
     }
 
     #[inline]
-    fn goto_new_height(&mut self, new_height: usize) {
+    fn goto_new_height(&mut self, new_height: u64) {
         self.clean_save_info();
         self.clean_filter();
         self.height = new_height;
@@ -276,7 +276,7 @@ impl Bft {
         self.verify_result.clear();
     }
 
-    fn retransmit_vote(&self, round: usize) {
+    fn retransmit_vote(&self, round: u64) {
         info!(
             "Some nodes are at low height, retransmit votes of height {:?}, round {:?}",
             self.height - 1,
@@ -352,7 +352,7 @@ impl Bft {
         };
 
         let nonce = self.height + self.round;
-        if self.params.address == self.authority_list[nonce % count] {
+        if self.params.address == self.authority_list[(nonce as usize) % count] {
             info!(
                 "Become proposer at height {:?}, round {:?}",
                 self.height, self.round
