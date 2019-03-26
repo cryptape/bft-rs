@@ -144,7 +144,6 @@ impl BftActuator {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::BftActuator as Bft;
