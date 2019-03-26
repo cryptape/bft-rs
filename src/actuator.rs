@@ -143,3 +143,160 @@ impl BftActuator {
         self.height
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::BftActuator as Bft;
+    use crate::{error::BftError, *};
+
+    fn create_status(height: u64) -> BftMsg {
+        BftMsg::Status(Status {
+            height,
+            interval: None,
+            authority_list: vec![],
+        })
+    }
+
+    fn generate_msg() -> Vec<BftMsg> {
+        vec![
+            BftMsg::Proposal(Proposal {
+                height: 0,
+                round: 0,
+                content: vec![],
+                lock_round: None,
+                lock_votes: None,
+                proposer: vec![1],
+            }),
+            BftMsg::Vote(Vote {
+                vote_type: VoteType::Precommit,
+                height: 0,
+                round: 0,
+                proposal: vec![],
+                voter: vec![1],
+            }),
+            BftMsg::Feed(Feed {
+                height: 0,
+                proposal: vec![],
+            }),
+            BftMsg::Commit(Commit {
+                height: 0,
+                round: 0,
+                proposal: vec![],
+                lock_votes: vec![],
+                address: vec![1],
+            }),
+            BftMsg::Status(Status {
+                height: 0,
+                interval: None,
+                authority_list: vec![],
+            }),
+            BftMsg::Pause,
+            BftMsg::Start,
+        ]
+    }
+
+    #[test]
+    fn test_send_proposal() {
+        let actuator = Bft::new(vec![1]);
+        let msg = generate_msg();
+
+        for msg_index in 0..6 {
+            let res = actuator.send_proposal(msg.get(msg_index).unwrap().to_owned());
+            if msg_index == 0 {
+                assert_eq!(Ok(()), res);
+            } else {
+                assert_eq!(Err(BftError::MsgTypeErr), res);
+            }
+        }
+    }
+
+    #[test]
+    fn test_send_vote() {
+        let actuator = Bft::new(vec![1]);
+        let msg = generate_msg();
+
+        for msg_index in 0..6 {
+            let res = actuator.send_vote(msg.get(msg_index).unwrap().to_owned());
+            if msg_index == 1 {
+                assert_eq!(Ok(()), res);
+            } else {
+                assert_eq!(Err(BftError::MsgTypeErr), res);
+            }
+        }
+    }
+
+    #[test]
+    fn test_send_feed() {
+        let actuator = Bft::new(vec![1]);
+        let msg = generate_msg();
+
+        for msg_index in 0..6 {
+            let res = actuator.send_feed(msg.get(msg_index).unwrap().to_owned());
+            if msg_index == 2 {
+                assert_eq!(Ok(()), res);
+            } else {
+                assert_eq!(Err(BftError::MsgTypeErr), res);
+            }
+        }
+    }
+
+    #[test]
+    fn test_send_status() {
+        let mut actuator = Bft::new(vec![1]);
+        let msg = generate_msg();
+
+        for msg_index in 0..3 {
+            let res = actuator.send_status(msg.get(msg_index).unwrap().to_owned());
+            if msg_index == 4 {
+                assert_eq!(Ok(()), res);
+            } else {
+                assert_eq!(Err(BftError::MsgTypeErr), res);
+            }
+        }
+    }
+
+    #[test]
+    fn test_send_pause() {
+        let actuator = Bft::new(vec![1]);
+        let msg = generate_msg();
+
+        for msg_index in 0..6 {
+            let res = actuator.send_pause(msg.get(msg_index).unwrap().to_owned());
+            if msg_index == 5 {
+                assert_eq!(Ok(()), res);
+            } else {
+                assert_eq!(Err(BftError::MsgTypeErr), res);
+            }
+        }
+    }
+
+    #[test]
+    fn test_send_start() {
+        let actuator = Bft::new(vec![1]);
+        let msg = generate_msg();
+
+        for msg_index in 0..6 {
+            let res = actuator.send_start(msg.get(msg_index).unwrap().to_owned());
+            if msg_index == 6 {
+                assert_eq!(Ok(()), res);
+            } else {
+                assert_eq!(Err(BftError::MsgTypeErr), res);
+            }
+        }
+    }
+
+    #[test]
+    fn test_height_change() {
+        let height: Vec<(u64, u64)> = vec![(1, 2), (2, 3), (1, 3), (4, 5), (6, 7), (5, 7)];
+        let mut actuator = Bft::new(vec![1]);
+        assert_eq!(actuator.get_height(), 0);
+
+        for h in height.into_iter() {
+            if let Ok(_) = actuator.send_status(create_status(h.0)) {
+                assert_eq!(actuator.get_height(), h.1);
+            } else {
+                panic!("Send Error!");
+            }
+        }
+    }
+}
