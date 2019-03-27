@@ -14,11 +14,13 @@ extern crate min_max_heap;
 #[macro_use]
 extern crate serde_derive;
 
+use crate::error::BftError;
+
 /// Bft actuator.
 pub mod actuator;
 /// BFT state machine.
 pub mod algorithm;
-///
+/// BFT error.
 pub mod error;
 /// BFT params include time interval and local address.
 pub mod params;
@@ -152,4 +154,60 @@ pub struct VerifyResp {
     pub is_pass: bool,
     /// The verify proposal
     pub proposal: Target,
+}
+
+/// A signed proposal.
+pub struct SignProposal<T> {
+    /// Bft proposal.
+    pub proposal: Proposal,
+    /// Proposal signature.
+    pub signature: T,
+}
+
+/// A signed vote.
+pub struct SignVote<T> {
+    /// Bft Vote.
+    pub vote: Vote,
+    /// Vote signature.
+    pub signature: T,
+}
+
+///
+pub trait SendMsg {
+    /// A function to send proposal.
+    fn send_proposal<T>() -> Result<(), BftError>;
+    /// A function to send vote.
+    fn send_vote<T>() -> Result<(), BftError>;
+    /// A function to start of pause Bft machine.
+    fn send_commend() -> Result<(), BftError>;
+}
+
+///
+pub trait BftSupport {
+    /// A function to check signature.
+    fn verify_proposal(proposal: Proposal) -> Result<bool, BftError>;
+    /// A function to pack proposal.
+    fn package_proposal(height: u64) -> Result<Proposal, BftError>;
+    /// A function to update rich status.
+    fn update_status(height: u64) -> Result<Status, BftError>;
+    /// A funciton to transmit messages.
+    fn transmit(msg: BftMsg) -> Result<(), BftError>;
+
+    /// A function to get verify result.
+    #[cfg(feature = "verify_req")]
+    fn verify_proposal(p: Proposal) -> Result<bool, BftError>;
+}
+
+///
+pub trait Crypto {
+    /// Hash type
+    type Hash;
+    /// Signature type
+    type Signature;
+    /// A function to encrypt hash.
+    fn hash() -> Self::Hash;
+    /// A function to check signature
+    fn check_signature(hash: &Self::Hash, sig: &Self::Signature) -> bool;
+    /// A function to signature the message hash.
+    fn signature(hash: &Self::Hash, privkey: &[u8]) -> Self::Signature;
 }
