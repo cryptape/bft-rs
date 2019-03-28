@@ -407,7 +407,7 @@ impl Bft {
                 round: self.round,
                 content: self.lock_status.clone().unwrap().proposal,
                 lock_round: Some(self.lock_status.clone().unwrap().round),
-                lock_votes: Some(self.lock_status.clone().unwrap().votes),
+                lock_votes: self.lock_status.clone().unwrap().votes,
                 proposer: self.params.address.clone(),
             })
         } else {
@@ -425,7 +425,7 @@ impl Bft {
                 round: self.round,
                 content: self.proposal.clone().unwrap(),
                 lock_round: None,
-                lock_votes: None,
+                lock_votes: Vec::new(),
                 proposer: self.params.address.clone(),
             })
         };
@@ -486,9 +486,9 @@ impl Bft {
             self.lock_status = Some(LockStatus {
                 proposal: proposal.content,
                 round: proposal.lock_round.unwrap(),
-                votes: proposal.lock_votes.unwrap(),
+                votes: proposal.lock_votes,
             });
-        } else if proposal.lock_votes.is_none()
+        } else if proposal.lock_votes.is_empty()
             && self.lock_status.is_none()
             && proposal.round == self.round
         {
