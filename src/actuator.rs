@@ -52,7 +52,12 @@ impl BftActuator {
     }
 
     ///
-    pub fn start<F: BftSupport>(&mut self) {
-        ::std::thread::spawn(move || {});
+    pub fn send_commend(&self, cmd: BftMsg) -> Result<()> {
+        match cmd {
+            BftMsg::Pause => Ok(cmd),
+            BftMsg::Start => Ok(cmd),
+            _ => Err(BftError::MsgTypeErr),
+        }
+        .and_then(|cmd| self.sender.send(cmd).map_err(|_| BftError::SendCmdErr))
     }
 }
