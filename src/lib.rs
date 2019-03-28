@@ -4,7 +4,7 @@
 
 #![deny(missing_docs)]
 
-extern crate bincode;
+extern crate rlp;
 #[macro_use]
 extern crate crossbeam;
 #[macro_use]
@@ -15,6 +15,8 @@ extern crate min_max_heap;
 extern crate serde_derive;
 
 use crate::error::BftError;
+
+use rlp::{Encodable, RlpStream};
 
 /// Bft actuator.
 pub mod actuator;
@@ -65,10 +67,32 @@ pub enum VoteType {
     Precommit,
 }
 
-/// Something need to be consensus in a round.
-/// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
-/// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
-/// the proposal. Therefore, these must have same variant of `Option`.
+impl From<u8> for VoteType {
+    fn from(s: u8) -> Self {
+        match s {
+            0 => VoteType::Prevote,
+            1 => VoteType::Precommit,
+            _ => panic!("Invalid vote type!"),
+        }
+    }
+}
+
+impl Into<u8> for VoteType {
+    fn into(self) -> u8 {
+        match self {
+            VoteType::Prevote => 0,
+            VoteType::Precommit => 1,
+        }
+    }
+}
+
+impl Encodable for VoteType {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(self.into());
+    }
+}
+
+/// A Bft proposal
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal {
     /// The height of proposal.
@@ -80,9 +104,23 @@ pub struct Proposal {
     /// A lock round of the proposal.
     pub lock_round: Option<u64>,
     /// The lock votes of the proposal.
-    pub lock_votes: Option<Vec<Vote>>,
+    pub lock_votes: Vec<Vote>,
     /// The address of proposer.
     pub proposer: Address,
+}
+
+impl Encodable for Proposal {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        let votes = self.lock_votes.clone();
+        s.append(&self.height)
+            .append(&self.round)
+            .append(&self.content)
+            .append(&self.lock_round);
+        for vote in votes.into_iter() {
+            s.append(&vote);
+        }
+        s.append(&self.proposer);
+    }
 }
 
 /// A PoLC.
@@ -109,6 +147,16 @@ pub struct Vote {
     pub proposal: Target,
     /// The address of voter
     pub voter: Address,
+}
+
+impl Encodable for Vote {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.vote_type)
+            .append(&self.height)
+            .append(&self.round)
+            .append(&self.proposal)
+            .append(&self.voter);
+    }
 }
 
 /// A proposal for a height.
@@ -157,11 +205,11 @@ pub struct VerifyResp {
 }
 
 /// A signed proposal.
-pub struct SignProposal<T> {
+pub struct SignProposal<T: Crypto> {
     /// Bft proposal.
     pub proposal: Proposal,
     /// Proposal signature.
-    pub signature: T,
+    pub signature: T::Signature,
 }
 
 /// A signed vote.
@@ -173,13 +221,13 @@ pub struct SignVote<T> {
 }
 
 ///
-pub trait SendMsg {
+pub trait RecvMsg {
     /// A function to send proposal.
-    fn send_proposal<T>() -> Result<(), BftError>;
+    fn recv_proposal<T>() -> Result<(), BftError>;
     /// A function to send vote.
-    fn send_vote<T>() -> Result<(), BftError>;
+    fn recv_vote<T>() -> Result<(), BftError>;
     /// A function to start of pause Bft machine.
-    fn send_commend() -> Result<(), BftError>;
+    fn recv_commend() -> Result<(), BftError>;
 }
 
 ///
@@ -203,11 +251,13 @@ pub trait Crypto {
     /// Hash type
     type Hash;
     /// Signature type
-    type Signature;
+    type Signature: Crypto;
+    /// A function to get signature.
+    fn get_signature(&self) -> Self::Signature;
     /// A function to encrypt hash.
-    fn hash() -> Self::Hash;
+    fn hash(&self, msg: Vec<u8>) -> Self::Hash;
     /// A function to check signature
-    fn check_signature(hash: &Self::Hash, sig: &Self::Signature) -> bool;
+    fn check_signature(&self, hash: &Self::Hash, sig: &Self::Signature) -> Result<(), BftError>;
     /// A function to signature the message hash.
-    fn signature(hash: &Self::Hash, privkey: &[u8]) -> Self::Signature;
+    fn signature(&self, hash: &Self::Hash, privkey: &[u8]) -> Self::Signature;
 }
