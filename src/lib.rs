@@ -58,6 +58,18 @@ pub enum BftMsg {
     Start,
 }
 
+
+impl Into<u8> for BftMsg {
+    fn into(self) -> u8 {
+        match self {
+            BftMsg::Proposal(_) => 0,
+            BftMsg::Vote(_) => 1,
+            BftMsg::Commit(_) => 2,
+            _ => panic!(""),
+        }
+    }
+}
+
 /// Bft vote types.
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum VoteType {
@@ -233,24 +245,24 @@ pub trait RecvMsg {
 ///
 pub trait BftSupport {
     /// A function to check signature.
-    fn verify_proposal(proposal: Proposal) -> Result<bool, BftError>;
+    fn verify_proposal(&self, proposal: Proposal) -> Result<bool, BftError>;
     /// A function to pack proposal.
-    fn package_proposal(height: u64) -> Result<Proposal, BftError>;
+    fn package_proposal(&self, height: u64) -> Result<Proposal, BftError>;
     /// A function to update rich status.
-    fn update_status(height: u64) -> Result<Status, BftError>;
+    fn update_status(&self, height: u64) -> Result<Status, BftError>;
     /// A funciton to transmit messages.
-    fn transmit(msg: BftMsg) -> Result<(), BftError>;
+    fn transmit(&self, msg: BftMsg) -> Result<(), BftError>;
 
     /// A function to get verify result.
     #[cfg(feature = "verify_req")]
-    fn verify_proposal(p: Proposal) -> Result<bool, BftError>;
+    fn verify_transcation(&self, p: Proposal) -> Result<bool, BftError>;
 }
 
 ///
 pub trait Crypto {
     /// Hash type
     type Hash;
-    /// Signature type
+    /// Signature types
     type Signature: Crypto;
     /// A function to get signature.
     fn get_signature(&self) -> Self::Signature;

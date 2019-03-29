@@ -64,8 +64,7 @@ impl Default for Step {
 }
 
 /// BFT state message.
-pub(crate) struct Bft {
-    msg_sender: Sender<BftMsg>,
+pub(crate) struct Bft<T> {
     msg_receiver: Receiver<BftMsg>,
     timer_seter: Sender<TimeoutInfo>,
     timer_notity: Receiver<TimeoutInfo>,
@@ -82,6 +81,7 @@ pub(crate) struct Bft {
     height_filter: HashMap<Address, Instant>,
     round_filter: HashMap<Address, Instant>,
     authority_list: Vec<Address>,
+    function: T,
     htime: Instant,
     params: BftParams,
 
@@ -89,9 +89,11 @@ pub(crate) struct Bft {
     verify_result: HashMap<Target, bool>,
 }
 
-impl Bft {
+impl<T> Bft<T>
+    where T: BftSupport + Send + 'static
+{
     /// A function to start a BFT state machine.
-    pub(crate) fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
+    pub(crate) fn start(r: Receiver<BftMsg>, f: T, local_address: Address) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
@@ -106,7 +108,7 @@ impl Bft {
             .unwrap();
 
         // start main loop module.
-        let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
+        let mut engine = Bft::initialize(r, bft2timer, bft4timer, f, local_address);
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
             .spawn(move || {
@@ -146,15 +148,14 @@ impl Bft {
 
     #[cfg(not(feature = "verify_req"))]
     fn initialize(
-        s: Sender<BftMsg>,
         r: Receiver<BftMsg>,
         ts: Sender<TimeoutInfo>,
         tn: Receiver<TimeoutInfo>,
+        f: T,
         local_address: Target,
     ) -> Self {
         info!("BFT State Machine Launched.");
         Bft {
-            msg_sender: s,
             msg_receiver: r,
             timer_seter: ts,
             timer_notity: tn,
@@ -169,6 +170,7 @@ impl Bft {
             last_commit_round: None,
             last_commit_proposal: None,
             authority_list: Vec::new(),
+            function: f,
             htime: Instant::now(),
             height_filter: HashMap::new(),
             round_filter: HashMap::new(),
@@ -178,15 +180,14 @@ impl Bft {
 
     #[cfg(feature = "verify_req")]
     fn initialize(
-        s: Sender<BftMsg>,
         r: Receiver<BftMsg>,
         ts: Sender<TimeoutInfo>,
         tn: Receiver<TimeoutInfo>,
+        f: T,
         local_address: Target,
     ) -> Self {
         info!("BFT State Machine Launched.");
         Bft {
-            msg_sender: s,
             msg_receiver: r,
             timer_seter: ts,
             timer_notity: tn,
@@ -201,6 +202,7 @@ impl Bft {
             last_commit_round: None,
             last_commit_proposal: None,
             authority_list: Vec::new(),
+            function: f,
             htime: Instant::now(),
             height_filter: HashMap::new(),
             round_filter: HashMap::new(),
@@ -224,7 +226,7 @@ impl Bft {
 
     #[inline]
     fn send_bft_msg(&self, msg: BftMsg) {
-        self.msg_sender.send(msg).unwrap();
+        self.function.transmit(msg).expect("Error in transmit BftMsg");
     }
 
     #[inline]

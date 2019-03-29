@@ -5,6 +5,8 @@ pub enum BftError {
     SendProposalErr,
     /// Send proposal error.
     SendVoteErr,
+    /// Send commend error.
+    SendCmdErr,
     /// Receive message error.
     RecvMsgErr,
     /// Message type error.
@@ -13,4 +15,6 @@ pub enum BftError {
     Unreachable,
     /// The lock round of the Proposal is `Some`, however, lock vote is empty.
     ProposalIllegal(u64, u64),
+    ///
+    TransmitMsgErr(u8),
 }

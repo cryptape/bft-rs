@@ -1,25 +1,21 @@
 use crate::*;
 use crate::{algorithm::Bft, error::BftError};
 
-use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam::crossbeam_channel::{unbounded, Sender};
 use rlp::encode;
 
 /// Results of Bft actuator.
 pub type Result<T> = ::std::result::Result<T, BftError>;
 
 /// A Bft Actuator
-pub struct BftActuator {
-    sender: Sender<BftMsg>,
-    receiver: Receiver<BftMsg>,
-}
+pub struct BftActuator(Sender<BftMsg>);
 
 impl BftActuator {
     /// A function to create a new Bft actuator.
-    pub fn new(address: Address) -> Self {
+    pub fn new<T: BftSupport + Send + 'static>(support: T, address: Address) -> Self {
         let (sender, internal_receiver) = unbounded();
-        let (internal_sender, receiver) = unbounded();
-        Bft::start(internal_sender, internal_receiver, address);
-        Self { sender, receiver }
+        Bft::start(internal_receiver, support, address);
+        Self(sender)
     }
 
     /// A function to send proposal.
@@ -34,7 +30,7 @@ impl BftActuator {
         if proposal.lock_round.is_some() && proposal.lock_votes.is_empty() {
             return Err(BftError::ProposalIllegal(proposal.height, proposal.round));
         }
-        self.sender
+        self.0
             .send(BftMsg::Proposal(proposal))
             .map_err(|_| BftError::SendProposalErr)
     }
@@ -46,7 +42,7 @@ impl BftActuator {
 
         // check vote signature
         sig.check_signature(&sig.hash(encode(&vote)), &sig.get_signature())?;
-        self.sender
+        self.0
             .send(BftMsg::Vote(vote))
             .map_err(|_| BftError::SendVoteErr)
     }
@@ -58,6 +54,6 @@ impl BftActuator {
             BftMsg::Start => Ok(cmd),
             _ => Err(BftError::MsgTypeErr),
         }
-        .and_then(|cmd| self.sender.send(cmd).map_err(|_| BftError::SendCmdErr))
+        .and_then(|cmd| self.0.send(cmd).map_err(|_| BftError::SendCmdErr))
     }
 }
