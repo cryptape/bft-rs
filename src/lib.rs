@@ -43,11 +43,6 @@ pub enum BftMsg {
     Proposal(Proposal),
     /// Vote message.
     Vote(Vote),
-    /// Feed messge, this is the proposal of the height.
-    Feed(Feed),
-    /// Verify response
-    #[cfg(feature = "verify_req")]
-    VerifyResp(VerifyResp),
     /// Status message, rich status.
     Status(Status),
     /// Commit message.
@@ -57,7 +52,6 @@ pub enum BftMsg {
     /// Start running BFT state machine.
     Start,
 }
-
 
 impl Into<u8> for BftMsg {
     fn into(self) -> u8 {
@@ -171,15 +165,6 @@ impl Encodable for Vote {
     }
 }
 
-/// A proposal for a height.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Feed {
-    /// The height of the proposal.
-    pub height: u64,
-    /// A proposal.
-    pub proposal: Target,
-}
-
 /// A result of a height.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Commit {
@@ -204,16 +189,6 @@ pub struct Status {
     pub interval: Option<u64>,
     /// A new authority list for next height.
     pub authority_list: Vec<Address>,
-}
-
-/// A verify result of a proposal.
-#[cfg(feature = "verify_req")]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct VerifyResp {
-    /// The Response of proposal verify
-    pub is_pass: bool,
-    /// The verify proposal
-    pub proposal: Target,
 }
 
 /// A signed proposal.
@@ -255,7 +230,7 @@ pub trait BftSupport {
 
     /// A function to get verify result.
     #[cfg(feature = "verify_req")]
-    fn verify_transcation(&self, p: Proposal) -> Result<bool, BftError>;
+    fn verify_transcation(&self, p: Target) -> Result<bool, BftError>;
 }
 
 ///

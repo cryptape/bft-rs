@@ -22,17 +22,6 @@ const TIMEOUT_RETRANSE_COEF: u32 = 15;
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 300;
 const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 300;
 
-#[cfg(feature = "verify_req")]
-const VERIFY_AWAIT_COEF: u32 = 50;
-
-#[cfg(feature = "verify_req")]
-#[derive(Clone, Eq, PartialEq)]
-enum VerifyResult {
-    Approved,
-    Failed,
-    Undetermined,
-}
-
 /// BFT step
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
 pub(crate) enum Step {
@@ -44,9 +33,6 @@ pub(crate) enum Step {
     Prevote,
     /// A step to wait for more prevote if none of them reach 2/3.
     PrevoteWait,
-    /// A step to wait for proposal verify result.
-    #[cfg(feature = "verify_req")]
-    VerifyWait,
     /// A step to transmit precommit and check precommit count.
     Precommit,
     /// A step to wait for more prevote if none of them reach 2/3.
@@ -72,7 +58,6 @@ pub(crate) struct Bft<T> {
     height: u64,
     round: u64,
     step: Step,
-    feed: Option<Feed>, // feed means the latest proposal given by auth at this height
     proposal: Option<Target>,
     votes: VoteCollector,
     lock_status: Option<LockStatus>,
@@ -84,13 +69,11 @@ pub(crate) struct Bft<T> {
     function: T,
     htime: Instant,
     params: BftParams,
-
-    #[cfg(feature = "verify_req")]
-    verify_result: HashMap<Target, bool>,
 }
 
 impl<T> Bft<T>
-    where T: BftSupport + Send + 'static
+where
+    T: BftSupport + Send + 'static,
 {
     /// A function to start a BFT state machine.
     pub(crate) fn start(r: Receiver<BftMsg>, f: T, local_address: Address) {
@@ -146,7 +129,6 @@ impl<T> Bft<T>
             .unwrap();
     }
 
-    #[cfg(not(feature = "verify_req"))]
     fn initialize(
         r: Receiver<BftMsg>,
         ts: Sender<TimeoutInfo>,
@@ -163,7 +145,6 @@ impl<T> Bft<T>
             height: INIT_HEIGHT,
             round: INIT_ROUND,
             step: Step::default(),
-            feed: None,
             proposal: None,
             votes: VoteCollector::new(),
             lock_status: None,
@@ -175,39 +156,6 @@ impl<T> Bft<T>
             height_filter: HashMap::new(),
             round_filter: HashMap::new(),
             params: BftParams::new(local_address),
-        }
-    }
-
-    #[cfg(feature = "verify_req")]
-    fn initialize(
-        r: Receiver<BftMsg>,
-        ts: Sender<TimeoutInfo>,
-        tn: Receiver<TimeoutInfo>,
-        f: T,
-        local_address: Target,
-    ) -> Self {
-        info!("BFT State Machine Launched.");
-        Bft {
-            msg_receiver: r,
-            timer_seter: ts,
-            timer_notity: tn,
-
-            height: INIT_HEIGHT,
-            round: INIT_ROUND,
-            step: Step::default(),
-            feed: None,
-            proposal: None,
-            votes: VoteCollector::new(),
-            lock_status: None,
-            last_commit_round: None,
-            last_commit_proposal: None,
-            authority_list: Vec::new(),
-            function: f,
-            htime: Instant::now(),
-            height_filter: HashMap::new(),
-            round_filter: HashMap::new(),
-            params: BftParams::new(local_address),
-            verify_result: HashMap::new(),
         }
     }
 
@@ -226,7 +174,9 @@ impl<T> Bft<T>
 
     #[inline]
     fn send_bft_msg(&self, msg: BftMsg) {
-        self.function.transmit(msg).expect("Error in transmit BftMsg");
+        self.function
+            .transmit(msg)
+            .expect("Error in transmit BftMsg");
     }
 
     #[inline]
@@ -273,9 +223,6 @@ impl<T> Bft<T>
         self.lock_status = None;
         self.votes.clear_prevote_count();
         self.authority_list = Vec::new();
-
-        #[cfg(feature = "verify_req")]
-        self.verify_result.clear();
     }
 
     fn retransmit_vote(&self, round: u64) {
@@ -376,23 +323,19 @@ impl<T> Bft<T>
         false
     }
 
-    fn try_transmit_proposal(&mut self) -> bool {
-        if self.lock_status.is_none()
-            && (self.feed.is_none() || self.feed.clone().unwrap().height != self.height)
-        {
-            // if a proposer find there is no proposal nor lock, goto step proposewait
-            info!("The lock status is none and feed is mismatched.");
-            let coef = if self.round > PROPOSAL_TIMES_COEF {
-                PROPOSAL_TIMES_COEF
+    fn transmit_proposal(&mut self) {
+        if self.lock_status.is_none() {
+            if let Ok(prop) = self.function.package_proposal(self.height) {
+                if self.function.verify_proposal(prop.clone()).is_ok() {
+                    self.proposal = Some(prop.content);
+                } else {
+                    warn!("Verify proposal failed!");
+                    return;
+                }
             } else {
-                self.round
-            };
-
-            self.set_timer(
-                self.params.timer.get_propose() * 2u32.pow(coef as u32),
-                Step::ProposeWait,
-            );
-            return false;
+                warn!("Package proposal failed!");
+                return;
+            }
         }
 
         let msg = if self.lock_status.is_some() {
@@ -413,8 +356,6 @@ impl<T> Bft<T>
                 proposer: self.params.address.clone(),
             })
         } else {
-            // if is not locked, transmit the cached proposal
-            self.proposal = Some(self.feed.clone().unwrap().proposal);
             trace!(
                 "Proposal at height {:?}, round {:?}, is {:?}",
                 self.height,
@@ -436,7 +377,6 @@ impl<T> Bft<T>
             self.height, self.round
         );
         self.send_bft_msg(msg);
-        true
     }
 
     fn handle_proposal(&self, proposal: Proposal) -> Option<Proposal> {
@@ -653,41 +593,30 @@ impl<T> Bft<T>
         false
     }
 
-    #[cfg(feature = "verify_req")]
-    fn check_verify(&mut self) -> VerifyResult {
-        if let Some(lock) = self.lock_status.clone() {
-            let prop = lock.proposal;
-            if self.verify_result.contains_key(&prop) {
-                if *self.verify_result.get(&prop).unwrap() {
-                    return VerifyResult::Approved;
-                } else {
-                    let prop = self.lock_status.clone().unwrap().proposal;
-                    if let Some(feed) = self.feed.clone() {
-                        // if feed eq proposal, clean it
-                        if prop == feed.proposal {
-                            self.feed = None;
-                        }
-                    }
-                    // clean save info
-                    self.clean_polc();
-                    return VerifyResult::Failed;
-                }
-            } else {
-                let tv = self.params.timer.get_prevote() * VERIFY_AWAIT_COEF;
-                self.set_timer(tv, Step::VerifyWait);
-                return VerifyResult::Undetermined;
-            }
-        }
-        VerifyResult::Approved
-    }
-
     fn transmit_precommit(&mut self) {
-        let precommit = if let Some(lock_proposal) = self.lock_status.clone() {
+        let mut precommit = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
         } else {
             self.proposal = None;
             Vec::new()
         };
+
+        #[cfg(feature = "verify_req")]
+        {
+            if let Ok(res) = self.function.verify_transcation(precommit.clone()) {
+                if !res {
+                    info!("Transcations in proposal {:?} verified fail.", precommit);
+                    self.lock_status = None;
+                    self.proposal = None;
+                    precommit = Vec::new();
+                }
+            } else {
+                warn!("Verify transcations failed!");
+                self.lock_status = None;
+                self.proposal = None;
+                precommit = Vec::new();
+            }
+        }
 
         trace!(
             "Transmit precommit at height {:?}, round {:?}",
@@ -822,49 +751,14 @@ impl<T> Bft<T>
         false
     }
 
-    fn try_handle_feed(&mut self, feed: Feed) -> bool {
-        if feed.height >= self.height {
-            self.feed = Some(feed);
-            info!(
-                "Receive feed of height {:?}",
-                self.feed.clone().unwrap().height
-            );
-            true
-        } else {
-            false
-        }
-    }
-
-    #[cfg(feature = "verify_req")]
-    fn save_verify_resp(&mut self, verify_result: VerifyResp) {
-        if self.verify_result.contains_key(&verify_result.proposal) {
-            if &verify_result.is_pass != self.verify_result.get(&verify_result.proposal).unwrap() {
-                error!(
-                    "The verify results of {:?} are different!",
-                    verify_result.proposal
-                );
-                return;
-            }
-        }
-        info!(
-            "Receive verify result of proposal {:?}",
-            verify_result.proposal.clone()
-        );
-        self.verify_result
-            .insert(verify_result.proposal, verify_result.is_pass);
-    }
-
     fn new_round_start(&mut self) {
         if self.step != Step::ProposeWait {
             info!("Start height {:?}, round{:?}", self.height, self.round);
         }
         if self.is_proposer() {
-            if self.try_transmit_proposal() {
-                self.transmit_prevote();
-                self.change_to_step(Step::Prevote);
-            } else {
-                self.change_to_step(Step::ProposeWait);
-            }
+            self.transmit_proposal();
+            self.transmit_prevote();
+            self.change_to_step(Step::Prevote);
         } else {
             self.change_to_step(Step::ProposeWait);
         }
@@ -927,50 +821,11 @@ impl<T> Bft<T>
                     error!("Invalid Vote Type!");
                 }
             }
-            BftMsg::Feed(feed) => {
-                if self.try_handle_feed(feed) && self.step == Step::ProposeWait {
-                    self.new_round_start();
-                }
-            }
             BftMsg::Status(rich_status) => {
                 if self.try_handle_status(rich_status) {
                     self.new_round_start();
                 }
             }
-
-            #[cfg(feature = "verify_req")]
-            BftMsg::VerifyResp(verify_resp) => {
-                self.save_verify_resp(verify_resp);
-                if self.step == Step::VerifyWait {
-                    // next do precommit
-                    self.change_to_step(Step::Precommit);
-                    if self.check_verify() == VerifyResult::Undetermined {
-                        self.change_to_step(Step::VerifyWait);
-                        return;
-                    }
-                    self.transmit_precommit();
-                    let precommit_result = self.check_precommit_count();
-
-                    if precommit_result == PRECOMMIT_ON_NOTHING {
-                        // only receive +2/3 precommits might lead BFT to PrecommitWait
-                        self.change_to_step(Step::PrecommitWait);
-                    }
-
-                    if precommit_result == PRECOMMIT_ON_NIL {
-                        if self.lock_status.is_none() {
-                            self.proposal = None;
-                        }
-                        self.goto_next_round();
-                        self.new_round_start();
-                    }
-                    if precommit_result == PRECOMMIT_ON_PROPOSAL {
-                        self.change_to_step(Step::Commit);
-                        self.proc_commit();
-                        self.change_to_step(Step::CommitWait);
-                    }
-                }
-            }
-
             _ => error!("Invalid Message!"),
         }
     }
@@ -1004,15 +859,6 @@ impl<T> Bft<T>
                 }
                 // next do precommit
                 self.change_to_step(Step::Precommit);
-                #[cfg(feature = "verify_req")]
-                {
-                    let verify_result = self.check_verify();
-                    if verify_result == VerifyResult::Undetermined {
-                        self.change_to_step(Step::VerifyWait);
-                        return;
-                    }
-                }
-
                 self.transmit_precommit();
                 let precommit_result = self.check_precommit_count();
 
@@ -1044,36 +890,6 @@ impl<T> Bft<T>
                 self.goto_next_round();
                 self.new_round_start();
             }
-
-            #[cfg(feature = "verify_req")]
-            Step::VerifyWait => {
-                // clean fsave info
-                self.clean_polc();
-
-                // next do precommit
-                self.change_to_step(Step::Precommit);
-                self.transmit_precommit();
-                let precommit_result = self.check_precommit_count();
-
-                if precommit_result == PRECOMMIT_ON_NOTHING {
-                    // only receive +2/3 precommits might lead BFT to PrecommitWait
-                    self.change_to_step(Step::PrecommitWait);
-                }
-
-                if precommit_result == PRECOMMIT_ON_NIL {
-                    if self.lock_status.is_none() {
-                        self.proposal = None;
-                    }
-                    self.goto_next_round();
-                    self.new_round_start();
-                }
-                if precommit_result == PRECOMMIT_ON_PROPOSAL {
-                    self.change_to_step(Step::Commit);
-                    self.proc_commit();
-                    self.change_to_step(Step::CommitWait);
-                }
-            }
-
             _ => error!("Invalid Timeout Info!"),
         }
     }
