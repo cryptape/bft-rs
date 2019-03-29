@@ -15,11 +15,11 @@ impl BftActuator {
     pub fn new<T: BftSupport + Send + 'static>(support: T, address: Address) -> Self {
         let (sender, internal_receiver) = unbounded();
         Bft::start(internal_receiver, support, address);
-        Self(sender)
+        BftActuator(sender)
     }
 
     /// A function to send proposal.
-    pub fn send_proposal<T: Crypto>(&self, sp: SignProposal<T>) -> Result<()> {
+    pub fn send_proposal<F: Crypto>(&self, sp: SignProposal<F>) -> Result<()> {
         let sig = sp.signature;
         let proposal = sp.proposal;
 
@@ -36,7 +36,7 @@ impl BftActuator {
     }
 
     /// A function to send vote.
-    pub fn send_vote<T: Crypto>(&self, sv: SignVote<T>) -> Result<()> {
+    pub fn send_vote<F: Crypto>(&self, sv: SignVote<F>) -> Result<()> {
         let sig = sv.signature;
         let vote = sv.vote;
 
@@ -47,8 +47,15 @@ impl BftActuator {
             .map_err(|_| BftError::SendVoteErr)
     }
 
-    ///
-    pub fn send_commend(&self, cmd: BftMsg) -> Result<()> {
+    /// A function to send status.
+    pub fn send_status(&self, status: Status) -> Result<()> {
+        self.0
+            .send(BftMsg::Status(status))
+            .map_err(|_| BftError::SendVoteErr)
+    }
+
+    /// A function to send command
+    pub fn send_command(&self, cmd: BftMsg) -> Result<()> {
         match cmd {
             BftMsg::Pause => Ok(cmd),
             BftMsg::Start => Ok(cmd),

@@ -207,15 +207,6 @@ pub struct SignVote<T> {
     pub signature: T,
 }
 
-///
-pub trait RecvMsg {
-    /// A function to send proposal.
-    fn recv_proposal<T>() -> Result<(), BftError>;
-    /// A function to send vote.
-    fn recv_vote<T>() -> Result<(), BftError>;
-    /// A function to start of pause Bft machine.
-    fn recv_commend() -> Result<(), BftError>;
-}
 
 ///
 pub trait BftSupport {
