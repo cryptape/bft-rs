@@ -70,19 +70,21 @@ impl BftActuator {
 
     /// A function to send status to Bft.
     pub fn send_status(&mut self, status: BftMsg) -> Result<()> {
+        let rich_status;
         match status {
-            BftMsg::Status(s) => Ok(s),
-            _ => Err(BftError::MsgTypeErr),
-        }
-        .and_then(|s| {
-            if s.height >= self.height {
-                self.height = s.height + 1;
-            }
+            BftMsg::Status(s) => rich_status = s,
+            _ => return Err(BftError::MsgTypeErr),
+        };
 
-            self.sender
-                .send(BftMsg::Status(s))
-                .map_err(|_| BftError::SendMsgErr)
-        })
+        let status_height = rich_status.height;
+        if self.sender.send(BftMsg::Status(rich_status)).is_ok() {
+            if self.height <= status_height {
+                self.height = status_height + 1;
+            }
+            Ok(())
+        } else {
+            Err(BftError::SendMsgErr)
+        }
     }
 
     /// A function to send verify result to Bft.
