@@ -45,8 +45,6 @@ pub enum BftMsg {
     Vote(Vote),
     /// Status message, rich status.
     Status(Status),
-    /// Commit message.
-    Commit(Commit),
     /// Pause BFT state machine.
     Pause,
     /// Start running BFT state machine.
@@ -58,7 +56,7 @@ impl Into<u8> for BftMsg {
         match self {
             BftMsg::Proposal(_) => 0,
             BftMsg::Vote(_) => 1,
-            BftMsg::Commit(_) => 2,
+            BftMsg::Status(_) => 2,
             _ => panic!(""),
         }
     }
@@ -192,7 +190,7 @@ pub struct Status {
 }
 
 /// A signed proposal.
-pub struct SignProposal<T: Crypto> {
+pub struct SignedProposal<T: Crypto> {
     /// Bft proposal.
     pub proposal: Proposal,
     /// Proposal signature.
@@ -200,13 +198,12 @@ pub struct SignProposal<T: Crypto> {
 }
 
 /// A signed vote.
-pub struct SignVote<T> {
+pub struct SignedVote<T> {
     /// Bft Vote.
     pub vote: Vote,
     /// Vote signature.
     pub signature: T,
 }
-
 
 ///
 pub trait BftSupport {
@@ -218,6 +215,8 @@ pub trait BftSupport {
     fn update_status(&self, height: u64) -> Result<Status, BftError>;
     /// A funciton to transmit messages.
     fn transmit(&self, msg: BftMsg) -> Result<(), BftError>;
+    /// A function to commit the proposal.
+    fn commit(&self, commit: Commit) -> Result<(), BftError>;
 
     /// A function to get verify result.
     #[cfg(feature = "verify_req")]

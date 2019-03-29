@@ -19,9 +19,9 @@ impl BftActuator {
     }
 
     /// A function to send proposal.
-    pub fn send_proposal<F: Crypto>(&self, sp: SignProposal<F>) -> Result<()> {
-        let sig = sp.signature;
-        let proposal = sp.proposal;
+    pub fn send_proposal<F: Crypto>(&self, signed_proposal: SignedProposal<F>) -> Result<()> {
+        let sig = signed_proposal.signature;
+        let proposal = signed_proposal.proposal;
 
         // check proposal signature
         sig.check_signature(&sig.hash(encode(&proposal)), &sig.get_signature())?;
@@ -36,9 +36,9 @@ impl BftActuator {
     }
 
     /// A function to send vote.
-    pub fn send_vote<F: Crypto>(&self, sv: SignVote<F>) -> Result<()> {
-        let sig = sv.signature;
-        let vote = sv.vote;
+    pub fn send_vote<F: Crypto>(&self, signed_vote: SignedVote<F>) -> Result<()> {
+        let sig = signed_vote.signature;
+        let vote = signed_vote.vote;
 
         // check vote signature
         sig.check_signature(&sig.hash(encode(&vote)), &sig.get_signature())?;

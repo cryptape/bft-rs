@@ -714,13 +714,15 @@ where
 
     fn proc_commit(&mut self) {
         let result = self.lock_status.clone().expect("No lock when commit!");
-        self.send_bft_msg(BftMsg::Commit(Commit {
-            height: self.height,
-            round: self.round,
-            proposal: result.clone().proposal,
-            lock_votes: self.lock_status.clone().unwrap().votes,
-            address: self.params.clone().address,
-        }));
+        self.function
+            .commit(Commit {
+                height: self.height,
+                round: self.round,
+                proposal: result.clone().proposal,
+                lock_votes: self.lock_status.clone().unwrap().votes,
+                address: self.params.clone().address,
+            })
+            .expect("Commit error");
 
         info!(
             "Commit {:?} at height {:?}, consensus time {:?}",
