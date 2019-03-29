@@ -593,6 +593,40 @@ where
         false
     }
 
+    #[cfg(not(feature = "verify_req"))]
+    fn transmit_precommit(&mut self) {
+        let precommit = if let Some(lock_proposal) = self.lock_status.clone() {
+            lock_proposal.proposal
+        } else {
+            self.proposal = None;
+            Vec::new()
+        };
+
+        trace!(
+            "Transmit precommit at height {:?}, round {:?}",
+            self.height,
+            self.round
+        );
+
+        let vote = Vote {
+            vote_type: VoteType::Precommit,
+            height: self.height,
+            round: self.round,
+            proposal: precommit.clone(),
+            voter: self.params.address.clone(),
+        };
+
+        let _ = self.votes.add(vote.clone());
+        let msg = BftMsg::Vote(vote);
+        debug!("Precommit to {:?}", precommit);
+        self.send_bft_msg(msg);
+        self.set_timer(
+            self.params.timer.get_precommit() * TIMEOUT_RETRANSE_COEF,
+            Step::Precommit,
+        );
+    }
+
+    #[cfg(feature = "verify_req")]
     fn transmit_precommit(&mut self) {
         let mut precommit = if let Some(lock_proposal) = self.lock_status.clone() {
             lock_proposal.proposal
@@ -601,8 +635,7 @@ where
             Vec::new()
         };
 
-        #[cfg(feature = "verify_req")]
-        {
+        if precommit != Vec::new() {
             if let Ok(res) = self.function.verify_transcation(precommit.clone()) {
                 if !res {
                     info!("Transcations in proposal {:?} verified fail.", precommit);
