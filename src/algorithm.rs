@@ -771,12 +771,12 @@ impl<T> Bft<T>
         self.last_commit_proposal = Some(result.proposal);
     }
 
-    fn set_polc(&mut self, hash: &Target, voteset: &VoteSet, vote_type: VoteType) {
+    fn set_polc(&mut self, hash: &[u8], voteset: &VoteSet, vote_type: VoteType) {
         self.proposal = Some(hash.to_owned());
         self.lock_status = Some(LockStatus {
             proposal: hash.to_owned(),
             round: self.round,
-            votes: voteset.extract_polc(self.height, self.round, vote_type, &hash),
+            votes: voteset.extract_polc(self.height, self.round, vote_type, hash),
         });
 
         info!(

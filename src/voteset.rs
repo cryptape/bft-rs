@@ -128,12 +128,13 @@ impl VoteSet {
         height: u64,
         round: u64,
         vote_type: VoteType,
-        proposal: &Target,
+        proposal: &[u8],
     ) -> Vec<Vote> {
         // abstract the votes for the polc proposal into a vec
         let mut polc = Vec::new();
         for (address, vote_proposal) in &self.votes_by_sender {
-            if vote_proposal == proposal {
+            let proposal = proposal.to_vec();
+            if vote_proposal == &proposal {
                 polc.push(Vote {
                     vote_type: vote_type.clone(),
                     height,

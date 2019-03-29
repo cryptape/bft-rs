@@ -100,7 +100,7 @@ impl Into<u8> for VoteType {
 
 impl Encodable for VoteType {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.append(self.into());
+        s.append(self);
     }
 }
 
