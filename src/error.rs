@@ -5,6 +5,8 @@ pub enum BftError {
     SendProposalErr,
     /// Send proposal error.
     SendVoteErr,
+    /// Send status error.
+    SendStatusErr(u64),
     /// Send commend error.
     SendCmdErr,
     /// Receive message error.
@@ -17,4 +19,6 @@ pub enum BftError {
     ProposalIllegal(u64, u64),
     ///
     TransmitMsgErr(u8),
+    ///
+    OutdateStatus(u64),
 }
