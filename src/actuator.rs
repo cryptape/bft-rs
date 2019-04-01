@@ -72,6 +72,7 @@ impl BftActuator {
         // check proposal signature
         sig.check_signature(&sig.hash(encode(&proposal)), &sig.get_signature())?;
 
+
         // check lock round and lock votes
         if proposal.lock_round.is_some() && proposal.lock_votes.is_empty() {
             return Err(BftError::ProposalIllegal(proposal.height, proposal.round));
