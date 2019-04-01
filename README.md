@@ -58,9 +58,12 @@ A complete BFT model consists of 4 essential parts:
 
 **NOTICE**: The bft-rs only provides a basic BFT state machine and does not support the advanced functions such as signature verification, proof generation, compact block, etc. These functions are in consensus module rather than bft-rs library.
 
+## Feature
+The bft-rs provides `verify_req` feature to verify transcations after received a proposal. BFT state machine will check the verify result of the proposal before `Precommit` step. If it has not receive the result of the proposal yet, it will wait for an extra 1/2 of the consensus duration.
+
 ## Interface
 
-If bft-rs works correctly, it need to receive 4 types of message: `Proposal`, `Vote`, `Feed`, `Status`. And  bft-rs can send 3 types of message: `Proposal`, `Vote`, `Commit`. Besides, bft-rs also provides `Stop` and `Start` message that can control state machine stop or go on. These types of messages consist the `enum BftMsg`:
+If bft-rs works correctly, it needs to receive 4 types of message: `Proposal`, `Vote`, `Feed`, `Status`. And  bft-rs can send 3 types of message: `Proposal`, `Vote`, `Commit`. Besides, bft-rs also provides `Stop` and `Start` message that can control state machine stop or go on. These types of messages consist the `enum BftMsg`:
 
 ```rust
 enum BftMsg {
@@ -69,6 +72,9 @@ enum BftMsg {
     Feed(Feed),
     Status(Status),
     Commit(Commit),
+
+    #[cfg(feature = "verify_req")]
+    VerifyResp(VerifyResp),
     Pause,
     Start,
 }
@@ -83,6 +89,13 @@ First, add bft-rs and crossbeam to your `Cargo.toml`:
 ```rust
 [dependencies]
 bft-rs = { git = "https://github.com/cryptape/bft-rs.git", branch = "develop" }
+```
+
+If you want to use `verify_req` feature, needs to add following codes:
+
+```rust
+[features]
+verify_req = ["bft-rs/verify_req"]
 ```
 
 Second, add BFT and channel to your crate as following:
@@ -104,8 +117,12 @@ let actuator = BFT::new(address);
 What needs to illustrate is that the BFT machine is in stop step by default, therefore, the first thing is send `BftMsg::Start` message. Use `send_start()` function to send a message to BFT state machine. LikeWise use `send_proposal()`, `send_vote()`, `send_feed()`, `send_status()`, `send_pause()` functions to send `Proposal`, `Vote`, `Feed`, `Status`, `Pause` messages to the BFT actuator, these functions will return a `Result`. take `Status` for example:
 
 ```rust
-actuator.send_start(BftMsg::Start).expect();
-actuator.send_status(BftMsg::Status(status)).expect();
+actuator.send_start(BftMsg::Start).expect("");
+
+actuator.send_status(BftMsg::Status(status)).expect("");
+
+// only in feature verify_req
+actuator.send_verify(BftMsg::VerifyResq(result)).expect("");
 ```
 
 And use `recv()` function and `match` to receive messages from BFT state machine as following:
