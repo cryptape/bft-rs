@@ -550,7 +550,9 @@ impl Bft {
                 let (add_flag, trans_flag) = self.determine_height_filter(sender.clone());
 
                 if add_flag {
-                    self.height_filter.insert(sender, Instant::now());
+                    self.height_filter
+                        .entry(sender)
+                        .or_insert_with(Instant::now);
                 }
                 if trans_flag {
                     self.retransmit_vote(vote.round);
@@ -563,7 +565,7 @@ impl Bft {
             let (add_flag, trans_flag) = self.determine_round_filter(sender.clone());
 
             if add_flag {
-                self.round_filter.insert(sender, Instant::now());
+                self.round_filter.entry(sender).or_insert_with(Instant::now);
             }
             if trans_flag {
                 info!("Some nodes fall behind, send nil vote to help them pursue");
@@ -849,7 +851,8 @@ impl Bft {
             verify_result.proposal.clone()
         );
         self.verify_result
-            .insert(verify_result.proposal, verify_result.is_pass);
+            .entry(verify_result.proposal)
+            .or_insert(verify_result.is_pass);
     }
 
     fn new_round_start(&mut self) {
