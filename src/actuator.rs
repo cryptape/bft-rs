@@ -72,7 +72,6 @@ impl BftActuator {
         // check proposal signature
         sig.check_signature(&sig.hash(encode(&proposal)), &sig.get_signature())?;
 
-
         // check lock round and lock votes
         if proposal.lock_round.is_some() && proposal.lock_votes.is_empty() {
             return Err(BftError::ProposalIllegal(proposal.height, proposal.round));
@@ -173,7 +172,7 @@ impl BftActuator {
 
     #[cfg(feature = "message_cache")]
     fn clean_cache(&mut self, h_begin: u64, h_end: u64) {
-        for height in self.h_begin..h_end {
+        for height in h_begin..h_end {
             let _ = self.proposal_cache.remove(&height);
             let _ = self.vote_cache.remove(&height);
         }
