@@ -1,6 +1,7 @@
 use crate::*;
 use crate::{
     params::BftParams,
+    random::random_proposer,
     timer::{TimeoutInfo, WaitTimer},
     voteset::{VoteCollector, VoteSet},
 };
@@ -66,6 +67,8 @@ pub(crate) struct Bft<T> {
     height_filter: HashMap<Address, Instant>,
     round_filter: HashMap<Address, Instant>,
     authority_list: Vec<Address>,
+    propose_weight: (Vec<u32>, u32),
+    vote_weight: (Vec<u32>, u32),
     function: T,
     htime: Instant,
     params: BftParams,
@@ -151,6 +154,8 @@ where
             last_commit_round: None,
             last_commit_proposal: None,
             authority_list: Vec::new(),
+            propose_weight: (Vec::new(), 0),
+            vote_weight: (Vec::new(), 0),
             function: f,
             htime: Instant::now(),
             height_filter: HashMap::new(),
@@ -293,15 +298,15 @@ where
     }
 
     fn is_proposer(&self) -> bool {
-        let count = if !self.authority_list.is_empty() {
-            self.authority_list.len()
-        } else {
+        if self.authority_list.is_empty() {
             error!("The Authority List is Empty!");
             return false;
-        };
+        }
 
-        let nonce = self.height + self.round;
-        if self.params.address == self.authority_list[(nonce as usize) % count] {
+        let seed = self.height + self.round;
+        let proposer_index =
+            random_proposer(seed, self.propose_weight.clone()).expect("Determine Proposer Error!");
+        if self.params.address == self.authority_list[proposer_index] {
             info!(
                 "Become proposer at height {:?}, round {:?}",
                 self.height, self.round
@@ -780,7 +785,11 @@ where
             }
             // goto new height directly and update authorty list
             self.goto_new_height(rich_status.height + 1);
-            self.authority_list = rich_status.authority_list;
+            self.authority_list = rich_status.get_authority_list();
+            let res = rich_status.get_weight();
+            self.propose_weight = (res.0, res.1);
+            self.vote_weight = (res.2, res.3);
+
             if let Some(interval) = rich_status.interval {
                 // update the bft interval
                 self.params.timer.set_total_duration(interval);

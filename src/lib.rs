@@ -4,13 +4,15 @@
 
 #![deny(missing_docs)]
 
-extern crate rlp;
 #[macro_use]
 extern crate crossbeam;
 #[macro_use]
 extern crate log;
 extern crate lru_cache;
 extern crate min_max_heap;
+extern crate rand_core;
+extern crate rand_pcg;
+extern crate rlp;
 #[macro_use]
 extern crate serde_derive;
 
@@ -26,6 +28,8 @@ pub mod algorithm;
 pub mod error;
 /// BFT params include time interval and local address.
 pub mod params;
+///
+pub mod random;
 /// BFT timer.
 pub mod timer;
 /// BFT vote set.
@@ -37,7 +41,7 @@ pub type Address = Vec<u8>;
 pub type Target = Vec<u8>;
 
 /// BFT input message.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum BftMsg {
     /// Proposal message.
     Proposal(Proposal),
@@ -179,22 +183,47 @@ pub struct Commit {
 }
 
 /// The chain status.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Status {
     /// The height of rich status.
     pub height: u64,
     /// The time interval of next height. If it is none, maintain the old interval.
     pub interval: Option<u64>,
     /// A new authority list for next height.
-    pub authority_list: Vec<Address>,
+    pub authority_list: Vec<Node>,
+}
+
+impl Status {
+    pub(crate) fn get_authority_list(&self) -> Vec<Address> {
+        let mut res = Vec::new();
+        for node in self.authority_list.iter() {
+            res.push(node.address.to_vec());
+        }
+        res
+    }
+
+    pub(crate) fn get_weight(&self) -> (Vec<u32>, u32, Vec<u32>, u32) {
+        let mut p_weight = Vec::new();
+        let mut v_weight = Vec::new();
+        let mut pw_sum: u32 = 0;
+        let mut vw_sum: u32 = 0;
+
+        for weight in self.authority_list.iter() {
+            p_weight.push(pw_sum + weight.propose_weight);
+            v_weight.push(vw_sum + weight.vote_weight);
+            pw_sum += weight.propose_weight;
+            vw_sum += weight.vote_weight;
+        }
+        (p_weight, pw_sum, v_weight, vw_sum)
+    }
 }
 
 ///
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Node {
     address: Address,
-    propose_weight: f32,
-    vote_weight: f32,
+    propose_weight: u32,
+    vote_weight: u32,
 }
 
 impl Node {
@@ -202,18 +231,18 @@ impl Node {
     pub fn new(address: Address) -> Self {
         Node {
             address,
-            propose_weight: 0.1,
-            vote_weight: 0.1,
+            propose_weight: 1,
+            vote_weight: 1,
         }
     }
 
     ///
-    pub fn set_propose_weight(&mut self, propose_weight: f32) {
+    pub fn set_propose_weight(&mut self, propose_weight: u32) {
         self.propose_weight = propose_weight;
     }
 
     ///
-    pub fn set_vote_weight(&mut self, vote_weight: f32) {
+    pub fn set_vote_weight(&mut self, vote_weight: u32) {
         self.vote_weight = vote_weight;
     }
 }
