@@ -189,7 +189,7 @@ pub struct Status {
     pub authority_list: Vec<Address>,
 }
 
-/// 
+///
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Node {
     address: Address,
@@ -203,7 +203,7 @@ impl Node {
         Node {
             address,
             propose_weight: 0.1,
-            vote_weight: 0.1
+            vote_weight: 0.1,
         }
     }
 
