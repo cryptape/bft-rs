@@ -492,7 +492,9 @@ where
                 let (add_flag, trans_flag) = self.determine_height_filter(sender.clone());
 
                 if add_flag {
-                    self.height_filter.insert(sender, Instant::now());
+                    self.height_filter
+                        .entry(sender)
+                        .or_insert_with(Instant::now);
                 }
                 if trans_flag {
                     self.retransmit_vote(vote.round);
@@ -505,7 +507,7 @@ where
             let (add_flag, trans_flag) = self.determine_round_filter(sender.clone());
 
             if add_flag {
-                self.round_filter.insert(sender, Instant::now());
+                self.round_filter.entry(sender).or_insert_with(Instant::now);
             }
             if trans_flag {
                 info!("Some nodes fall behind, send nil vote to help them pursue");
@@ -784,6 +786,26 @@ where
             return true;
         }
         false
+    }
+
+    #[cfg(feature = "verify_req")]
+    fn save_verify_resp(&mut self, verify_result: VerifyResp) {
+        if self.verify_result.contains_key(&verify_result.proposal) {
+            if &verify_result.is_pass != self.verify_result.get(&verify_result.proposal).unwrap() {
+                error!(
+                    "The verify results of {:?} are different!",
+                    verify_result.proposal
+                );
+                return;
+            }
+        }
+        info!(
+            "Receive verify result of proposal {:?}",
+            verify_result.proposal.clone()
+        );
+        self.verify_result
+            .entry(verify_result.proposal)
+            .or_insert(verify_result.is_pass);
     }
 
     fn new_round_start(&mut self) {

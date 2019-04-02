@@ -1,6 +1,6 @@
 [package]
 name = "bft-rs"
-version = "0.2.0"
+version = "0.2.0-alpha"
 authors = ["Eason Gao <kaoimin@qq.com>", "Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 license = "MIT"
@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/cryptape/bft-rs"
 homepage = "https://github.com/cryptape/bft-rs"
 description = """
-An efficent and stable Rust library of BFT protocol for distributed system.
+An efficient and stable Rust library of BFT protocol for distributed system.
 """
 
 [dependencies]
