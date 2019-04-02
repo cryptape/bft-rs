@@ -1,16 +1,16 @@
 # BFT
 
-An efficent and stable Rust library of BFT protocol for distributed system.
+An efficient and stable Rust library of BFT protocol for distributed system.
 
 ## What is BFT?
 
-BFT(Byzantine Fault Tolerance) comprise a class of consensus algorithms that achieve byzantine fault tolerance. BFT can guarantee liveness and safety for a distributed system where there are not more than 33% malicious byzantine nodes, and thus BFT is often used in blockchain network.
+BFT(Byzantine Fault Tolerance) comprise a class of consensus algorithms that achieve byzantine fault tolerance. BFT can guarantee liveness and safety for a distributed system where there are not more than 33% malicious byzantine nodes, and thus BFT is often used in the blockchain network.
 
 ## BFT Protocol
 
 ### Protocol
 
-BFT is an State Machine Replication algorithm, and some states are shown below:
+BFT is a State Machine Replication algorithm, and some states are shown below:
 
 1. The three states protocol
 
@@ -48,7 +48,7 @@ BFT is an State Machine Replication algorithm, and some states are shown below:
 
 A complete BFT model consists of 4 essential parts:
 
-1. Consensus Module, the consensus algorithm module includes signature verification, proof generation, version check, etc;
+1. Consensus Module, the consensus algorithm module includes signature verification, proof generation, version check, etc.;
 
 2. State Machine, the BFT state machine is focused on consensus proposal;
 
@@ -59,11 +59,11 @@ A complete BFT model consists of 4 essential parts:
 **NOTICE**: The bft-rs only provides a basic BFT state machine and does not support the advanced functions such as signature verification, proof generation, compact block, etc. These functions are in consensus module rather than bft-rs library.
 
 ## Feature
-The bft-rs provides `verify_req` feature to verify transcations after received a proposal. BFT state machine will check the verify result of the proposal before `Precommit` step. If it has not receive the result of the proposal yet, it will wait for an extra 1/2 of the consensus duration.
+The bft-rs provides `verify_req` feature to verify transcation after received a proposal. BFT state machine will check the verify result of the proposal before `Precommit` step. If it has not received the result of the proposal yet, it will wait for an extra 1/2 of the consensus duration.
 
 ## Interface
 
-If bft-rs works correctly, it needs to receive 4 types of message: `Proposal`, `Vote`, `Feed`, `Status`. And  bft-rs can send 3 types of message: `Proposal`, `Vote`, `Commit`. Besides, bft-rs also provides `Stop` and `Start` message that can control state machine stop or go on. These types of messages consist the `enum BftMsg`:
+If bft-rs works correctly, it needs to receive 4 types of message: `Proposal`, `Vote`, `Feed`, `Status`. And  bft-rs can send 3 types of message: `Proposal`, `Vote`, `Commit`. Besides, bft-rs also provides `Stop` and `Start` message that can control state machine stop or go on. These types of messages consist of the `enum BftMsg`:
 
 ```rust
 enum BftMsg {
@@ -146,4 +146,4 @@ let height: u64 = actuator.get_height();
 
 ## License
 
-This project is licensed under the terms of the [MIT License](https://github.com/cryptape/bft-rs/blob/master/LICENSE).
+This an open source project under the [MIT License](https://github.com/cryptape/bft-rs/blob/master/LICENSE).
