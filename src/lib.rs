@@ -178,7 +178,7 @@ pub struct Commit {
     pub address: Address,
 }
 
-/// Necessary messages for a height.
+/// The chain status.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Status {
     /// The height of rich status.
@@ -187,6 +187,35 @@ pub struct Status {
     pub interval: Option<u64>,
     /// A new authority list for next height.
     pub authority_list: Vec<Address>,
+}
+
+/// 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Node {
+    address: Address,
+    propose_weight: f32,
+    vote_weight: f32,
+}
+
+impl Node {
+    ///
+    pub fn new(address: Address) -> Self {
+        Node {
+            address,
+            propose_weight: 0.1,
+            vote_weight: 0.1
+        }
+    }
+
+    ///
+    pub fn set_propose_weight(&mut self, propose_weight: f32) {
+        self.propose_weight = propose_weight;
+    }
+
+    ///
+    pub fn set_vote_weight(&mut self, vote_weight: f32) {
+        self.vote_weight = vote_weight;
+    }
 }
 
 /// A signed proposal.
@@ -198,11 +227,11 @@ pub struct SignedProposal<T: Crypto> {
 }
 
 /// A signed vote.
-pub struct SignedVote<T> {
+pub struct SignedVote<T: Crypto> {
     /// Bft Vote.
     pub vote: Vote,
     /// Vote signature.
-    pub signature: T,
+    pub signature: T::Signature,
 }
 
 ///
@@ -210,9 +239,7 @@ pub trait BftSupport {
     /// A function to check signature.
     fn verify_proposal(&self, proposal: Proposal) -> Result<bool, BftError>;
     /// A function to pack proposal.
-    fn package_proposal(&self, height: u64) -> Result<Proposal, BftError>;
-    /// A function to update rich status.
-    fn update_status(&self, height: u64) -> Result<Status, BftError>;
+    fn package_block(&self, height: u64) -> Result<Proposal, BftError>;
     /// A funciton to transmit messages.
     fn transmit(&self, msg: BftMsg) -> Result<(), BftError>;
     /// A function to commit the proposal.
