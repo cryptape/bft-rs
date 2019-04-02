@@ -795,26 +795,6 @@ where
         false
     }
 
-    #[cfg(feature = "verify_req")]
-    fn save_verify_resp(&mut self, verify_result: VerifyResp) {
-        if self.verify_result.contains_key(&verify_result.proposal) {
-            if &verify_result.is_pass != self.verify_result.get(&verify_result.proposal).unwrap() {
-                error!(
-                    "The verify results of {:?} are different!",
-                    verify_result.proposal
-                );
-                return;
-            }
-        }
-        info!(
-            "Receive verify result of proposal {:?}",
-            verify_result.proposal.clone()
-        );
-        self.verify_result
-            .entry(verify_result.proposal)
-            .or_insert(verify_result.is_pass);
-    }
-
     fn new_round_start(&mut self) {
         if self.step != Step::ProposeWait {
             info!("Start height {:?}, round{:?}", self.height, self.round);
