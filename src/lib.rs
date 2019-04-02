@@ -182,7 +182,6 @@ pub struct Commit {
     pub address: Address,
 }
 
-/// The chain status.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Status {
     /// The height of rich status.
@@ -243,6 +242,35 @@ impl Node {
 
     ///
     pub fn set_vote_weight(&mut self, vote_weight: u32) {
+        self.vote_weight = vote_weight;
+    }
+}
+
+///
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Node {
+    address: Address,
+    propose_weight: f32,
+    vote_weight: f32,
+}
+
+impl Node {
+    ///
+    pub fn new(address: Address) -> Self {
+        Node {
+            address,
+            propose_weight: 0.1,
+            vote_weight: 0.1,
+        }
+    }
+
+    ///
+    pub fn set_propose_weight(&mut self, propose_weight: f32) {
+        self.propose_weight = propose_weight;
+    }
+
+    ///
+    pub fn set_vote_weight(&mut self, vote_weight: f32) {
         self.vote_weight = vote_weight;
     }
 }
