@@ -21,4 +21,6 @@ pub enum BftError {
     TransmitMsgErr(u8),
     ///
     OutdateStatus(u64),
+    ///
+    DetermineProposerErr,
 }
