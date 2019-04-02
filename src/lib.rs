@@ -4,7 +4,7 @@
 
 #![deny(missing_docs)]
 
-extern crate rlp;
+extern crate bincode;
 #[macro_use]
 extern crate crossbeam;
 #[macro_use]
@@ -14,15 +14,11 @@ extern crate min_max_heap;
 #[macro_use]
 extern crate serde_derive;
 
-use crate::error::BftError;
-
-use rlp::{Encodable, RlpStream};
-
 /// Bft actuator.
 pub mod actuator;
 /// BFT state machine.
 pub mod algorithm;
-/// BFT error.
+///
 pub mod error;
 /// BFT params include time interval and local address.
 pub mod params;
@@ -43,23 +39,19 @@ pub enum BftMsg {
     Proposal(Proposal),
     /// Vote message.
     Vote(Vote),
+    /// Feed messge, this is the proposal of the height.
+    Feed(Feed),
+    /// Verify response
+    #[cfg(feature = "verify_req")]
+    VerifyResp(VerifyResp),
     /// Status message, rich status.
     Status(Status),
+    /// Commit message.
+    Commit(Commit),
     /// Pause BFT state machine.
     Pause,
     /// Start running BFT state machine.
     Start,
-}
-
-impl Into<u8> for BftMsg {
-    fn into(self) -> u8 {
-        match self {
-            BftMsg::Proposal(_) => 0,
-            BftMsg::Vote(_) => 1,
-            BftMsg::Status(_) => 2,
-            _ => panic!(""),
-        }
-    }
 }
 
 /// Bft vote types.
@@ -71,32 +63,10 @@ pub enum VoteType {
     Precommit,
 }
 
-impl From<u8> for VoteType {
-    fn from(s: u8) -> Self {
-        match s {
-            0 => VoteType::Prevote,
-            1 => VoteType::Precommit,
-            _ => panic!("Invalid vote type!"),
-        }
-    }
-}
-
-impl Into<u8> for VoteType {
-    fn into(self) -> u8 {
-        match self {
-            VoteType::Prevote => 0,
-            VoteType::Precommit => 1,
-        }
-    }
-}
-
-impl Encodable for VoteType {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.append(self);
-    }
-}
-
-/// A Bft proposal
+/// Something need to be consensus in a round.
+/// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
+/// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
+/// the proposal. Therefore, these must have same variant of `Option`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal {
     /// The height of proposal.
@@ -108,23 +78,9 @@ pub struct Proposal {
     /// A lock round of the proposal.
     pub lock_round: Option<u64>,
     /// The lock votes of the proposal.
-    pub lock_votes: Vec<Vote>,
+    pub lock_votes: Option<Vec<Vote>>,
     /// The address of proposer.
     pub proposer: Address,
-}
-
-impl Encodable for Proposal {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        let votes = self.lock_votes.clone();
-        s.append(&self.height)
-            .append(&self.round)
-            .append(&self.content)
-            .append(&self.lock_round);
-        for vote in votes.into_iter() {
-            s.append(&vote);
-        }
-        s.append(&self.proposer);
-    }
 }
 
 /// A PoLC.
@@ -153,14 +109,13 @@ pub struct Vote {
     pub voter: Address,
 }
 
-impl Encodable for Vote {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.append(&self.vote_type)
-            .append(&self.height)
-            .append(&self.round)
-            .append(&self.proposal)
-            .append(&self.voter);
-    }
+/// A proposal for a height.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Feed {
+    /// The height of the proposal.
+    pub height: u64,
+    /// A proposal.
+    pub proposal: Target,
 }
 
 /// A result of a height.
@@ -189,52 +144,12 @@ pub struct Status {
     pub authority_list: Vec<Address>,
 }
 
-/// A signed proposal.
-pub struct SignedProposal<T: Crypto> {
-    /// Bft proposal.
-    pub proposal: Proposal,
-    /// Proposal signature.
-    pub signature: T::Signature,
-}
-
-/// A signed vote.
-pub struct SignedVote<T> {
-    /// Bft Vote.
-    pub vote: Vote,
-    /// Vote signature.
-    pub signature: T,
-}
-
-///
-pub trait BftSupport {
-    /// A function to check signature.
-    fn verify_proposal(&self, proposal: Proposal) -> Result<bool, BftError>;
-    /// A function to pack proposal.
-    fn package_proposal(&self, height: u64) -> Result<Proposal, BftError>;
-    /// A function to update rich status.
-    fn update_status(&self, height: u64) -> Result<Status, BftError>;
-    /// A funciton to transmit messages.
-    fn transmit(&self, msg: BftMsg) -> Result<(), BftError>;
-    /// A function to commit the proposal.
-    fn commit(&self, commit: Commit) -> Result<(), BftError>;
-
-    /// A function to get verify result.
-    #[cfg(feature = "verify_req")]
-    fn verify_transcation(&self, p: Target) -> Result<bool, BftError>;
-}
-
-///
-pub trait Crypto {
-    /// Hash type
-    type Hash;
-    /// Signature types
-    type Signature: Crypto;
-    /// A function to get signature.
-    fn get_signature(&self) -> Self::Signature;
-    /// A function to encrypt hash.
-    fn hash(&self, msg: Vec<u8>) -> Self::Hash;
-    /// A function to check signature
-    fn check_signature(&self, hash: &Self::Hash, sig: &Self::Signature) -> Result<(), BftError>;
-    /// A function to signature the message hash.
-    fn signature(&self, hash: &Self::Hash, privkey: &[u8]) -> Self::Signature;
+/// A verify result of a proposal.
+#[cfg(feature = "verify_req")]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct VerifyResp {
+    /// The Response of proposal verify
+    pub is_pass: bool,
+    /// The verify proposal
+    pub proposal: Target,
 }
