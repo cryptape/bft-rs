@@ -325,7 +325,7 @@ where
 
     fn transmit_proposal(&mut self) {
         if self.lock_status.is_none() {
-            if let Ok(prop) = self.function.package_proposal(self.height) {
+            if let Ok(prop) = self.function.package_block(self.height) {
                 if self.function.verify_proposal(prop.clone()).is_ok() {
                     self.proposal = Some(prop.content);
                 } else {
@@ -380,6 +380,13 @@ where
     }
 
     fn handle_proposal(&self, proposal: Proposal) -> Option<Proposal> {
+        if self.function.verify_proposal(proposal.clone()).is_err() {
+            info!(
+                "Verify proposal of height {:?}, round {:?} failed.",
+                proposal.height, proposal.round
+            );
+            return None;
+        }
         if proposal.height == self.height - 1 {
             if self.last_commit_round.is_some() && proposal.round >= self.last_commit_round.unwrap()
             {
