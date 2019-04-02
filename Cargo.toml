@@ -12,11 +12,11 @@ An efficient and stable Rust library of BFT protocol for distributed system.
 """
 
 [dependencies]
-bincode = "0.8.0"
 crossbeam = "0.7"
 lru-cache = "0.1"
 log = "0.4.3"
 min-max-heap = "1.2.0"
+rlp = "0.3.0"
 serde = "1.0"
 serde_derive = "1.0"
 time = "0.1.36"
@@ -28,3 +28,4 @@ rand = "0.5.5"
 [features]
 default = []
 verify_req = []
+message_cache = []
