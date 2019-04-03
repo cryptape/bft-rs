@@ -1,8 +1,10 @@
 use crate::*;
 use crate::{
     params::BftParams,
+    random::random_proposer,
     timer::{TimeoutInfo, WaitTimer},
     voteset::{VoteCollector, VoteSet},
+    wal::Wal,
 };
 
 use std::collections::HashMap;
@@ -64,8 +66,7 @@ impl Default for Step {
 }
 
 /// BFT state message.
-pub(crate) struct Bft {
-    msg_sender: Sender<BftMsg>,
+pub(crate) struct Bft<T: BftSupport> {
     msg_receiver: Receiver<BftMsg>,
     timer_seter: Sender<TimeoutInfo>,
     timer_notity: Receiver<TimeoutInfo>,
@@ -73,25 +74,32 @@ pub(crate) struct Bft {
     height: u64,
     round: u64,
     step: Step,
-    feed: Option<Feed>, // feed means the latest proposal given by auth at this height
-    proposal: Option<Target>,
+    block: Option<Vec<u8>>,
+    #[cfg(feature = "verify_req")]
+    verified_blocks: Vec<Vec<u8>>,
     votes: VoteCollector,
     lock_status: Option<LockStatus>,
     last_commit_round: Option<u64>,
-    last_commit_proposal: Option<Target>,
+    last_commit_proposal: Option<Hash>,
     height_filter: HashMap<Address, Instant>,
     round_filter: HashMap<Address, Instant>,
-    authority_list: Vec<Address>,
+    authority_manage: AuthorityManage,
+    function: T,
     htime: Instant,
     params: BftParams,
-
-    #[cfg(feature = "verify_req")]
-    verify_result: HashMap<Target, bool>,
+    proof: Option<Proof>,
+    pre_hash: Option<Hash>,
+    proposal_cache: HashMap<u64, proposal>,
+    vote_cache: HashMap<u64, vote>,
+    wal_log: Wal,
 }
 
-impl Bft {
+impl<T> Bft<T>
+where
+    T: BftSupport + Send + 'static,
+{
     /// A function to start a BFT state machine.
-    pub(crate) fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, local_address: Address) {
+    pub(crate) fn start(r: Receiver<BftMsg>, f: T, local_address: Address, wal_path: &str) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
@@ -106,7 +114,7 @@ impl Bft {
             .unwrap();
 
         // start main loop module.
-        let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, local_address);
+        let mut engine = Bft::initialize(r, bft2timer, bft4timer, f, local_address, wal_path);
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
             .spawn(move || {
@@ -144,17 +152,16 @@ impl Bft {
             .unwrap();
     }
 
-    #[cfg(not(feature = "verify_req"))]
     fn initialize(
-        s: Sender<BftMsg>,
         r: Receiver<BftMsg>,
         ts: Sender<TimeoutInfo>,
         tn: Receiver<TimeoutInfo>,
-        local_address: Target,
+        f: T,
+        local_address: Hash,
+        wal_path: &str,
     ) -> Self {
         info!("BFT State Machine Launched.");
         Bft {
-            msg_sender: s,
             msg_receiver: r,
             timer_seter: ts,
             timer_notity: tn,
@@ -162,50 +169,24 @@ impl Bft {
             height: INIT_HEIGHT,
             round: INIT_ROUND,
             step: Step::default(),
-            feed: None,
-            proposal: None,
+            block: None,
+            #[cfg(feature = "verify_req")]
+            verified_blocks: Vec::new(),
             votes: VoteCollector::new(),
             lock_status: None,
             last_commit_round: None,
             last_commit_proposal: None,
-            authority_list: Vec::new(),
-            htime: Instant::now(),
             height_filter: HashMap::new(),
             round_filter: HashMap::new(),
-            params: BftParams::new(local_address),
-        }
-    }
-
-    #[cfg(feature = "verify_req")]
-    fn initialize(
-        s: Sender<BftMsg>,
-        r: Receiver<BftMsg>,
-        ts: Sender<TimeoutInfo>,
-        tn: Receiver<TimeoutInfo>,
-        local_address: Target,
-    ) -> Self {
-        info!("BFT State Machine Launched.");
-        Bft {
-            msg_sender: s,
-            msg_receiver: r,
-            timer_seter: ts,
-            timer_notity: tn,
-
-            height: INIT_HEIGHT,
-            round: INIT_ROUND,
-            step: Step::default(),
-            feed: None,
-            proposal: None,
-            votes: VoteCollector::new(),
-            lock_status: None,
-            last_commit_round: None,
-            last_commit_proposal: None,
-            authority_list: Vec::new(),
+            authority_manage: AuthorityManage::new(),
+            function: T,
             htime: Instant::now(),
-            height_filter: HashMap::new(),
-            round_filter: HashMap::new(),
             params: BftParams::new(local_address),
-            verify_result: HashMap::new(),
+            proof: None,
+            pre_hash: None,
+            proposal_cache: HashMap::new(),
+            vote_cache: HashMap::new(),
+            wal_log: Wal::new(wal_path),
         }
     }
 
