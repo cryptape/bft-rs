@@ -304,8 +304,7 @@ where
         }
 
         let seed = self.height + self.round;
-        let proposer_index =
-            random_proposer(seed, self.propose_weight.clone()).expect("Determine Proposer Error!");
+        let proposer_index = random_proposer(seed, self.propose_weight.clone());
         if self.params.address == self.authority_list[proposer_index] {
             info!(
                 "Become proposer at height {:?}, round {:?}",

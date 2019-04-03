@@ -10,6 +10,7 @@ extern crate crossbeam;
 extern crate log;
 extern crate lru_cache;
 extern crate min_max_heap;
+extern crate rand;
 extern crate rand_core;
 extern crate rand_pcg;
 extern crate rlp;
