@@ -1,3 +1,4 @@
+use rand::{thread_rng, Rng};
 use rand_core::{RngCore, SeedableRng};
 use rand_pcg::Pcg64Mcg as Pcg;
 
@@ -14,7 +15,8 @@ pub(crate) fn random_proposer(seed: u64, weight: (Vec<u32>, u32)) -> usize {
             return index;
         }
     }
-    0
+    let mut rng = thread_rng();
+    rng.gen_range(0, weight.len()) as usize
 }
 
 #[cfg(test)]
