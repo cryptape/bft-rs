@@ -9,4 +9,8 @@ pub enum BftError {
     MsgTypeErr,
     /// Unreachable error.
     Unreachable,
+
+    DecodeErr,
+
+    ObsoleteMsg,
 }
