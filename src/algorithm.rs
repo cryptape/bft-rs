@@ -4,13 +4,13 @@ use crate::{
     error::BftError,
     random::random_proposer,
     timer::{TimeoutInfo, WaitTimer},
-    voteset::{VoteCollector, VoteSet},
+    voteset::{ProposalCollector, VoteCollector, VoteSet},
     wal::Wal,
 };
 
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 use crypto::{pubkey_to_address, Sign, Signature};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -35,7 +35,6 @@ enum VerifyResult {
     Failed,
     Undetermined,
 }
-
 /// BFT step
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
 pub(crate) enum Step {
@@ -68,31 +67,33 @@ impl Default for Step {
 
 /// BFT state message.
 pub(crate) struct Bft<T: BftSupport> {
-    msg_receiver: Receiver<BftMsg>,
+    // channel
+    msg_receiver: Receiver<BftInput>,
     timer_seter: Sender<TimeoutInfo>,
     timer_notity: Receiver<TimeoutInfo>,
-
+    // bft-core params
     height: u64,
     round: u64,
     step: Step,
-    block: Option<Vec<u8>>,
-    #[cfg(feature = "verify_req")]
-    verified_blocks: Vec<Vec<u8>>,
-    votes: VoteCollector,
+    block_hash: Option<Hash>,
     lock_status: Option<LockStatus>,
-    last_commit_round: Option<u64>,
-    last_commit_proposal: Option<Hash>,
     height_filter: HashMap<Address, Instant>,
     round_filter: HashMap<Address, Instant>,
+    last_commit_round: Option<u64>,
+    last_commit_block_hash: Option<Hash>,
     authority_manage: AuthorityManage,
-    function: T,
-    htime: Instant,
     params: BftParams,
+    htime: Instant,
+    // caches
+    block: Option<Vec<u8>>,
+    verified_blocks: Vec<Vec<u8>>,
     proof: Option<Proof>,
     pre_hash: Option<Hash>,
-    proposal_cache: HashMap<u64, proposal>,
-    vote_cache: HashMap<u64, vote>,
+    proposals: ProposalCollector,
+    votes: VoteCollector,
     wal_log: Wal,
+    // user define
+    function: T,
 }
 
 impl<T> Bft<T>
@@ -168,28 +169,26 @@ where
             msg_receiver: r,
             timer_seter: ts,
             timer_notity: tn,
-
             height: INIT_HEIGHT,
             round: INIT_ROUND,
             step: Step::default(),
-            block: None,
-            #[cfg(feature = "verify_req")]
-            verified_blocks: Vec::new(),
-            votes: VoteCollector::new(),
+            block_hash: None,
             lock_status: None,
-            last_commit_round: None,
-            last_commit_proposal: None,
             height_filter: HashMap::new(),
             round_filter: HashMap::new(),
-            authority_manage: AuthorityManage::new(),
-            function: T,
-            htime: Instant::now(),
+            last_commit_round: None,
+            last_commit_block_hash: None,
+            htime: Instant,
             params: BftParams::new(local_address),
+            block: None,
+            verified_blocks: Vec::new(),
             proof: None,
+            authority_manage: AuthorityManage::new(),
             pre_hash: None,
-            proposal_cache: HashMap::new(),
-            vote_cache: HashMap::new(),
+            proposals: ProposalCollector::new(),
+            votes: VoteCollector::new(),
             wal_log: Wal::new(wal_path),
+            function: f,
         }
     }
 
@@ -869,7 +868,14 @@ where
         let address = check_signature(&signature, &hash)?;
         self.function.check_block(&block, height)?;
         if height >= self.height {
+            if need_wal {
+                let encode: Vec<u8> = rlp::encode(&proposal);
+                if let Err(_) = self.wal_log.save(height, LogType::ProposalIn, &msg){
+                    return Err(BftError::SaveWalErr);
+                }
+                self.proposals.add(height as usize, round as usize, &signed_proposal);
 
+            }
         }
 
 

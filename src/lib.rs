@@ -22,6 +22,7 @@ use crate::{
     algorithm::Step,
     error::BftError,
 };
+
 use crypto::{pubkey_to_address, Sign, Signature};
 use rlp::{Encodable, RlpStream};
 use std::collections::HashMap;
@@ -104,11 +105,60 @@ impl Into<u8> for VoteType {
     }
 }
 
+enum LogType {
+    ProposalIn,
+    VoteIn,
+    ProposalOut,
+    VoteOut,
+    Status,
+    Feed,
+    VerifyResp,
+    Commit,
+    Pause,
+    Start,
+}
+
+impl From<u8> for LogType {
+    fn from(s: u8) -> Self {
+        match s {
+            0 => LogType::ProposalIn,
+            1 => LogType::VoteIn,
+            2 => LogType::ProposalOut,
+            3 => LogType::VoteOut,
+            4 => LogType::Status,
+            5 => LogType::Feed,
+            6 => LogType::VerifyResp,
+            7 => LogType::Commit,
+            8 => LogType::Pause,
+            9 => LogType::Start,
+            _ => panic!("Invalid vote type!"),
+        }
+    }
+}
+
+impl Into<u8> for LogType {
+    fn into(self) -> u8 {
+        match self {
+            LogType::ProposalIn => 0,
+            LogType::VoteIn => 1,
+            LogType::ProposalOut => 2,
+            LogType::VoteOut => 3,
+            LogType::Status => 4,
+            LogType::Feed => 5,
+            LogType::VerifyResp => 6,
+            LogType::Commit => 7,
+            LogType::Pause => 8,
+            LogType::Start => 9,
+        }
+    }
+}
+
+
 /// Something need to be consensus in a round.
 /// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
 /// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
 /// the proposal. Therefore, these must have same variant of `Option`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Proposal {
     /// The height of proposal.
     pub height: u64,
@@ -442,7 +492,7 @@ impl Node {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Proof {
     ///
     pub height: u64,
@@ -452,6 +502,15 @@ pub struct Proof {
     pub block_hash: Hash,
     ///
     pub precommit_votes: HashMap<Address, Signature>,
+}
+
+impl Hashable for Proof {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.height.hash(state);
+        self.round.hash(state);
+        self.block_hash.hash(state);
+        //TODO: Ignore precommit_votes maybe leaves flaws
+    }
 }
 
 impl Encodable for Proof {
@@ -515,7 +574,7 @@ impl Decodable for Proof {
 }
 
 /// A PoLC.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct LockStatus {
     /// The lock proposal
     pub proposal: Hash,
@@ -526,7 +585,7 @@ pub struct LockStatus {
 }
 
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct AuthorityManage {
     ///
     pub authorities: Vec<Node>,

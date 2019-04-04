@@ -13,4 +13,6 @@ pub enum BftError {
     DecodeErr,
 
     ObsoleteMsg,
+
+    SaveWalErr,
 }

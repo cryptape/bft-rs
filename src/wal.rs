@@ -14,7 +14,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+use crate::*;
 use std::collections::BTreeMap;
 use std::fs::{read_dir, DirBuilder, File, OpenOptions};
 use std::io::{self, Read, Seek, Write};
@@ -24,9 +24,9 @@ use std::str;
 const DELETE_FILE_INTERVAL: usize = 3;
 
 pub struct Wal {
-    height_fs: BTreeMap<usize, File>,
+    height_fs: BTreeMap<u64, File>,
     dir: String,
-    current_height: usize,
+    current_height: u64,
     ifile: File,    // store off-line height
 }
 
@@ -49,13 +49,13 @@ impl Wal {
 
         let mut string_buf: String = String::new();
         let res_fsize = ifs.read_to_string(&mut string_buf)?;
-        let cur_height: usize;
+        let cur_height: u64;
         let last_file_path: String;
         if res_fsize == 0 {
             last_file_path = dir.to_string() + "/0.log";
-            cur_height = 0;
+            cur_height = 0u64;
         } else {
-            let hi_res = string_buf.parse::<usize>();
+            let hi_res = string_buf.parse::<u64>();
             if let Ok(hi) = hi_res {
                 cur_height = hi;
                 last_file_path = dir.to_string() + "/" + cur_height.to_string().as_str() + ".log"
@@ -84,14 +84,14 @@ impl Wal {
         })
     }
 
-    fn get_file_path(dir: &str, height: usize) -> String {
+    fn get_file_path(dir: &str, height: u64) -> String {
         let mut name = height.to_string();
         name += ".log";
         let pathname = dir.to_string() + "/";
         pathname.clone() + &*name
     }
 
-    pub fn set_height(&mut self, height: usize) -> Result<(), io::Error> {
+    pub fn set_height(&mut self, height: u64) -> Result<(), io::Error> {
         self.current_height = height;
         self.ifile.seek(io::SeekFrom::Start(0))?;
         let hstr = height.to_string();
@@ -121,7 +121,7 @@ impl Wal {
         Ok(())
     }
 
-    pub fn save(&mut self, height: usize, mtype: u8, msg: &[u8]) -> io::Result<usize> {
+    pub fn save(&mut self, height: u64, mtype: LogType, msg: &[u8]) -> io::Result<usize> {
         trace!("Wal save mtype: {}, height: {}", mtype, height);
         if !self.height_fs.contains_key(&height) {
             // 2 more higher than current height, do not process it
@@ -145,7 +145,7 @@ impl Wal {
         let mut hlen = 0;
         if let Some(fs) = self.height_fs.get_mut(&height) {
             let len_bytes: [u8; 4] = unsafe { transmute(mlen.to_le()) };
-            let type_bytes: [u8; 1] = unsafe { transmute(mtype.to_le()) };
+            let type_bytes: [u8; 1] = unsafe { transmute(mtype.into().to_le()) };
             fs.seek(io::SeekFrom::End(0))?;
             fs.write_all(&len_bytes[..])?;
             fs.write_all(&type_bytes[..])?;
@@ -157,9 +157,9 @@ impl Wal {
         Ok(hlen)
     }
 
-    pub fn load(&mut self) -> Vec<(u8, Vec<u8>)> {
+    pub fn load(&mut self) -> Vec<(LogType, Vec<u8>)> {
         let mut vec_buf: Vec<u8> = Vec::new();
-        let mut vec_out: Vec<(u8, Vec<u8>)> = Vec::new();
+        let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
         let cur_height = self.current_height;
         if self.height_fs.is_empty() || cur_height == 0 {
             return vec_out;
@@ -198,7 +198,7 @@ impl Wal {
                 if index + bodylen > fsize {
                     break;
                 }
-                vec_out.push((mtype, vec_buf[index..index + bodylen].to_vec()));
+                vec_out.push((LogType::from(mtype), vec_buf[index..index + bodylen].to_vec()));
                 index += bodylen;
             }
         }

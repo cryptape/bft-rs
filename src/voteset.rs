@@ -1,4 +1,4 @@
-use crate::{Address, Target, Vote, VoteType};
+use crate::{Address, Hash, Proposal, Vote, VoteType};
 
 use std::collections::HashMap;
 
@@ -28,7 +28,7 @@ impl VoteCollector {
         let round = vote.round;
         let vote_type = vote.vote_type;
         let sender = vote.voter;
-        let vote = vote.proposal;
+        let block_hash = vote.block_hash;
 
         if vote_type == VoteType::Prevote {
             if self.votes.contains_key(&height) {
@@ -36,7 +36,7 @@ impl VoteCollector {
                     .votes
                     .get_mut(&height)
                     .unwrap()
-                    .add(round, vote_type, sender, vote)
+                    .add(vote)
                 {
                     // update prevote count hashmap
                     let counter = self.prevote_count.entry(round).or_insert(0);
@@ -48,7 +48,7 @@ impl VoteCollector {
                 }
             } else {
                 let mut round_votes = RoundCollector::new();
-                round_votes.add(round, vote_type, sender, vote);
+                round_votes.add(vote);
                 self.votes.insert(height, round_votes);
                 // update prevote count hashmap
                 let counter = self.prevote_count.entry(round).or_insert(0);
@@ -59,10 +59,10 @@ impl VoteCollector {
             self.votes
                 .get_mut(&height)
                 .unwrap()
-                .add(round, vote_type, sender, vote)
+                .add(vote)
         } else {
             let mut round_votes = RoundCollector::new();
-            round_votes.add(round, vote_type, sender, vote);
+            round_votes.add(vote);
             self.votes.insert(height, round_votes);
             true
         }
@@ -86,68 +86,6 @@ impl VoteCollector {
     }
 }
 
-/// BFT vote set
-// 1. sender's vote message  2. proposal's hash  3. count
-#[derive(Clone, Debug)]
-pub(crate) struct VoteSet {
-    /// A HashMap that K is voter, V is proposal.
-    pub(crate) votes_by_sender: HashMap<Address, Target>,
-    /// A HashMap that K is proposal V is count of the proposal.
-    pub(crate) votes_by_proposal: HashMap<Target, usize>,
-    /// Count of vote set.
-    pub(crate) count: usize,
-}
-
-impl VoteSet {
-    /// A function to create a new vote set.
-    pub(crate) fn new() -> Self {
-        VoteSet {
-            votes_by_sender: HashMap::new(),
-            votes_by_proposal: HashMap::new(),
-            count: 0,
-        }
-    }
-
-    /// A function to add a vote to the vote set.
-    pub(crate) fn add(&mut self, sender: Address, vote: Target) -> bool {
-        let mut is_add = false;
-        self.votes_by_sender.entry(sender).or_insert_with(|| {
-            is_add = true;
-            vote.to_owned()
-        });
-        if is_add {
-            self.count += 1;
-            *self.votes_by_proposal.entry(vote).or_insert(0) += 1;
-        }
-        is_add
-    }
-
-    /// A function to abstract the PoLC of the round.
-    pub(crate) fn extract_polc(
-        &self,
-        height: u64,
-        round: u64,
-        vote_type: VoteType,
-        proposal: &[u8],
-    ) -> Vec<Vote> {
-        // abstract the votes for the polc proposal into a vec
-        let mut polc = Vec::new();
-        for (address, vote_proposal) in &self.votes_by_sender {
-            let proposal = proposal.to_vec();
-            if vote_proposal == &proposal {
-                polc.push(Vote {
-                    vote_type: vote_type.clone(),
-                    height,
-                    round,
-                    proposal: proposal.clone(),
-                    voter: address.clone(),
-                });
-            }
-        }
-        polc
-    }
-}
-
 /// BFT round vote collector.
 // round -> step collector
 #[derive(Debug)]
@@ -167,19 +105,21 @@ impl RoundCollector {
     /// A function try to add a vote to a round collector.
     pub(crate) fn add(
         &mut self,
-        round: u64,
-        vote_type: VoteType,
-        sender: Address,
-        vote: Target,
+        vote: Vote,
     ) -> bool {
+        let round = vote.round;
+        let vote_type = vote.vote_type;
+        let sender = vote.sender;
+        let block_hash = vote.block_hash;
+
         if self.round_votes.contains_key(&round) {
             self.round_votes
                 .get_mut(&round)
                 .unwrap()
-                .add(vote_type, sender, vote)
+                .add(vote)
         } else {
             let mut step_votes = StepCollector::new();
-            step_votes.add(vote_type, sender, vote);
+            step_votes.add(vote);
             self.round_votes.insert(round, step_votes);
             true
         }
@@ -210,15 +150,133 @@ impl StepCollector {
     }
 
     /// A function to add a vote to the step collector.
-    pub(crate) fn add(&mut self, vote_type: VoteType, sender: Address, vote: Target) -> bool {
+    pub(crate) fn add(&mut self, vote: Vote) -> bool {
+        let vote_type = vote.vote_type;
         self.step_votes
             .entry(vote_type)
             .or_insert_with(VoteSet::new)
-            .add(sender, vote)
+            .add(vote)
     }
 
     /// A function to get voteset of the vote type
     pub(crate) fn get_voteset(&self, vote_type: VoteType) -> Option<VoteSet> {
         self.step_votes.get(&vote_type).cloned()
+    }
+}
+
+
+/// BFT vote set
+// 1. sender's vote message  2. proposal's hash  3. count
+#[derive(Clone, Debug)]
+pub(crate) struct VoteSet {
+    /// A HashMap that K is voter, V is proposal.
+    pub(crate) votes_by_sender: HashMap<Address, Vote>,
+    /// A HashMap that K is proposal V is count of the proposal.
+    pub(crate) votes_by_proposal: HashMap<Hash, usize>,
+    /// Count of vote set.
+    pub(crate) count: usize,
+}
+
+impl VoteSet {
+    /// A function to create a new vote set.
+    pub(crate) fn new() -> Self {
+        VoteSet {
+            votes_by_sender: HashMap::new(),
+            votes_by_proposal: HashMap::new(),
+            count: 0,
+        }
+    }
+
+    /// A function to add a vote to the vote set.
+    pub(crate) fn add(&mut self, vote: Vote) -> bool {
+        let mut is_add = false;
+        self.votes_by_sender.entry(sender).or_insert_with(|| {
+            is_add = true;
+            vote.to_owned()
+        });
+        if is_add {
+            self.count += 1;
+            *self.votes_by_proposal.entry(vote).or_insert(0) += 1;
+        }
+        is_add
+    }
+
+    /// A function to abstract the PoLC of the round.
+    pub(crate) fn extract_polc(
+        &self,
+        height: u64,
+        round: u64,
+        vote_type: VoteType,
+        proposal: &[u8],
+    ) -> Vec<Vote> {
+        // abstract the votes for the polc proposal into a vec
+        let mut polc = Vec::new();
+        for (address, vote) in &self.votes_by_sender {
+            let hash = vote.block_hash;
+            let proposal = proposal.to_vec();
+            if hash == &proposal {
+                polc.push(vote.to_owned());
+            }
+        }
+        polc
+    }
+}
+
+#[derive(Debug)]
+pub struct ProposalCollector {
+    pub proposals: LruCache<usize, ProposalRoundCollector>,
+}
+
+impl ProposalCollector {
+    pub fn new() -> Self {
+        ProposalCollector {
+            proposals: LruCache::new(16),
+        }
+    }
+
+    pub fn add(&mut self, height: usize, round: usize, proposal: Proposal) -> bool {
+        if self.proposals.contains_key(&height) {
+            self.proposals
+                .get_mut(&height)
+                .unwrap()
+                .add(round, proposal)
+        } else {
+            let mut round_proposals = ProposalRoundCollector::new();
+            round_proposals.add(round, proposal);
+            self.proposals.insert(height, round_proposals);
+            true
+        }
+    }
+
+    pub fn get_proposal(&mut self, height: usize, round: usize) -> Option<Proposal> {
+        self.proposals
+            .get_mut(&height)
+            .and_then(|prc| prc.get_proposal(round))
+    }
+}
+
+#[derive(Debug)]
+pub struct ProposalRoundCollector {
+    pub round_proposals: LruCache<usize, Proposal>,
+}
+
+impl ProposalRoundCollector {
+    pub fn new() -> Self {
+        ProposalRoundCollector {
+            round_proposals: LruCache::new(16),
+        }
+    }
+
+    pub fn add(&mut self, round: usize, proposal: Proposal) -> bool {
+        if self.round_proposals.contains_key(&round) {
+            false
+        } else {
+            self.round_proposals.insert(round, proposal);
+            true
+        }
+    }
+
+    pub fn get_proposal(&mut self, round: usize) -> Option<Proposal> {
+        self.round_proposals.get_mut(&round).cloned()
     }
 }
