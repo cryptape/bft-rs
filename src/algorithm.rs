@@ -554,7 +554,7 @@ where
         let signed_vote = self.build_signed_vote(&vote);
 
         let vote_weight = self.get_vote_weight(self.height, &vote.voter);
-        let _ = self.votes.add(&signed_vote, vote_weight);
+        let _ = self.votes.add(&signed_vote, vote_weight, self.height);
 
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
         self.send_bft_msg(msg);
@@ -753,7 +753,7 @@ where
         let signed_vote = self.build_signed_vote(&vote);
 
         let vote_weight = self.get_vote_weight(self.height, &vote.voter);
-        let _ = self.votes.add(&signed_vote, vote_weight);
+        let _ = self.votes.add(&signed_vote, vote_weight, self.height);
 
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
         self.send_bft_msg(msg);
@@ -1079,7 +1079,7 @@ where
         }
 
         let vote_weight = self.get_vote_weight(vote.height, &vote.voter);
-        self.votes.add(&signed_vote, vote_weight);
+        self.votes.add(&signed_vote, vote_weight, self.height);
 
         if height > self.height {
             return Err(BftError::HigherMsg);
@@ -1271,7 +1271,7 @@ where
         }
 
         let vote_weight = self.get_vote_weight(height, &voter);
-        self.votes.add(&signed_vote, vote_weight);
+        self.votes.add(&signed_vote, vote_weight, self.height);
         Ok(address)
     }
 

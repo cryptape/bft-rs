@@ -23,7 +23,7 @@ impl VoteCollector {
     }
 
     /// A function try to add a vote, return `bool`.
-    pub(crate) fn add(&mut self, signed_vote: &SignedVote, vote_weight: u64) -> bool {
+    pub(crate) fn add(&mut self, signed_vote: &SignedVote, vote_weight: u64, current_height: u64) -> bool {
         let vote = &signed_vote.vote;
         let height = vote.height;
         let round = vote.round;
@@ -36,7 +36,7 @@ impl VoteCollector {
                     .votes
                     .get_mut(&height)
                     .unwrap()
-                    .add(signed_vote, vote_weight)
+                    .add(signed_vote, vote_weight) && height == current_height
                 {
                     // update prevote count hashmap
                     let counter = self.prevote_count.entry(round).or_insert(0);
@@ -51,8 +51,10 @@ impl VoteCollector {
                 round_votes.add(signed_vote, vote_weight);
                 self.votes.insert(height, round_votes);
                 // update prevote count hashmap
-                let counter = self.prevote_count.entry(round).or_insert(0);
-                *counter += vote_weight;
+                if height == current_height {
+                    let counter = self.prevote_count.entry(round).or_insert(0);
+                    *counter += vote_weight;
+                }
                 true
             }
         } else if self.votes.contains_key(&height) {
