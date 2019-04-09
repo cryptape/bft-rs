@@ -9,7 +9,7 @@ use crate::{
 };
 
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -85,7 +85,7 @@ pub(crate) struct Bft<T: BftSupport> {
     params: BftParams,
     htime: Instant,
     // caches
-    feeds: VecDeque<(u64, Vec<u8>)>,
+    feeds: HashMap<u64, Vec<u8>>,
     verify_results: HashMap<Hash, bool>,
     proof: Option<Proof>,
 //    pre_hash: Option<Hash>,
@@ -171,7 +171,7 @@ where
             last_commit_block_hash: None,
             htime: Instant::now(),
             params: BftParams::new(local_address),
-            feeds: VecDeque::new(),
+            feeds: HashMap::new(),
             verify_results: HashMap::new(),
             proof: None,
             authority_manage: AuthorityManage::new(),
@@ -260,7 +260,7 @@ where
     #[inline]
     fn clean_feeds(&mut self) {
         let height = self.height;
-        self.feeds.retain(|&(hi, _)| hi >= height);
+        self.feeds.retain(|&hi, _| hi >= height);
     }
 
     fn retransmit_vote(&self, round: u64) {
@@ -369,7 +369,7 @@ where
 
     fn try_transmit_proposal(&mut self) -> bool {
         if self.lock_status.is_none()
-            && (!self.feeds.iter().any(|(height, _)| *height == self.height)
+            && (self.feeds.get(&self.height).is_none()
             || self.proof.is_none() || (self.proof.iter().next().unwrap().height != self.height - 1))
         {
             // if a proposer find there is no proposal nor lock, goto step proposewait
@@ -423,7 +423,7 @@ where
 
         } else {
             // if is not locked, transmit the cached proposal
-            let block = self.feeds.iter().find(|(height, _)| *height == self.height).unwrap().1.clone();
+            let block = self.feeds.get(&self.height).unwrap().clone();
             let block_hash = self.function.crypt_hash(&block);
             self.block_hash = Some(block_hash.clone());
             trace!(
@@ -711,9 +711,9 @@ where
                 if *self.verify_results.get(&block_hash).unwrap() {
                     return VerifyResult::Approved;
                 } else {
-                    if self.feeds.iter().any(|(height, block)|
-                        *height == self.height && self.function.crypt_hash(block) == block_hash){
-                        self.feeds.retain(|&(hi, _)| hi != height);
+                    let feed = self.feeds.get(&self.height);
+                    if feed.is_some() && self.function.crypt_hash(feed.unwrap()) == block_hash {
+                        self.feeds.remove(&self.height);
                     }
                     // clean save info
                     self.clean_polc();
@@ -1056,7 +1056,7 @@ where
         let block_hash = self.function.crypt_hash(&feed.block);
         self.save_verify_res(&block_hash, true);
 
-        self.feeds.push_back((height, feed.block));
+        self.feeds.insert(height, feed.block);
 
         if height > self.height - 1{
             return Err(BftError::HigherMsg);
