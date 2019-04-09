@@ -226,18 +226,18 @@ impl VoteSet {
 }
 
 #[derive(Debug)]
-pub struct ProposalCollector {
+pub(crate) struct ProposalCollector {
     pub proposals: LruCache<u64, ProposalRoundCollector>,
 }
 
 impl ProposalCollector {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         ProposalCollector {
             proposals: LruCache::new(16),
         }
     }
 
-    pub fn add(&mut self, proposal: &Proposal) -> bool {
+    pub(crate) fn add(&mut self, proposal: &Proposal) -> bool {
         let height = proposal.height;
         let round = proposal.round;
         if self.proposals.contains_key(&height) {
@@ -253,7 +253,7 @@ impl ProposalCollector {
         }
     }
 
-    pub fn get_proposal(&mut self, height: u64, round: u64) -> Option<Proposal> {
+    pub(crate) fn get_proposal(&mut self, height: u64, round: u64) -> Option<Proposal> {
         self.proposals
             .get_mut(&height)
             .and_then(|prc| prc.get_proposal(round))
@@ -261,18 +261,18 @@ impl ProposalCollector {
 }
 
 #[derive(Debug)]
-pub struct ProposalRoundCollector {
+pub(crate) struct ProposalRoundCollector {
     pub round_proposals: LruCache<u64, Proposal>,
 }
 
 impl ProposalRoundCollector {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         ProposalRoundCollector {
             round_proposals: LruCache::new(16),
         }
     }
 
-    pub fn add(&mut self, round: u64, proposal: &Proposal) -> bool {
+    pub(crate) fn add(&mut self, round: u64, proposal: &Proposal) -> bool {
         if self.round_proposals.contains_key(&round) {
             false
         } else {
@@ -281,7 +281,7 @@ impl ProposalRoundCollector {
         }
     }
 
-    pub fn get_proposal(&mut self, round: u64) -> Option<Proposal> {
+    pub(crate) fn get_proposal(&mut self, round: u64) -> Option<Proposal> {
         self.round_proposals.get_mut(&round).cloned()
     }
 }

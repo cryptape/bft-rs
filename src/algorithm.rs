@@ -10,6 +10,7 @@ use crate::{
 
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
 use std::collections::HashMap;
+use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -183,6 +184,30 @@ where
             function: f,
             consensus_power: false,
         }
+    }
+
+    fn reset(&mut self) {
+        self.height = INIT_HEIGHT;
+        self.round = INIT_ROUND;
+        self.step = Step::default();
+        self.block_hash = None;
+        self.lock_status = None;
+        self.height_filter.clear();
+        self.round_filter.clear();
+        self.last_commit_round = None;
+        self.last_commit_block_hash = None;
+        self.htime = Instant::now();
+        self.feeds.clear();
+        self.verify_results.clear();
+        self.proof = None;
+        self.authority_manage = AuthorityManage::new();
+        self.proposals = ProposalCollector::new();
+        self.votes = VoteCollector::new();
+        //TODO: 将之前的 wal 文件备份
+        let wal_path = &self.wal_log.dir;
+        let _ = fs::remove_dir_all(wal_path);
+        self.wal_log = Wal::new(wal_path).unwrap();
+        self.consensus_power = false;
     }
 
     fn load_wal_log(&mut self) {
@@ -871,7 +896,7 @@ where
         );
 
         self.last_commit_round = Some(self.round);
-        self.last_commit_block_hash = Some(self.function.crypt_hash(&block));
+        self.last_commit_block_hash = Some(self.function.crypt_hash(&proposal.block));
     }
 
     fn generate_proof(&mut self, lock_status: LockStatus) -> Proof {
@@ -1486,6 +1511,12 @@ where
             BftMsg::Pause => self.consensus_power = false,
 
             BftMsg::Start => self.consensus_power = true,
+
+            BftMsg::Snapshot(snap_shot) => {
+                self.reset();
+                self.height = snap_shot.proof.height;
+                self.proof = Some(snap_shot.proof);
+            }
         }
 
         Ok(())

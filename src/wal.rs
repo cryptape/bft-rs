@@ -25,7 +25,7 @@ const DELETE_FILE_INTERVAL: u64 = 3u64;
 
 pub struct Wal {
     height_fs: BTreeMap<u64, File>,
-    dir: String,
+    pub dir: String,
     current_height: u64,
     ifile: File,    // store off-line height
 }

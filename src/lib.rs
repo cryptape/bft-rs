@@ -61,6 +61,7 @@ pub enum BftMsg {
     Feed(Feed),
     Pause,
     Start,
+    Snapshot(Snapshot),
 }
 
 /// Bft vote types.
@@ -457,13 +458,30 @@ impl Decodable for VerifyResp {
     }
 }
 
-//#[derive(Clone, Debug, PartialEq, Eq)]
-//pub struct Snapshot {
-//    /// The Response of proposal verify
-//    pub is_pass: bool,
-//    /// The verify proposal
-//    pub block_hash: Hash,
-//}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Snapshot {
+    pub proof: Proof,
+}
+
+impl Encodable for Snapshot {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(1).append(&self.proof);
+    }
+}
+
+impl Decodable for Snapshot {
+    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
+        match r.prototype()? {
+            Prototype::List(1) => {
+                let proof: Proof = r.val_at(0)?;
+                Ok(Snapshot{
+                    proof,
+                })
+            }
+            _ => Err(DecoderError::RlpInconsistentLengthAndData)
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Node {
