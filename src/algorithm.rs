@@ -88,7 +88,6 @@ pub(crate) struct Bft<T: BftSupport> {
     feeds: HashMap<u64, Vec<u8>>,
     verify_results: HashMap<Hash, bool>,
     proof: Option<Proof>,
-//    pre_hash: Option<Hash>,
     proposals: ProposalCollector,
     votes: VoteCollector,
     wal_log: Wal,
@@ -187,29 +186,30 @@ where
     }
 
     fn load_wal_log(&mut self) {
+        // TODO: should prevent saving wal
         info!("Cita-bft starts to load wal log!");
         let vec_buf = self.wal_log.load();
         for (log_type, msg) in vec_buf {
             match log_type {
                 LogType::Proposal => {
-                    info!("Cita-bft loads signed_proposal!");
+                    info!("Cita-bft loads proposal!");
                     self.msg_sender.send(BftMsg::Proposal(msg)).unwrap();
                 }
                 LogType::Vote => {
-                    info!("Cita-bft loads raw_bytes message!");
+                    info!("Cita-bft loads vote message!");
                     self.msg_sender.send(BftMsg::Vote(msg)).unwrap();
                 }
                 LogType::Feed => {
-                    info!("Cita-bft loads rich_status message!");
+                    info!("Cita-bft loads feed message!");
                     self.msg_sender.send(BftMsg::Feed(rlp::decode(&msg).unwrap())).unwrap();
                 }
                 LogType::Status => {
-                    info!("Cita-bft loads block_txs message!");
+                    info!("Cita-bft loads status message!");
                     self.msg_sender.send(BftMsg::Status(rlp::decode(&msg).unwrap())).unwrap();
                 }
                 #[cfg(feature = "verify_req")]
                 LogType::VerifyResp => {
-                    info!("Cita-bft loads verify_block_resp message!");
+                    info!("Cita-bft loads verify_resp message!");
                     self.msg_sender.send(BftMsg::VerifyResp(rlp::decode(&msg).unwrap())).unwrap();
                 }
             }
@@ -850,13 +850,14 @@ where
         let lock_status = self.lock_status.clone().expect("No lock when commit!");
 
         let proof = self.generate_proof(lock_status.clone());
+        self.proof = Some(proof);
 
-        let block = self.proposals.get_proposal(self.height, self.round).unwrap().block;
+        let proposal = self.proposals.get_proposal(self.height, self.round).unwrap();
 
         let commit = Commit{
             height: self.height,
-            block: block.clone(),
-            proof,
+            block: proposal.block.clone(),
+            proof: proposal.proof,
             address: self.params.address.clone(),
         };
 
@@ -1588,7 +1589,6 @@ where
                     self.change_to_step(Step::CommitWait);
                 }
             }
-
             _ => error!("Invalid Timeout Info!"),
         }
     }

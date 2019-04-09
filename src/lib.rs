@@ -457,6 +457,14 @@ impl Decodable for VerifyResp {
     }
 }
 
+//#[derive(Clone, Debug, PartialEq, Eq)]
+//pub struct Snapshot {
+//    /// The Response of proposal verify
+//    pub is_pass: bool,
+//    /// The verify proposal
+//    pub block_hash: Hash,
+//}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Node {
     ///
