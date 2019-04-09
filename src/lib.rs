@@ -17,7 +17,7 @@ extern crate rlp;
 
 use crate::{
     error::BftError,
-    objects::{Vote, VoteType, Feed},
+    objects::{Vote, VoteType},
 };
 
 use rlp::{Encodable, Decodable, DecoderError, Prototype, Rlp, RlpStream};
@@ -146,6 +146,38 @@ impl Decodable for Status {
                     height,
                     interval,
                     authority_list,
+                })
+            }
+            _ => Err(DecoderError::RlpInconsistentLengthAndData)
+        }
+    }
+}
+
+/// A proposal for a height.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Feed {
+    /// The height of the proposal.
+    pub height: u64,
+    /// A proposal.
+    pub block: Vec<u8>,
+}
+
+impl Encodable for Feed {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(2).append(&self.height)
+            .append(&self.block);
+    }
+}
+
+impl Decodable for Feed {
+    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
+        match r.prototype()? {
+            Prototype::List(2) => {
+                let height: u64 = r.val_at(0)?;
+                let block: Vec<u8> = r.val_at(1)?;
+                Ok(Feed{
+                    height,
+                    block,
                 })
             }
             _ => Err(DecoderError::RlpInconsistentLengthAndData)
@@ -316,11 +348,10 @@ impl Decodable for Proof {
 
 pub trait BftSupport {
     /// A function to check signature.
-    #[cfg(not(feature = "verify_req"))]
     fn check_block(&self, block: &[u8], height: u64) -> bool;
     /// A function to check signature.
     #[cfg(feature = "verify_req")]
-    fn check_block(&self, block: &[u8], height: u64) -> VerifyResult;
+    fn check_transaction(&self, block: &[u8], height: u64) -> bool;
     /// A funciton to transmit messages.
     fn transmit(&self, msg: BftMsg);
     /// A function to commit the proposal.

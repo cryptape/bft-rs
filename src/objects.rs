@@ -191,38 +191,6 @@ impl Decodable for SignedVote {
     }
 }
 
-/// A proposal for a height.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Feed {
-    /// The height of the proposal.
-    pub height: u64,
-    /// A proposal.
-    pub block: Vec<u8>,
-}
-
-impl Encodable for Feed {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(2).append(&self.height)
-            .append(&self.block);
-    }
-}
-
-impl Decodable for Feed {
-    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
-        match r.prototype()? {
-            Prototype::List(2) => {
-                let height: u64 = r.val_at(0)?;
-                let block: Vec<u8> = r.val_at(1)?;
-                Ok(Feed{
-                    height,
-                    block,
-                })
-            }
-            _ => Err(DecoderError::RlpInconsistentLengthAndData)
-        }
-    }
-}
-
 /// A PoLC.
 #[derive(Clone, Debug)]
 pub(crate) struct LockStatus {

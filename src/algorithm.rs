@@ -1244,25 +1244,26 @@ where
                 }
             }
 
-
         #[cfg(feature = "verify_req")]
             {
-                match self.function.check_block(block, height) {
-                    VerifyResult::Failed => {
-                        self.save_verify_res(&block_hash, false);
-                        Err(BftError::CheckBlockFailed)
-                    },
-                    VerifyResult::Undetermined => {
-                        Ok(())
-                    },
-                    VerifyResult::Approved => {
-                        self.save_verify_res(&block_hash, true);
-                        Ok(())
-                    }
+                if !self.function.check_block(block, height) {
+                    self.save_verify_res(&block_hash, false);
+                    Err(BftError::CheckBlockFailed)
                 }
+
+                let function = self.function.clone();
+                let sender = self.msg_sender.clone();
+                let height = self.height;
+                cross_thread::scope(|s|{
+                    s.spawn(move |_|{
+                        let is_pass = function.check_transaction(block, height);
+                        let block_hash = function.crypt_hash(block);
+                        let verify_resp = VerifyResp{is_pass, block_hash};
+                        sender.send(BftMsg::VerifyResp(verify_resp)).unwrap();
+                    });
+                }).unwrap();
+                Ok(())
             }
-
-
     }
 
     fn check_proof(&mut self, height: u64, proof: &Proof) -> BftResult<()> {
