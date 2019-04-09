@@ -1,4 +1,4 @@
-use crate::{Address, Target};
+use crate::{Address, Hash};
 
 use std::cell::Cell;
 use std::time::Duration;
@@ -14,7 +14,7 @@ pub(crate) struct BftParams {
 
 impl BftParams {
     /// A function to create a new BFT params.
-    pub(crate) fn new(local_address: Target) -> Self {
+    pub(crate) fn new(local_address: Hash) -> Self {
         BftParams {
             address: local_address,
             timer: BftTimer::default(),

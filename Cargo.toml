@@ -23,7 +23,7 @@ rlp = "0.3.0"
 serde = "1.0"
 serde_derive = "1.0"
 time = "0.1.36"
-cita-crypto = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+
 
 [dev-dependencies]
 env_logger = "0.6.0"

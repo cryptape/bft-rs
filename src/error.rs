@@ -14,5 +14,38 @@ pub enum BftError {
 
     ObsoleteMsg,
 
+    HigherMsg,
+
     SaveWalErr,
+
+    ShouldNotHappen,
+
+    EmptyAuthManage,
+
+    InvalidProposer,
+
+    InvalidVoter,
+
+    CheckBlockFailed,
+
+    NoConsensusPower,
+
+    CheckSigFailed,
+
+//    FailedToSign,
+
+    MismatchingProposer,
+
+    MismatchingVoter,
+
+    MismatchingVote,
+
+    RepeatLockVote,
+
+    NotEnoughVotes,
+
+    CheckProofFailed,
+
+    VoteError,
+
 }

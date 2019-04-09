@@ -21,7 +21,7 @@ use std::io::{self, Read, Seek, Write};
 use std::mem::transmute;
 use std::str;
 
-const DELETE_FILE_INTERVAL: usize = 3;
+const DELETE_FILE_INTERVAL: u64 = 3u64;
 
 pub struct Wal {
     height_fs: BTreeMap<u64, File>,
@@ -121,12 +121,12 @@ impl Wal {
         Ok(())
     }
 
-    pub fn save(&mut self, height: u64, mtype: LogType, msg: &[u8]) -> io::Result<usize> {
-        trace!("Wal save mtype: {}, height: {}", mtype, height);
+    pub fn save(&mut self, height: u64, mtype: LogType, msg: &[u8]) -> io::Result<()> {
+        trace!("Wal save mtype: {:?}, height: {}", mtype, height);
         if !self.height_fs.contains_key(&height) {
             // 2 more higher than current height, do not process it
             if height > self.current_height + 1 {
-                return Ok(0);
+                return Ok(());
             } else if height == self.current_height + 1 {
                 let filename = Wal::get_file_path(&self.dir, height);
                 let fs = OpenOptions::new()
@@ -139,22 +139,22 @@ impl Wal {
         }
         let mlen = msg.len() as u32;
         if mlen == 0 {
-            return Ok(0);
+            return Ok(());
         }
 
-        let mut hlen = 0;
         if let Some(fs) = self.height_fs.get_mut(&height) {
             let len_bytes: [u8; 4] = unsafe { transmute(mlen.to_le()) };
-            let type_bytes: [u8; 1] = unsafe { transmute(mtype.into().to_le()) };
+            let mtype: u8 = mtype.into();
+            let type_bytes: [u8; 1] = unsafe { transmute(mtype.to_le()) };
             fs.seek(io::SeekFrom::End(0))?;
             fs.write_all(&len_bytes[..])?;
             fs.write_all(&type_bytes[..])?;
-            hlen = fs.write(msg)?;
+            fs.write(msg)?;
             fs.flush()?;
         } else {
             warn!("Can't find wal log in height {} ", height);
         }
-        Ok(hlen)
+        Ok(())
     }
 
     pub fn load(&mut self) -> Vec<(LogType, Vec<u8>)> {
