@@ -41,6 +41,8 @@ pub mod random;
 /// BFT timer.
 pub mod timer;
 
+pub mod utils;
+
 pub mod wal;
 
 /// Type for node address.
