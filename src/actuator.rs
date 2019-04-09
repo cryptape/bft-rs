@@ -11,7 +11,7 @@ pub struct BftActuator (Sender<BftMsg>);
 
 impl BftActuator {
     /// A function to create a new Bft actuator.
-    pub fn new<T: BftSupport + Send + 'static>(support: T, address: Address, wal_path: &str) -> Self {
+    pub fn new<T: BftSupport + Clone + Send + 'static>(support: T, address: Address, wal_path: &str) -> Self {
         let (sender, internal_receiver) = unbounded();
         Bft::start(internal_receiver, sender.clone(), support, address, wal_path);
         BftActuator(sender)

@@ -14,7 +14,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use crate::*;
+use crate::objects::LogType;
 use std::collections::BTreeMap;
 use std::fs::{read_dir, DirBuilder, File, OpenOptions};
 use std::io::{self, Read, Seek, Write};
@@ -23,15 +23,15 @@ use std::str;
 
 const DELETE_FILE_INTERVAL: u64 = 3u64;
 
-pub struct Wal {
+pub(crate) struct Wal {
     height_fs: BTreeMap<u64, File>,
-    pub dir: String,
+    pub(crate) dir: String,
     current_height: u64,
     ifile: File,    // store off-line height
 }
 
 impl Wal {
-    pub fn new(dir: &str) -> Result<Wal, io::Error> {
+    pub(crate) fn new(dir: &str) -> Result<Wal, io::Error> {
         let fss = read_dir(&dir);
         if fss.is_err() {
             DirBuilder::new().recursive(true).create(dir).expect("Create wal directory failed!");
@@ -91,7 +91,7 @@ impl Wal {
         pathname.clone() + &*name
     }
 
-    pub fn set_height(&mut self, height: u64) -> Result<(), io::Error> {
+    pub(crate) fn set_height(&mut self, height: u64) -> Result<(), io::Error> {
         self.current_height = height;
         self.ifile.seek(io::SeekFrom::Start(0))?;
         let hstr = height.to_string();
@@ -121,7 +121,7 @@ impl Wal {
         Ok(())
     }
 
-    pub fn save(&mut self, height: u64, mtype: LogType, msg: &[u8]) -> io::Result<()> {
+    pub(crate) fn save(&mut self, height: u64, mtype: LogType, msg: &[u8]) -> io::Result<()> {
         trace!("Wal save mtype: {:?}, height: {}", mtype, height);
         if !self.height_fs.contains_key(&height) {
             // 2 more higher than current height, do not process it
@@ -157,7 +157,7 @@ impl Wal {
         Ok(())
     }
 
-    pub fn load(&mut self) -> Vec<(LogType, Vec<u8>)> {
+    pub(crate) fn load(&mut self) -> Vec<(LogType, Vec<u8>)> {
         let mut vec_buf: Vec<u8> = Vec::new();
         let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
         let cur_height = self.current_height;

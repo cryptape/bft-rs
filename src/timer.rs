@@ -1,4 +1,4 @@
-use crate::algorithm::Step;
+use crate::objects::Step;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

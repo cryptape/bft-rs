@@ -13,6 +13,7 @@ An efficient and stable Rust library of BFT protocol for distributed system.
 
 [dependencies]
 crossbeam = "0.7"
+crossbeam-utils = "0.6.5"
 lru-cache = "0.1"
 log = "0.4.3"
 min-max-heap = "1.2.0"
