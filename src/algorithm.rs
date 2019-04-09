@@ -118,6 +118,9 @@ where
 
         // start main loop module.
         let mut engine = Bft::initialize(r, s, bft2timer, bft4timer, f, local_address, wal_path);
+
+        engine.load_wal_log();
+
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
             .spawn(move || {
@@ -175,13 +178,43 @@ where
             verify_results: HashMap::new(),
             proof: None,
             authority_manage: AuthorityManage::new(),
-//            pre_hash: None,
             proposals: ProposalCollector::new(),
             votes: VoteCollector::new(),
             wal_log: Wal::new(wal_path).unwrap(),
             function: f,
             consensus_power: false,
         }
+    }
+
+    fn load_wal_log(&mut self) {
+        info!("Cita-bft starts to load wal log!");
+        let vec_buf = self.wal_log.load();
+        for (log_type, msg) in vec_buf {
+            match log_type {
+                LogType::Proposal => {
+                    info!("Cita-bft loads signed_proposal!");
+                    self.msg_sender.send(BftMsg::Proposal(msg)).unwrap();
+                }
+                LogType::Vote => {
+                    info!("Cita-bft loads raw_bytes message!");
+                    self.msg_sender.send(BftMsg::Vote(msg)).unwrap();
+                }
+                LogType::Feed => {
+                    info!("Cita-bft loads rich_status message!");
+                    self.msg_sender.send(BftMsg::Feed(rlp::decode(&msg).unwrap())).unwrap();
+                }
+                LogType::Status => {
+                    info!("Cita-bft loads block_txs message!");
+                    self.msg_sender.send(BftMsg::Status(rlp::decode(&msg).unwrap())).unwrap();
+                }
+                #[cfg(feature = "verify_req")]
+                LogType::VerifyResp => {
+                    info!("Cita-bft loads verify_block_resp message!");
+                    self.msg_sender.send(BftMsg::VerifyResp(rlp::decode(&msg).unwrap())).unwrap();
+                }
+            }
+        }
+        info!("Cita-bft successfully processes the whole wal log!");
     }
 
     #[inline]

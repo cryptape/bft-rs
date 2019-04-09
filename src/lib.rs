@@ -104,10 +104,8 @@ pub enum LogType {
     Vote,
     Status,
     Feed,
+    #[cfg(feature = "verify_req")]
     VerifyResp,
-    Commit,
-    Pause,
-    Start,
 }
 
 impl From<u8> for LogType {
@@ -117,10 +115,8 @@ impl From<u8> for LogType {
             1 => LogType::Vote,
             2 => LogType::Status,
             3 => LogType::Feed,
+            #[cfg(feature = "verify_req")]
             4 => LogType::VerifyResp,
-            5 => LogType::Commit,
-            6 => LogType::Pause,
-            7 => LogType::Start,
             _ => panic!("Invalid vote type!"),
         }
     }
@@ -133,10 +129,8 @@ impl Into<u8> for LogType {
             LogType::Vote => 1,
             LogType::Status => 2,
             LogType::Feed => 3,
+            #[cfg(feature = "verify_req")]
             LogType::VerifyResp => 4,
-            LogType::Commit => 5,
-            LogType::Pause => 6,
-            LogType::Start => 7,
         }
     }
 }
