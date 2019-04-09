@@ -4,7 +4,7 @@ use crate::{
     error::BftError,
     random::get_proposer,
     timer::{TimeoutInfo, WaitTimer},
-    voteset::{ProposalCollector, VoteCollector, VoteSet},
+    voteset::{ProposalCollector, VoteCollector, RoundCollector, VoteSet},
     wal::Wal,
 };
 
@@ -577,7 +577,6 @@ where
     }
 
     fn get_vote_weight(&self, height: u64, address: &Address) -> u64 {
-        //TODO: 在到达新高度取出 vote 的时候, 一定要记得重置 weight 后保存.
         if height != self.height{
             return 1u64;
         }
@@ -919,23 +918,31 @@ where
         false
     }
 
-    // TODO;
-    fn flush_cache(&self) {
+    fn flush_cache(&mut self) {
+        let proposals = &mut self.proposals.proposals;
+        let round_proposals = proposals.get_mut(&self.height);
+        let votes = &mut self.votes.votes;
+        let round_votes = votes.get_mut(&self.height);
+        let mut round_collector = RoundCollector::new();
+        if !round_votes.is_none() {
+            round_collector = round_votes.unwrap().clone();
+            self.votes.remove(self.height);
+        }
 
+        if let Some(round_proposals) = round_proposals {
+            for (_, signed_proposal) in round_proposals.round_proposals.iter() {
+                self.msg_sender.send(BftMsg::Proposal(rlp::encode(signed_proposal))).unwrap();
+            }
+        };
+
+        for (_, step_votes) in round_collector.round_votes.iter() {
+            for (_, vote_set) in step_votes.step_votes.iter() {
+                for (_, signed_vote) in vote_set.votes_by_sender.iter() {
+                    self.msg_sender.send(BftMsg::Vote(rlp::encode(signed_vote))).unwrap();
+                }
+            }
+        }
     }
-
-//    fn try_handle_feed(&mut self, feed: Feed) -> bool {
-//        if feed.height >= self.height {
-//            self.feed = Some(feed);
-//            info!(
-//                "Receive feed of height {:?}",
-//                self.feed.clone().unwrap().height
-//            );
-//            true
-//        } else {
-//            false
-//        }
-//    }
 
     fn save_verify_res(&mut self, block_hash: &[u8], is_pass: bool) {
         if self.verify_results.contains_key(block_hash) {

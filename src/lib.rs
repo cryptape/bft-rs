@@ -271,14 +271,6 @@ impl Decodable for Vote {
                 let round: u64 = r.val_at(2)?;
                 let block_hash: Vec<u8> = r.val_at(3)?;
                 let voter: Address = r.val_at(4)?;
-//                let signature: Vec<u8> = r.val_at(5)?;
-//                let bytes: Vec<u8> = r.val_at(5)?;
-//                if bytes.len() != 65 {
-//                    return Err(DecoderError::RlpIncorrectListLen);
-//                }
-//                let mut sig = [0u8; 65];
-//                sig[0..65].copy_from_slice(&bytes);
-//                let signature = Signature(sig);
                 Ok(Vote{
                     vote_type,
                     height,
@@ -553,7 +545,6 @@ impl Encodable for Proof {
         let mut value_list: Vec<Vec<u8>> = vec![];
         self.precommit_votes.iter().for_each(|(address, sig)| {
             key_list.push(address.to_owned());
-//            value_list.push(sig.0[0..65].to_vec());
             value_list.push(sig.to_owned());
         });
         s.begin_list(key_list.len());
@@ -579,18 +570,6 @@ impl Decodable for Proof {
                 if key_list.len() != value_list.len() {
                     return Err(DecoderError::RlpIncorrectListLen);
                 }
-//                let mut flag = true;
-//                let sig_list: Vec<Signature> = value_list.into_iter().map(|bytes|{
-//                    if bytes.len() != 65 {
-//                        flag = false;
-//                    }
-//                    let mut sig = [0u8; 65];
-//                    sig[0..65].copy_from_slice(&bytes);
-//                    Signature(sig)
-//                }).collect();
-//                if !flag {
-//                    return Err(DecoderError::RlpIncorrectListLen);
-//                }
                 let precommit_votes: HashMap<_, _> = key_list.into_iter().zip(value_list.into_iter()).collect();
                 Ok(Proof{
                     height,
@@ -680,16 +659,6 @@ pub trait BftSupport {
     fn crypt_hash(&self, msg: &[u8]) -> Vec<u8>;
 }
 
-//fn check_signature(signature: &Signature, hash: &H256) -> BftResult<Address> {
-//    if let Ok(pubkey) = signature.recover(hash) {
-//        let address = pubkey_to_address(&pubkey);
-//        return Ok(address);
-//    }
-//    error!("The signature verified failed!");
-//    Err(BftError::InvalidSignature)
-//}
-
-// Check proof
 pub fn check_proof(proof: &Proof, height: u64, authorities: &[Node],
                    crypt_hash: fn(msg: &[u8]) -> Vec<u8>,
                    check_signature: fn(signature: &[u8], hash: &[u8]) -> Option<Address>) -> bool {
@@ -724,10 +693,6 @@ pub fn check_proof(proof: &Proof, height: u64, authorities: &[Node],
             if let Some(address) = check_signature(sig, &crypt_hash(&msg)) {
                 return address == *voter;
             }
-//            let signature = Signature(sig.0.into());
-//            if let Ok(pubkey) = signature.recover(&msg.crypt_hash().into()) {
-//                return pubkey_to_address(&pubkey) == sender.clone().into();
-//            }
         }
         false
     })

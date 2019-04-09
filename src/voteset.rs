@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use lru_cache::LruCache;
 
 /// BFT vote collector
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct VoteCollector {
     /// A LruCache to store vote collect of each round.
     pub(crate) votes: LruCache<u64, RoundCollector>,
@@ -70,6 +70,11 @@ impl VoteCollector {
         }
     }
 
+    pub(crate) fn remove(&mut self, current_height: u64){
+        self.votes.remove(&current_height);
+        self.clear_prevote_count();
+    }
+
     /// A function to get the vote set of the height, the round, and the vote type.
     pub(crate) fn get_voteset(
         &mut self,
@@ -90,7 +95,7 @@ impl VoteCollector {
 
 /// BFT round vote collector.
 // round -> step collector
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct RoundCollector {
     /// A LruCache to store step collect of a round.
     pub(crate) round_votes: LruCache<u64, StepCollector>,
@@ -135,7 +140,7 @@ impl RoundCollector {
 
 /// BFT step collector.
 // step -> voteset
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct StepCollector {
     /// A HashMap that K is step, V is the vote set
     pub(crate) step_votes: HashMap<VoteType, VoteSet>,
