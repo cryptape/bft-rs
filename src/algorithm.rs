@@ -19,8 +19,8 @@ pub(crate) const INIT_HEIGHT: u64 = 0;
 pub(crate) const INIT_ROUND: u64 = 0;
 const PROPOSAL_TIMES_COEF: u64 = 10;
 const TIMEOUT_RETRANSE_COEF: u32 = 15;
-const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 300;
-const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 300;
+const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;
+const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
 
 #[cfg(feature = "verify_req")]
 const VERIFY_AWAIT_COEF: u32 = 50;
@@ -430,6 +430,11 @@ where
     }
 
     fn try_handle_status(&mut self, status: Status) -> bool {
+        // commit timeout since pub block to chain,so resending the block
+        if status.height == self.height - 1 && self.step >= Step::Commit {
+            self.handle_commit();
+        }
+
         // receive a rich status that height ge self.height is the only way to go to new height
         if status.height >= self.height {
             if status.height > self.height {
