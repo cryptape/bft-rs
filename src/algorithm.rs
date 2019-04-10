@@ -184,10 +184,10 @@ where
                     self.change_to_step(Step::Precommit);
                     if self.check_verify() == VerifyResult::Undetermined {
                         self.change_to_step(Step::VerifyWait);
-                        break;
+                    } else{
+                        self.transmit_precommit();
+                        self.handle_precommit();
                     }
-                    self.transmit_precommit();
-                    self.handle_precommit();
                 }
             }
 

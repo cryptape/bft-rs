@@ -7,7 +7,8 @@ use crate::{
     random::get_proposer,
     wal::Wal,
 };
-
+#[cfg(feature = "verify_req")]
+use crossbeam_utils::thread as cross_thread;
 use std::collections::HashMap;
 use std::fs;
 use std::time::Instant;
@@ -237,7 +238,7 @@ impl<T> Bft<T>
     pub(crate) fn check_and_save_verify_resp(&mut self, verify_resp: &VerifyResp, need_wal: bool) -> BftResult<()> {
         if need_wal {
             let msg: Vec<u8> = rlp::encode(verify_resp);
-            self.wal_log.save(height, LogType::VerifyResp, &msg).or( Err(BftError::SaveWalErr))?;
+            self.wal_log.save(self.height, LogType::VerifyResp, &msg).or( Err(BftError::SaveWalErr))?;
         }
         self.save_verify_res(&verify_resp.block_hash, verify_resp.is_pass);
 
@@ -292,7 +293,7 @@ impl<T> Bft<T>
             {
                 if !self.function.check_block(block, height) {
                     self.save_verify_res(&block_hash, false);
-                    Err(BftError::CheckBlockFailed)
+                    return Err(BftError::CheckBlockFailed);
                 }
 
                 let function = self.function.clone();
