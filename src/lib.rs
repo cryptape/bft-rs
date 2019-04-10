@@ -349,6 +349,8 @@ impl Decodable for Proof {
 
 
 pub trait BftSupport {
+
+    fn start(&self);
     /// A function to check signature.
     fn check_block(&self, block: &[u8], height: u64) -> bool;
     /// A function to check signature.
