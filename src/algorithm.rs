@@ -26,10 +26,10 @@ const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
 const VERIFY_AWAIT_COEF: u32 = 50;
 
 /// BFT state message.
-pub struct Bft<T: BftSupport> {
+pub(crate) struct Bft<T: BftSupport> {
     // channel
-    pub(crate) msg_receiver: Receiver<BftMsg>,
     pub(crate) msg_sender: Sender<BftMsg>,
+    pub(crate) msg_receiver: Receiver<BftMsg>,
     pub(crate) timer_seter: Sender<TimeoutInfo>,
     pub(crate) timer_notity: Receiver<TimeoutInfo>,
     // bft-core params
@@ -282,8 +282,8 @@ where
     ) -> Self {
         info!("BFT State Machine Launched.");
         Bft {
-            msg_receiver: r,
             msg_sender: s,
+            msg_receiver: r,
             timer_seter: ts,
             timer_notity: tn,
             height: INIT_HEIGHT,
