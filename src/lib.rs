@@ -351,16 +351,16 @@ impl Decodable for Proof {
 
 pub trait BftSupport {
 
-    fn start(&self);
+    fn start(&mut self);
     /// A function to check signature.
     fn check_block(&self, block: &[u8], height: u64) -> bool;
     /// A function to check signature.
     #[cfg(feature = "verify_req")]
-    fn check_transaction(&self, block: &[u8], height: u64) -> bool;
+    fn check_transaction(&mut self, block: &[u8], height: u64) -> bool;
     /// A funciton to transmit messages.
     fn transmit(&self, msg: BftMsg);
     /// A function to commit the proposal.
-    fn commit(&self, commit: Commit);
+    fn commit(&mut self, commit: Commit);
 
     fn get_block(&self, height: u64) -> Option<Vec<u8>>;
 
