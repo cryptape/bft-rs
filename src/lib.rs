@@ -90,6 +90,17 @@ pub struct Commit {
     pub address: Address,
 }
 
+impl Default for Commit {
+    fn default() -> Self {
+        Commit {
+            height: 0u64,
+            block: vec![],
+            proof: Proof::default(),
+            address: vec![],
+        }
+    }
+}
+
 impl Encodable for Commit {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(4).append(&self.height)
@@ -130,6 +141,16 @@ pub struct Status {
     pub authority_list: Vec<Node>,
 }
 
+impl Default for Status {
+    fn default() -> Self {
+        Status {
+            height: 0u64,
+            interval: None,
+            authority_list: vec![],
+        }
+    }
+}
+
 impl Encodable for Status {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(3).append(&self.height)
@@ -165,6 +186,15 @@ pub struct Feed {
     pub block: Vec<u8>,
 }
 
+impl Default for Feed {
+    fn default() -> Self {
+        Feed {
+            height: 0u64,
+            block: vec![],
+        }
+    }
+}
+
 impl Encodable for Feed {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(2).append(&self.height)
@@ -196,6 +226,16 @@ pub struct VerifyResp {
     pub is_pass: bool,
     /// The verify proposal
     pub block_hash: Hash,
+}
+
+#[cfg(feature = "verify_req")]
+impl Default for VerifyResp {
+    fn default() -> Self {
+        VerifyResp {
+            is_pass: false,
+            block_hash: vec![],
+        }
+    }
 }
 
 #[cfg(feature = "verify_req")]
@@ -289,6 +329,17 @@ pub struct Proof {
     pub block_hash: Hash,
     ///
     pub precommit_votes: HashMap<Address, Signature>,
+}
+
+impl Default for Proof {
+    fn default() -> Self {
+        Proof {
+            height: 0u64,
+            round: 0u64,
+            block_hash: vec![],
+            precommit_votes: HashMap::new(),
+        }
+    }
 }
 
 impl Hashable for Proof {
