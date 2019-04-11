@@ -5,7 +5,7 @@
 //#![deny(missing_docs)]
 
 #[macro_use]
-extern crate crossbeam;
+pub extern crate crossbeam;
 #[macro_use]
 extern crate log;
 extern crate lru_cache;
@@ -16,6 +16,7 @@ extern crate rand_pcg;
 extern crate rlp;
 
 use crate::{
+    algorithm::Bft,
     error::BftError,
     objects::{Vote, VoteType},
 };
@@ -24,8 +25,6 @@ use rlp::{Encodable, Decodable, DecoderError, Prototype, Rlp, RlpStream};
 use std::collections::HashMap;
 use std::hash::{Hash as Hashable, Hasher};
 
-/// Bft actuator.
-pub mod actuator;
 /// BFT state machine.
 pub mod algorithm;
 /// BFT vote set.
@@ -53,6 +52,8 @@ pub type Hash = Vec<u8>;
 pub type Signature = Vec<u8>;
 
 pub type BftResult<T> = ::std::result::Result<T, BftError>;
+
+pub type BftActuator<T> = Bft<T>;
 
 #[derive(Debug)]
 pub enum BftMsg {

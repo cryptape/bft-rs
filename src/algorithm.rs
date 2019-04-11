@@ -26,7 +26,7 @@ const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
 const VERIFY_AWAIT_COEF: u32 = 50;
 
 /// BFT state message.
-pub(crate) struct Bft<T: BftSupport> {
+pub struct Bft<T: BftSupport> {
     // channel
     pub(crate) msg_sender: Sender<BftMsg>,
     pub(crate) msg_receiver: Receiver<BftMsg>,
