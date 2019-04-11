@@ -62,7 +62,7 @@ where
     T: BftSupport + Clone + Send + 'static,
 {
     /// A function to start a BFT state machine.
-    pub fn start(r: Receiver<BftMsg>, s: Sender<BftMsg>, f: T, local_address: Address, wal_path: &str) {
+    pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, f: T, local_address: Address, wal_path: &str) {
         // define message channel and timeout channel
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
@@ -77,7 +77,7 @@ where
             .unwrap();
 
         // start main loop module.
-        let mut engine = Bft::initialize(r, s, bft2timer, bft4timer, f, local_address, wal_path);
+        let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, f, local_address, wal_path);
         engine.load_wal_log();
 
         let _main_thread = thread::Builder::new()
@@ -272,8 +272,8 @@ where
     }
 
     fn initialize(
-        r: Receiver<BftMsg>,
         s: Sender<BftMsg>,
+        r: Receiver<BftMsg>,
         ts: Sender<TimeoutInfo>,
         tn: Receiver<TimeoutInfo>,
         f: T,

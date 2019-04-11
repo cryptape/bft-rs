@@ -13,7 +13,7 @@ impl BftActuator {
     /// A function to create a new Bft actuator.
     pub fn new<T: BftSupport + Clone + Send + 'static>(support: T, address: Address, wal_path: &str) -> Self {
         let (sender, internal_receiver) = unbounded();
-        Bft::start(internal_receiver, sender.clone(), support, address, wal_path);
+        Bft::start(sender.clone(), internal_receiver, support, address, wal_path);
         BftActuator(sender)
     }
 
