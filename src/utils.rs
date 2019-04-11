@@ -296,7 +296,7 @@ impl<T> Bft<T>
                     return Err(BftError::CheckBlockFailed);
                 }
 
-                let function = self.function.clone();
+                let mut function = self.function.clone();
                 let sender = self.msg_sender.clone();
                 let height = self.height;
                 cross_thread::scope(|s|{
