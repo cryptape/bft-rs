@@ -407,7 +407,7 @@ pub trait BftSupport {
     fn check_block(&self, block: &[u8], height: u64) -> bool;
     /// A function to check signature.
     #[cfg(feature = "verify_req")]
-    fn check_transaction(&mut self, block: &[u8], height: u64) -> bool;
+    fn check_transaction(&mut self, block: &[u8], height: u64, round: u64) -> bool;
     /// A funciton to transmit messages.
     fn transmit(&self, msg: BftMsg);
     /// A function to commit the proposal.

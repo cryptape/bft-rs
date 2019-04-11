@@ -299,9 +299,10 @@ impl<T> Bft<T>
                 let mut function = self.function.clone();
                 let sender = self.msg_sender.clone();
                 let height = self.height;
+                let round = self.round;
                 cross_thread::scope(|s|{
                     s.spawn(move |_|{
-                        let is_pass = function.check_transaction(block, height);
+                        let is_pass = function.check_transaction(block, height, round);
                         let block_hash = function.crypt_hash(block);
                         let verify_resp = VerifyResp{is_pass, block_hash};
                         sender.send(BftMsg::VerifyResp(verify_resp)).unwrap();
