@@ -53,7 +53,23 @@ pub type Signature = Vec<u8>;
 
 pub type BftResult<T> = ::std::result::Result<T, BftError>;
 
-pub type BftActuator<T> = Bft<T>;
+pub struct BftActuator (Sender<BftMsg>);
+
+impl BftActuator {
+    /// A function to create a new Bft actuator.
+    pub fn new<T: BftSupport + 'static>(support: T, address: Address, wal_path: &str) -> Self {
+        let (sender, internal_receiver) = unbounded();
+        Bft::start(sender.clone(), internal_receiver, support, address, wal_path);
+        BftActuator(sender)
+    }
+
+    /// A function to create a new Bft actuator.
+    pub fn send(&self, msg: BftMsg) -> BftResult<()> {
+        self.0
+            .send(msg)
+            .map_err(|_| BftError::SendMsgErr)
+    }
+}
 
 #[derive(Debug)]
 pub enum BftMsg {
