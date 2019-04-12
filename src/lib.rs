@@ -82,7 +82,7 @@ pub enum BftMsg {
     Feed(Feed),
     Pause,
     Start,
-    Snapshot(Snapshot),
+    Clear,
 }
 
 #[cfg(feature = "verify_req")]
@@ -278,11 +278,6 @@ impl Decodable for VerifyResp {
             _ => Err(DecoderError::RlpInconsistentLengthAndData)
         }
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Snapshot {
-    pub proof: Proof,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

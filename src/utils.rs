@@ -17,7 +17,7 @@ impl<T> Bft<T>
     where
         T: BftSupport + 'static,
 {
-    pub(crate) fn reset(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.height = INIT_HEIGHT;
         self.round = INIT_ROUND;
         self.step = Step::default();

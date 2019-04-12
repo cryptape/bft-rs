@@ -194,10 +194,8 @@ where
 
             BftMsg::Start => self.consensus_power = true,
 
-            BftMsg::Snapshot(snap_shot) => {
-                self.reset();
-                self.height = snap_shot.proof.height;
-                self.proof = Some(snap_shot.proof);
+            BftMsg::Clear => {
+                self.clear();
             }
         }
 
