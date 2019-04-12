@@ -24,6 +24,7 @@ use crate::{
 use rlp::{Encodable, Decodable, DecoderError, Prototype, Rlp, RlpStream};
 use std::collections::HashMap;
 use std::hash::{Hash as Hashable, Hasher};
+use crossbeam::crossbeam_channel::{unbounded, Sender};
 
 /// BFT state machine.
 pub mod algorithm;
