@@ -15,7 +15,7 @@ use std::time::Instant;
 
 impl<T> Bft<T>
     where
-        T: BftSupport + Clone + Send + 'static,
+        T: BftSupport + 'static,
 {
     pub(crate) fn reset(&mut self) {
         self.height = INIT_HEIGHT;

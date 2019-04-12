@@ -14,6 +14,7 @@ use crossbeam_utils::thread as cross_thread;
 use std::collections::HashMap;
 use std::thread;
 use std::time::{Duration, Instant};
+use std::sync::Arc;
 
 pub(crate) const INIT_HEIGHT: u64 = 0;
 pub(crate) const INIT_ROUND: u64 = 0;
@@ -53,13 +54,13 @@ pub struct Bft<T: BftSupport> {
     pub(crate) votes: VoteCollector,
     pub(crate) wal_log: Wal,
     // user define
-    pub(crate) function: T,
+    pub(crate) function: Arc<T>,
     pub(crate) consensus_power: bool,
 }
 
 impl<T> Bft<T>
 where
-    T: BftSupport + Clone + Send + 'static,
+    T: BftSupport + 'static,
 {
     /// A function to start a BFT state machine.
     pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, f: T, local_address: Address, wal_path: &str) {
@@ -304,7 +305,7 @@ where
             proposals: ProposalCollector::new(),
             votes: VoteCollector::new(),
             wal_log: Wal::new(wal_path).unwrap(),
-            function: f,
+            function: Arc::new(f),
             consensus_power: false,
         }
     }
