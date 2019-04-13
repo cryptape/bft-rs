@@ -222,7 +222,7 @@ impl<T> Bft<T>
 
     pub(crate) fn check_and_save_status(&mut self, status: &Status, need_wal: bool) -> BftResult<()> {
         let height = status.height;
-        if height < self.height - 1 {
+        if self.height > 0 && height < self.height - 1 {
             warn!("The height of rich_status is {} which is obsolete compared to self.height {}!", height, self.height);
             return Err(BftError::ObsoleteMsg);
         }
