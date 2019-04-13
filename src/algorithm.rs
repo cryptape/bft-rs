@@ -84,6 +84,7 @@ where
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
             .spawn(move || {
+                info!("bft_actuator start running!");
                 loop {
                     let mut get_timer_msg = Err(RecvError);
                     let mut get_msg = Err(RecvError);
@@ -113,6 +114,7 @@ where
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
                     let signed_proposal: SignedProposal = rlp::decode(&encode).or(Err(BftError::DecodeErr))?;
+                    trace!("receive signed_proposal {:?}", &signed_proposal);
                     self.check_and_save_proposal(&signed_proposal, true)?;
 
                     let proposal = signed_proposal.proposal;
@@ -134,6 +136,7 @@ where
             BftMsg::Vote(encode) => {
                 if self.consensus_power {
                     let signed_vote: SignedVote = rlp::decode(&encode).or(Err(BftError::DecodeErr))?;
+                    trace!("receive signed_vote {:?}", &signed_vote);
                     self.check_and_save_vote(&signed_vote, true)?;
 
                     let vote = signed_vote.vote;
@@ -159,6 +162,7 @@ where
             }
 
             BftMsg::Feed(feed) => {
+                trace!("receive feed {:?}", &feed);
                 self.check_and_save_feed(feed, true)?;
 
                 if self.step == Step::ProposeWait {
@@ -167,6 +171,7 @@ where
             }
 
             BftMsg::Status(status) => {
+                trace!("receive status {:?}", &status);
                 self.check_and_save_status(&status, true)?;
 
                 if self.try_handle_status(status) {
@@ -176,6 +181,7 @@ where
 
             #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
+                trace!("receive verify_resp {:?}", &verify_resp);
                 self.check_and_save_verify_resp(&verify_resp, true)?;
 
                 if self.step == Step::VerifyWait {
