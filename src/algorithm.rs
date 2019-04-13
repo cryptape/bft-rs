@@ -436,7 +436,7 @@ where
 
     fn try_handle_status(&mut self, status: Status) -> bool {
         // commit timeout since pub block to chain,so resending the block
-        if status.height == self.height - 1 && self.step >= Step::Commit {
+        if self.height > 0 && status.height == self.height - 1 && self.step >= Step::Commit {
             self.handle_commit();
         }
 
