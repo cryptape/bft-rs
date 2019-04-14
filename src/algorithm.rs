@@ -283,7 +283,8 @@ where
         local_address: Hash,
         wal_path: &str,
     ) -> Self {
-        info!("BFT State Machine Launched.");
+        info!("Initialize Bft State Machine.");
+        info!("Address: {:?}, wal_path: {}", local_address, wal_path);
         Bft {
             msg_sender: s,
             msg_receiver: r,
@@ -450,14 +451,15 @@ where
             // goto new height directly and update authorty list
 
             self.authority_manage.receive_authorities_list(status.height, &status.authority_list);
+            trace!("The updated authority_manage is {:?}", self.authority_manage);
 
             if self.consensus_power &&
                 !status.authority_list.iter().any(|node| node.address == self.params.address) {
-                info!("Cita-bft loses consensus power in height {} and stops the bft-rs process!", status.height);
+                info!("Bft loses consensus power in height {} and stops the bft-rs process!", status.height);
                 self.consensus_power = false;
             } else if !self.consensus_power
                 && status.authority_list.iter().any(|node| node.address == self.params.address) {
-                info!("Cita-bft accesses consensus power in height {} and starts the bft-rs process!", status.height);
+                info!("Bft accesses consensus power in height {} and starts the bft-rs process!", status.height);
                 self.consensus_power = true;
             }
 
@@ -742,6 +744,7 @@ where
         let nonce = self.height + self.round;
         let weight: Vec<u64> = authorities.iter().map(|node| node.proposal_weight as u64).collect();
         let proposer: &Address = &authorities.get(get_proposer(nonce, &weight)).unwrap().address;
+        trace!("The proposer of ({},{}) is {:?}", self.height, self.round, proposer);
         if self.params.address == *proposer {
             info!(
                 "Become proposer at height {:?}, round {:?}",

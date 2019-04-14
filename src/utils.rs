@@ -43,34 +43,34 @@ impl<T> Bft<T>
 
     pub(crate) fn load_wal_log(&mut self) {
         // TODO: should prevent saving wal
-        info!("Cita-bft starts to load wal log!");
+        info!("Bft starts to load wal log!");
         let vec_buf = self.wal_log.load();
         for (log_type, msg) in vec_buf {
             match log_type {
                 LogType::Proposal => {
-                    info!("Cita-bft loads proposal!");
+                    info!("Load proposal!");
                     self.send_bft_msg(BftMsg::Proposal(msg));
                 }
                 LogType::Vote => {
-                    info!("Cita-bft loads vote message!");
+                    info!("Load vote message!");
                     self.send_bft_msg(BftMsg::Vote(msg));
                 }
                 LogType::Feed => {
-                    info!("Cita-bft loads feed message!");
+                    info!("Load feed message!");
                     self.send_bft_msg(BftMsg::Feed(rlp::decode(&msg).unwrap()));
                 }
                 LogType::Status => {
-                    info!("Cita-bft loads status message!");
+                    info!("Load status message!");
                     self.send_bft_msg(BftMsg::Status(rlp::decode(&msg).unwrap()));
                 }
                 #[cfg(feature = "verify_req")]
                 LogType::VerifyResp => {
-                    info!("Cita-bft loads verify_resp message!");
+                    info!("Load verify_resp message!");
                     self.send_bft_msg(BftMsg::VerifyResp(rlp::decode(&msg).unwrap()));
                 }
             }
         }
-        info!("Cita-bft successfully processes the whole wal log!");
+        info!("Bft successfully processes the whole wal log!");
     }
 
     pub(crate) fn build_signed_vote(&self, vote: &Vote) -> SignedVote{
@@ -329,7 +329,7 @@ impl<T> Bft<T>
         }
 
         if self.proof.is_none() || self.proof.iter().next().unwrap().height != height - 1 {
-            info!("Cita-bft sets self.proof from received signed_proposal!");
+            info!("Bft sets self.proof from received signed_proposal!");
             self.proof = Some(proof.clone());
         }
 
@@ -430,7 +430,7 @@ impl<T> Bft<T>
         let p = &self.authority_manage;
         let mut authorities = &p.authorities;
         if height == p.authority_h_old {
-            info!("Cita-bft sets the authority manage with old authorities!");
+            info!("Bft sets the authority manage with old authorities!");
             authorities = &p.authorities_old;
         }
 
@@ -462,7 +462,7 @@ impl<T> Bft<T>
         let p = &self.authority_manage;
         let mut authorities = &p.authorities;
         if height == p.authority_h_old {
-            info!("Cita-bft sets the authority manage with old authorities!");
+            info!("Bft sets the authority manage with old authorities!");
             authorities = &p.authorities_old;
         }
         if authorities.len() == 0 {
@@ -488,7 +488,7 @@ impl<T> Bft<T>
         let p = &self.authority_manage;
         let mut authorities = &p.authorities;
         if height == p.authority_h_old {
-            info!("Cita-bft sets the authority manage with old authorities!");
+            info!("Bft sets the authority manage with old authorities!");
             authorities = &p.authorities_old;
         }
 

@@ -2,6 +2,7 @@ use rand_core::{RngCore, SeedableRng};
 use rand_pcg::Pcg64Mcg as Pcg;
 
 pub(crate) fn get_proposer(seed: u64, weight: &[u64]) -> usize {
+
     let sum: u64 = weight.iter().sum();
     let x = u64::max_value() / sum;
 
@@ -14,6 +15,7 @@ pub(crate) fn get_proposer(seed: u64, weight: &[u64]) -> usize {
     for (index, w) in weight.iter().enumerate() {
         acc += *w;
         if res < acc * x {
+            trace!("randomly choose index: {}", index);
             return index;
         }
     }
