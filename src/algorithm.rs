@@ -700,6 +700,7 @@ where
                 s.spawn(move |_|{
                     if let Some(block) = function.get_block(height){
                         let feed = Feed{height, block};
+                        trace!("transfer {:?}", feed);
                         sender.send(BftMsg::Feed(feed)).unwrap();
                     }
                 });
