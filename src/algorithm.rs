@@ -303,7 +303,7 @@ where
             params: BftParams::new(local_address),
             feeds: HashMap::new(),
             verify_results: HashMap::new(),
-            proof: None,
+            proof: Some(Proof::default()),
             authority_manage: AuthorityManage::new(),
             proposals: ProposalCollector::new(),
             votes: VoteCollector::new(),
