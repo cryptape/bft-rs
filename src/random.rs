@@ -15,7 +15,7 @@ pub(crate) fn get_proposer(seed: u64, weight: &[u64]) -> usize {
     for (index, w) in weight.iter().enumerate() {
         acc += *w;
         if res < acc * x {
-            trace!("randomly choose index: {}", index);
+            info!("randomly choose index: {}", index);
             return index;
         }
     }

@@ -114,7 +114,7 @@ where
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
                     let signed_proposal: SignedProposal = rlp::decode(&encode).or(Err(BftError::DecodeErr))?;
-                    trace!("receive signed_proposal {:?}", &signed_proposal);
+                    info!("receive signed_proposal {:?}", &signed_proposal);
                     self.check_and_save_proposal(&signed_proposal, true)?;
 
                     let proposal = signed_proposal.proposal;
@@ -136,7 +136,7 @@ where
             BftMsg::Vote(encode) => {
                 if self.consensus_power {
                     let signed_vote: SignedVote = rlp::decode(&encode).or(Err(BftError::DecodeErr))?;
-                    trace!("receive signed_vote {:?}", &signed_vote);
+                    info!("receive signed_vote {:?}", &signed_vote);
                     self.check_and_save_vote(&signed_vote, true)?;
 
                     let vote = signed_vote.vote;
@@ -162,7 +162,7 @@ where
             }
 
             BftMsg::Feed(feed) => {
-                trace!("receive feed {:?}", &feed);
+                info!("receive feed {:?}", &feed);
                 self.check_and_save_feed(feed, true)?;
 
                 if self.step == Step::ProposeWait {
@@ -171,7 +171,7 @@ where
             }
 
             BftMsg::Status(status) => {
-                trace!("receive status {:?}", &status);
+                info!("receive status {:?}", &status);
                 self.check_and_save_status(&status, true)?;
 
                 if self.try_handle_status(status) {
@@ -181,7 +181,7 @@ where
 
             #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
-                trace!("receive verify_resp {:?}", &verify_resp);
+                info!("receive verify_resp {:?}", &verify_resp);
                 self.check_and_save_verify_resp(&verify_resp, true)?;
 
                 if self.step == Step::VerifyWait {
@@ -451,7 +451,7 @@ where
             // goto new height directly and update authorty list
 
             self.authority_manage.receive_authorities_list(status.height, &status.authority_list);
-            trace!("The updated authority_manage is {:?}", self.authority_manage);
+            info!("The updated authority_manage is {:?}", self.authority_manage);
 
             if self.consensus_power &&
                 !status.authority_list.iter().any(|node| node.address == self.params.address) {
@@ -503,7 +503,7 @@ where
 
         let msg = if self.lock_status.is_some() {
             // if is locked, boradcast the lock proposal
-            trace!(
+            info!(
                 "Proposal at height {:?}, round {:?}, is {:?}",
                 self.height,
                 self.round,
@@ -540,7 +540,7 @@ where
             let block = self.feeds.get(&self.height).unwrap().clone();
             let block_hash = self.function.crypt_hash(&block);
             self.block_hash = Some(block_hash.clone());
-            trace!(
+            info!(
                 "Proposal at height {:?}, round {:?}, is {:?}",
                 self.height,
                 self.round,
@@ -584,7 +584,7 @@ where
             Vec::new()
         };
 
-        trace!(
+        info!(
             "Transmit prevote at height {:?}, round {:?}",
             self.height,
             self.round
@@ -620,7 +620,7 @@ where
             Vec::new()
         };
 
-        trace!(
+        info!(
             "Transmit precommit at height {:?}, round {:?}",
             self.height,
             self.round
@@ -700,7 +700,7 @@ where
                 s.spawn(move |_|{
                     if let Some(block) = function.get_block(height){
                         let feed = Feed{height, block};
-                        trace!("transfer {:?}", feed);
+                        info!("transfer {:?}", feed);
                         sender.send(BftMsg::Feed(feed)).unwrap();
                     }
                 });
@@ -730,7 +730,7 @@ where
 
     #[inline]
     fn goto_next_round(&mut self) {
-        trace!("Goto next round {:?}", self.round + 1);
+        info!("Goto next round {:?}", self.round + 1);
         self.round_filter.clear();
         self.round += 1;
     }
@@ -745,7 +745,7 @@ where
         let nonce = self.height + self.round;
         let weight: Vec<u64> = authorities.iter().map(|node| node.proposal_weight as u64).collect();
         let proposer: &Address = &authorities.get(get_proposer(nonce, &weight)).unwrap().address;
-        trace!("The proposer of ({},{}) is {:?}", self.height, self.round, proposer);
+        info!("The proposer of ({},{}) is {:?}", self.height, self.round, proposer);
         if self.params.address == *proposer {
             info!(
                 "Become proposer at height {:?}, round {:?}",
@@ -872,7 +872,7 @@ where
 
     #[inline]
     fn set_timer(&self, duration: Duration, step: Step) {
-        trace!("Set {:?} timer for {:?}", step, duration);
+        info!("Set {:?} timer for {:?}", step, duration);
         self.timer_seter
             .send(TimeoutInfo {
                 timeval: Instant::now() + duration,
@@ -919,7 +919,7 @@ where
                     {
                         if hash.is_empty() {
                             // receive +2/3 prevote to nil, clean lock info
-                            trace!(
+                            info!(
                                 "Receive over 2/3 prevote to nil at height {:?}, round {:?}",
                                 self.height,
                                 self.round
@@ -1026,7 +1026,7 @@ where
     fn clean_polc(&mut self) {
         self.block_hash = None;
         self.lock_status = None;
-        trace!(
+        info!(
             "Clean PoLC at height {:?}, round {:?}",
             self.height,
             self.round
