@@ -450,7 +450,7 @@ where
             }
             // goto new height directly and update authorty list
 
-            self.authority_manage.receive_authorities_list(status.height, &status.authority_list);
+            self.authority_manage.receive_authorities_list(status.height, status.authority_list.clone());
             info!("The updated authority_manage is {:?}", self.authority_manage);
 
             if self.consensus_power &&

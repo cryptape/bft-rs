@@ -280,7 +280,7 @@ impl Decodable for VerifyResp {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node {
     ///
     pub address: Address,

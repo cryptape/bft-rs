@@ -226,8 +226,9 @@ impl AuthorityManage {
     pub(crate) fn receive_authorities_list(
         &mut self,
         height: u64,
-        authorities: &[Node],
+        mut authorities: Vec<Node>,
     ) {
+        authorities.sort();
         if self.authorities != authorities {
             self.authorities_old.clear();
             self.authorities_old.extend_from_slice(&self.authorities);

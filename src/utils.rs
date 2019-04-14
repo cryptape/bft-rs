@@ -247,13 +247,13 @@ impl<T> Bft<T>
 
     pub(crate) fn check_and_save_feed(&mut self, feed: Feed, need_wal: bool) -> BftResult<()> {
         let height = feed.height;
-        if self.height != 0 && height < self.height - 1 {
+        if height < self.height {
             warn!("the height of block_txs is {}, while self.height is {}", height, self.height);
             return Err(BftError::ObsoleteMsg);
         }
         if need_wal {
             let msg: Vec<u8> = rlp::encode(&feed);
-            self.wal_log.save(height + 1, LogType::Feed, &msg).or(Err(BftError::SaveWalErr))?;
+            self.wal_log.save(height, LogType::Feed, &msg).or(Err(BftError::SaveWalErr))?;
         }
 
         let block_hash = self.function.crypt_hash(&feed.block);
@@ -261,7 +261,7 @@ impl<T> Bft<T>
 
         self.feeds.insert(height, feed.block);
 
-        if height > self.height - 1{
+        if height > self.height{
             return Err(BftError::HigherMsg);
         }
         Ok(())
