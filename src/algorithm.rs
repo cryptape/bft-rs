@@ -571,7 +571,7 @@ where
             "Transmit proposal at height {:?}, round {:?}",
             self.height, self.round
         );
-        self.send_bft_msg(msg);
+        self.function.transmit(msg);
         true
     }
 
@@ -603,8 +603,8 @@ where
         let _ = self.votes.add(&signed_vote, vote_weight, self.height);
 
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
-        self.send_bft_msg(msg);
-        debug!("Prevote to {:?}", block_hash);
+        self.function.transmit(msg);
+        info!("Prevote to {:?}", block_hash);
 
         self.set_timer(
             self.params.timer.get_prevote() * TIMEOUT_RETRANSE_COEF,
@@ -639,7 +639,7 @@ where
         let _ = self.votes.add(&signed_vote, vote_weight, self.height);
 
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
-        self.send_bft_msg(msg);
+        self.function.transmit(msg);
         debug!("Precommit to {:?}", block_hash);
 
         self.set_timer(
@@ -669,7 +669,7 @@ where
         };
 
         let signed_prevote = self.build_signed_vote(&prevote);
-        self.send_bft_msg(BftMsg::Vote(rlp::encode(&signed_prevote)));
+        self.function.transmit(BftMsg::Vote(rlp::encode(&signed_prevote)));
 
         let precommit = Vote{
             vote_type: VoteType::Precommit,
@@ -679,7 +679,7 @@ where
             voter: self.params.address.clone(),
         };
         let signed_precommit = self.build_signed_vote(&precommit);
-        self.send_bft_msg(BftMsg::Vote(rlp::encode(&signed_precommit)));
+        self.function.transmit(BftMsg::Vote(rlp::encode(&signed_precommit)));
     }
 
     #[inline]
