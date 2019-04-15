@@ -511,8 +511,6 @@ where
             let lock_proposal = self.proposals.get_proposal(self.height, lock_round).unwrap();
 
             let block = lock_proposal.block;
-            let block_hash = self.function.crypt_hash(&block);
-            let signature = self.function.sign(&block_hash).unwrap();
 
             let proposal = Proposal{
                 height: self.height,
@@ -524,10 +522,9 @@ where
                 proposer: self.params.address.clone(),
             };
 
-            let signed_proposal = SignedProposal{
-                proposal,
-                signature,
-            };
+            self.proposals.add(&proposal);
+            let signed_proposal = self.build_signed_proposal(&proposal);
+
             BftMsg::Proposal(rlp::encode(&signed_proposal))
 
         } else {
@@ -546,14 +543,9 @@ where
                 lock_votes: Vec::new(),
                 proposer: self.params.address.clone(),
             };
-            let proposal_encode = rlp::encode(&proposal);
-            let proposal_hash = self.function.crypt_hash(&proposal_encode);
-            let signature = self.function.sign(&proposal_hash).unwrap();
 
-            let signed_proposal = SignedProposal{
-                proposal,
-                signature,
-            };
+            self.proposals.add(&proposal);
+            let signed_proposal = self.build_signed_proposal(&proposal);
 
             BftMsg::Proposal(rlp::encode(&signed_proposal))
         };

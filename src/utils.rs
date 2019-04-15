@@ -73,6 +73,17 @@ impl<T> Bft<T>
         info!("Bft successfully processes the whole wal log!");
     }
 
+    pub(crate) fn build_signed_proposal(&self, proposal: &Proposal) -> SignedProposal{
+        let encode = rlp::encode(proposal);
+        let hash = self.function.crypt_hash(&encode);
+        let signature = self.function.sign(&hash).unwrap();
+
+        SignedProposal{
+            proposal: proposal.clone(),
+            signature,
+        }
+    }
+
     pub(crate) fn build_signed_vote(&self, vote: &Vote) -> SignedVote{
         let encode =  rlp::encode(vote);
         let hash = self.function.crypt_hash(&encode);
