@@ -502,7 +502,7 @@ impl<T> Bft<T>
 
     #[inline]
     pub(crate) fn send_bft_msg(&self, msg: BftMsg) {
-        info!("send bft msg!");
+        info!("Bft sends bft msg!");
         self.msg_sender.send(msg).unwrap();
     }
 
