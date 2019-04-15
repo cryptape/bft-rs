@@ -410,14 +410,14 @@ where
         let lock_status = self.lock_status.clone().expect("No lock when commit!");
 
         let proof = self.generate_proof(lock_status.clone());
-        self.proof = Some(proof);
+        self.proof = Some(proof.clone());
 
         let proposal = self.proposals.get_proposal(self.height, self.round).unwrap();
 
         let commit = Commit{
             height: self.height,
             block: proposal.block.clone(),
-            proof: proposal.proof,
+            proof,
             address: self.params.address.clone(),
         };
 
