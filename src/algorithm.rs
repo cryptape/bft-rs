@@ -522,9 +522,7 @@ where
                 proposer: self.params.address.clone(),
             };
 
-            self.proposals.add(&proposal);
             let signed_proposal = self.build_signed_proposal(&proposal);
-
             BftMsg::Proposal(rlp::encode(&signed_proposal))
 
         } else {
@@ -544,16 +542,15 @@ where
                 proposer: self.params.address.clone(),
             };
 
-            self.proposals.add(&proposal);
             let signed_proposal = self.build_signed_proposal(&proposal);
-
             BftMsg::Proposal(rlp::encode(&signed_proposal))
         };
         info!(
             "Bft transmits proposal at height {:?}, round {:?}",
             self.height, self.round
         );
-        self.function.transmit(msg);
+        self.function.transmit(msg.clone());
+        self.send_bft_msg(msg);
         true
     }
 

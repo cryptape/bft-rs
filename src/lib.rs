@@ -72,7 +72,7 @@ impl BftActuator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BftMsg {
     Proposal(Vec<u8>),
     Vote(Vec<u8>),
