@@ -337,10 +337,10 @@ impl<T> Bft<T>
     }
 
     pub(crate) fn check_proof_only(&self, proof: &Proof, height: u64, authorities: &[Node]) -> bool {
-        if height == 0 {
+        if proof.height == 0 {
             return true;
         }
-        if height != proof.height {
+        if height != proof.height + 1 {
             return false;
         }
 
