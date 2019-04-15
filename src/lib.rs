@@ -435,10 +435,10 @@ pub trait BftSupport: Sync + Send {
 pub fn check_proof(proof: &Proof, height: u64, authorities: &[Node],
                    crypt_hash: fn(msg: &[u8]) -> Vec<u8>,
                    check_sig: fn(signature: &[u8], hash: &[u8]) -> Option<Address>) -> bool {
-    if height == 0 {
+    if proof.height == 0 {
         return true;
     }
-    if height != proof.height {
+    if height != proof.height + 1 {
         return false;
     }
 
