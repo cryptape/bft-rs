@@ -693,7 +693,7 @@ where
         }
         if self.is_proposer() {
 
-            if !new_round {
+            if new_round {
                 let function = self.function.clone();
                 let sender = self.msg_sender.clone();
                 let height = self.height;
