@@ -449,7 +449,7 @@ pub fn check_proof(proof: &Proof, height: u64, authorities: &[Node],
         .map(|node| node.vote_weight as u64).collect();
     let weight_sum: u64 = weight.iter().sum();
     let vote_sum: u64 = votes_weight.iter().sum();
-    if vote_sum * 3 > weight_sum * 2 {
+    if vote_sum * 3 <= weight_sum * 2 {
         return false;
     }
 

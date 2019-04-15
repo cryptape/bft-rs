@@ -159,7 +159,7 @@ impl<T> Bft<T>
         let round = proposal.round;
 
         if height < self.height - 1 {
-            warn!("The height of proposal is {} which is obsolete compared to self.height {}!", height, self.height);
+            info!("The height of proposal is {} which is obsolete compared to self.height {}!", height, self.height);
             return Err(BftError::ObsoleteMsg);
         }
 
@@ -170,6 +170,7 @@ impl<T> Bft<T>
         let proposal_hash = self.function.crypt_hash(&proposal_encode);
         let address = self.function.check_sig(&signed_proposal.signature, &proposal_hash).ok_or(BftError::CheckSigFailed)?;
         if proposal.proposer != address {
+            warn!("Bft expects proposer's address {:?} while get {:?} from check_sig", proposal.proposer, address);
             return Err(BftError::MismatchingProposer);
         }
 
@@ -352,6 +353,7 @@ impl<T> Bft<T>
             return true;
         }
         if height != proof.height + 1 {
+            error!("Bft check proof failed, the proof.height is {}", proof.height);
             return false;
         }
 
@@ -362,7 +364,8 @@ impl<T> Bft<T>
             .map(|node| node.vote_weight as u64).collect();
         let weight_sum: u64 = weight.iter().sum();
         let vote_sum: u64 = votes_weight.iter().sum();
-        if vote_sum * 3 > weight_sum * 2 {
+        if vote_sum * 3 <= weight_sum * 2 {
+            error!("Bft check proof failed, the votes:weight is {}:{}", vote_sum, weight_sum);
             return false;
         }
 
