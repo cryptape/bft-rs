@@ -166,7 +166,7 @@ where
                 self.check_and_save_feed(feed, true)?;
 
                 if self.step == Step::ProposeWait {
-                    self.new_round_start();
+                    self.new_round_start(false);
                 }
             }
 
@@ -175,7 +175,7 @@ where
                 self.check_and_save_status(&status, true)?;
 
                 if self.try_handle_status(status) {
-                    self.new_round_start();
+                    self.new_round_start(true);
                 }
             }
 
@@ -257,7 +257,7 @@ where
                 // receive +2/3 precommits however no proposal reach +2/3
                 // then goto next round directly
                 self.goto_next_round();
-                self.new_round_start();
+                self.new_round_start(true);
             }
 
             #[cfg(feature = "verify_req")]
@@ -396,7 +396,7 @@ where
                     self.block_hash = None;
                 }
                 self.goto_next_round();
-                self.new_round_start();
+                self.new_round_start(true);
             }
             PrecommitRes::Proposal => {
                 self.change_to_step(Step::Commit);
@@ -687,24 +687,26 @@ where
         self.step = step;
     }
 
-    fn new_round_start(&mut self) {
+    fn new_round_start(&mut self, new_round: bool) {
         if self.step != Step::ProposeWait {
             info!("Start height {:?}, round{:?}", self.height, self.round);
         }
         if self.is_proposer() {
 
-            let function = self.function.clone();
-            let sender = self.msg_sender.clone();
-            let height = self.height;
-            cross_thread::scope(|s|{
-                s.spawn(move |_|{
-                    if let Some(block) = function.get_block(height){
-                        let feed = Feed{height, block};
-                        info!("transfer {:?}", feed);
-                        sender.send(BftMsg::Feed(feed)).unwrap();
-                    }
-                });
-            }).unwrap();
+            if !new_round {
+                let function = self.function.clone();
+                let sender = self.msg_sender.clone();
+                let height = self.height;
+                cross_thread::scope(|s|{
+                    s.spawn(move |_|{
+                        if let Some(block) = function.get_block(height){
+                            let feed = Feed{height, block};
+                            info!("transfer {:?}", feed);
+                            sender.send(BftMsg::Feed(feed)).unwrap();
+                        }
+                    });
+                }).unwrap();
+            }
 
             if self.try_transmit_proposal() {
                 self.transmit_prevote();
