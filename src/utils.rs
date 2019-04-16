@@ -377,7 +377,7 @@ impl<T> Bft<T>
             if authorities.iter().any(|node| node.address == *voter) {
                 let vote = Vote{
                     vote_type: VoteType::Precommit,
-                    height,
+                    height: proof.height,
                     round: proof.round,
                     block_hash: proof.block_hash.clone(),
                     voter: voter.clone(),

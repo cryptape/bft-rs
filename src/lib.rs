@@ -459,7 +459,7 @@ pub fn check_proof(proof: &Proof, height: u64, authorities: &[Node],
         if authorities.iter().any(|node| node.address == *voter) {
             let vote = Vote{
                 vote_type: VoteType::Precommit,
-                height,
+                height: proof.height,
                 round: proof.round,
                 block_hash: proof.block_hash.clone(),
                 voter: voter.clone(),
