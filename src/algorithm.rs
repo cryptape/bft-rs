@@ -114,7 +114,7 @@ where
                 if self.consensus_power {
                     let signed_proposal: SignedProposal = rlp::decode(&encode).or(Err(BftError::DecodeErr))?;
                     info!("Bft receives signed_proposal {:?}", &signed_proposal);
-                    self.check_and_save_proposal(&signed_proposal, true)?;
+                    self.check_and_save_proposal(&signed_proposal, &encode, true)?;
 
                     let proposal = signed_proposal.proposal;
                     if self.step <= Step::ProposeWait {

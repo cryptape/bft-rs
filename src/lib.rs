@@ -424,7 +424,7 @@ pub trait BftSupport: Sync + Send {
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate transactions here.
     /// The [`proposal_hash`] is corresponding to the proposal of the [`proposal_hash`].
-    fn check_txs(&self, block: &[u8], proposal_hash: &[u8], height: u64, round: u64) -> bool;
+    fn check_txs(&self, block: &[u8], signed_proposal_hash: &[u8], height: u64, round: u64) -> bool;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,
     /// users do not have to care about the structure of Proposal and Vote.

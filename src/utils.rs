@@ -153,7 +153,7 @@ impl<T> Bft<T>
         self.verify_results.entry(block_hash.to_vec()).or_insert(is_pass);
     }
 
-    pub(crate) fn check_and_save_proposal(&mut self, signed_proposal: &SignedProposal, need_wal: bool) -> BftResult<()> {
+    pub(crate) fn check_and_save_proposal(&mut self, signed_proposal: &SignedProposal, encode: &[u8], need_wal: bool) -> BftResult<()> {
         let proposal = &signed_proposal.proposal;
         let height = proposal.height;
         let round = proposal.round;
@@ -186,7 +186,8 @@ impl<T> Bft<T>
             return Err(BftError::HigherMsg);
         }
 
-        self.check_block(block, &proposal_hash, height, round)?;
+        let signed_proposal_hash = self.function.crypt_hash(encode);
+        self.check_block(block, &signed_proposal_hash, height, round)?;
         self.check_proposer(height, round, &address)?;
 
         let block_hash = self.function.crypt_hash(block);
