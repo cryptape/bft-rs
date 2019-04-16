@@ -369,9 +369,11 @@ impl Encodable for Proof {
             .append(&self.height)
             .append(&self.round)
             .append(&self.block_hash);
+        let mut key_values: Vec<(Address, Vec<u8>)> = self.precommit_votes.clone().into_iter().collect();
+        key_values.sort();
         let mut key_list: Vec<Address> = vec![];
         let mut value_list: Vec<Vec<u8>> = vec![];
-        self.precommit_votes.iter().for_each(|(address, sig)| {
+        key_values.iter().for_each(|(address, sig)| {
             key_list.push(address.to_owned());
             value_list.push(sig.to_owned());
         });
