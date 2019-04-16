@@ -112,7 +112,6 @@ where
         match msg {
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
-                    info!("Bft receives signed_proposal_encode {:?}", &encode);
                     let signed_proposal: SignedProposal = rlp::decode(&encode).or(Err(BftError::DecodeErr))?;
                     trace!("Bft receives signed_proposal {:?}", &signed_proposal);
                     self.check_and_save_proposal(&signed_proposal, &encode, true)?;

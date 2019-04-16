@@ -187,7 +187,6 @@ impl<T> Bft<T>
         }
 
         let signed_proposal_hash = self.function.crypt_hash(encode);
-        info!("Bft calculates signed_proposal_hash {:?}", &signed_proposal_hash);
         self.check_block(block, &signed_proposal_hash, height, round)?;
         self.check_proposer(height, round, &address)?;
 
