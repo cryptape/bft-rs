@@ -106,7 +106,6 @@ impl<T> Bft<T>
     }
 
     pub(crate) fn generate_proof(&mut self, lock_status: LockStatus) -> Proof {
-        info!("Bft generate proof with lock_status {:?}", lock_status);
         let block_hash = lock_status.block_hash;
         let lock_votes = lock_status.votes;
         let precommit_votes: HashMap<Address, Signature> = lock_votes.into_iter().map(|signed_vote| (signed_vote.vote.voter, signed_vote.signature)).collect();
@@ -166,7 +165,6 @@ impl<T> Bft<T>
 
         let proposal_encode = rlp::encode(proposal);
         let proposal_hash = self.function.crypt_hash(&proposal_encode);
-        info!("Bft calculates proposal_hash {:?}", proposal_hash);
         let address = self.function.check_sig(&signed_proposal.signature, &proposal_hash).ok_or(BftError::CheckSigFailed)?;
         if proposal.proposer != address {
             warn!("Bft expects proposer's address {:?} while get {:?} from check_sig", proposal.proposer, address);
@@ -177,7 +175,6 @@ impl<T> Bft<T>
 
         // check_prehash should involved in check_block
         self.check_block(block, height)?;
-        info!("Bft check_block successed!");
         if need_wal {
             let encode: Vec<u8> = rlp::encode(signed_proposal);
             self.wal_log.save(height, LogType::Proposal, &encode).or(Err(BftError::SaveWalErr))?
@@ -190,18 +187,15 @@ impl<T> Bft<T>
         }
 
         self.check_proposer(height, round, &address)?;
-        info!("Bft check_proposer successed!");
 
         let block_hash = self.function.crypt_hash(block);
         self.check_lock_votes(proposal, &block_hash)?;
-        info!("Bft check_lock_votes successed!");
 
         if height < self.height {
             return Ok(());
         }
 
         self.check_proof(height, &proposal.proof)?;
-        info!("Bft check_proof successed!");
 
         Ok(())
     }
@@ -320,7 +314,6 @@ impl<T> Bft<T>
                         let is_pass = function.check_transaction(block, height, round);
                         let block_hash = function.crypt_hash(block);
                         let verify_resp = VerifyResp{is_pass, block_hash};
-                        info!("Bft send verifyResp {:?} in check_block", verify_resp);
                         sender.send(BftMsg::VerifyResp(verify_resp)).unwrap();
                     });
                 }).unwrap();
@@ -345,7 +338,6 @@ impl<T> Bft<T>
         }
 
         if self.proof.is_none() || self.proof.iter().next().unwrap().height != height - 1 {
-            info!("Bft sets self.proof from received signed_proposal!");
             self.proof = Some(proof.clone());
         }
 
@@ -384,7 +376,6 @@ impl<T> Bft<T>
                 };
                 let msg = rlp::encode(&vote);
                 if let Some(address) = self.function.check_sig(sig, &self.function.crypt_hash(&msg)) {
-                    info!("Bft check_proof_only get address {:?} while voter is {:?}", address, voter);
                     return address == *voter;
                 }
             }
@@ -521,7 +512,6 @@ impl<T> Bft<T>
 
     #[inline]
     pub(crate) fn send_bft_msg(&self, msg: BftMsg) {
-        info!("Bft sends bft msg!");
         self.msg_sender.send(msg).unwrap();
     }
 

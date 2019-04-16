@@ -282,7 +282,6 @@ where
         local_address: Hash,
         wal_path: &str,
     ) -> Self {
-        info!("Bft State Machine is initializing.");
         info!("Bft Address: {:?}, wal_path: {}", local_address, wal_path);
         Bft {
             msg_sender: s,
@@ -410,7 +409,6 @@ where
         let lock_status = self.lock_status.clone().expect("No lock when commit!");
 
         let proof = self.generate_proof(lock_status.clone());
-        info!("Bft generate proof {:?}", proof);
         self.proof = Some(proof.clone());
 
         let proposal = self.proposals.get_proposal(self.height, self.round).unwrap();
@@ -726,7 +724,6 @@ where
         let nonce = self.height + self.round;
         let weight: Vec<u64> = authorities.iter().map(|node| node.proposal_weight as u64).collect();
         let proposer: &Address = &authorities.get(get_proposer(nonce, &weight)).unwrap().address;
-        info!("Bft calculates the proposer of ({},{}) be {:?}", self.height, self.round, proposer);
         if self.params.address == *proposer {
             info!(
                 "Bft becomes proposer at height {:?}, round {:?}",
@@ -790,10 +787,6 @@ where
 
 
     fn set_proposal(&mut self, proposal: Proposal) {
-        info!(
-            "Bft handles a proposal at height {:?}, round {:?}, from {:?}",
-            self.height, proposal.round, proposal.proposer
-        );
         let block_hash = self.function.crypt_hash(&proposal.block);
 
         if proposal.lock_round.is_some()
