@@ -417,7 +417,7 @@ where
             height: self.height,
             block: proposal.block.clone(),
             proof,
-            address: self.params.address.clone(),
+            address: proposal.proposer.clone(),
         };
 
         self.function.commit(commit);
