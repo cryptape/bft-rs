@@ -163,9 +163,6 @@ impl<T> Bft<T>
             return Err(BftError::ObsoleteMsg);
         }
 
-        let block = &proposal.block;
-        let block_hash = self.function.crypt_hash(block);
-
         let proposal_encode = rlp::encode(proposal);
         let proposal_hash = self.function.crypt_hash(&proposal_encode);
         info!("Bft calculates proposal_hash {:?}", proposal_hash);
@@ -174,6 +171,8 @@ impl<T> Bft<T>
             warn!("Bft expects proposer's address {:?} while get {:?} from check_sig", proposal.proposer, address);
             return Err(BftError::MismatchingProposer);
         }
+
+        let block = &proposal.block;
 
         // check_prehash should involved in check_block
         self.check_block(block, height)?;
@@ -191,6 +190,8 @@ impl<T> Bft<T>
 
         self.check_proposer(height, round, &address)?;
         info!("Bft check_proposer successed!");
+
+        let block_hash = self.function.crypt_hash(block);
         self.check_lock_votes(proposal, &block_hash)?;
         info!("Bft check_lock_votes successed!");
 
