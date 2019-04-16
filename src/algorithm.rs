@@ -100,7 +100,7 @@ where
 
                     if let Ok(ok_msg) = get_msg {
                         if let Err(error) = engine.process(ok_msg){
-                            error!("Bft process encounters {:?}!", error);
+                            warn!("Bft process encounters {:?}!", error);
                         }
                     }
                 }
@@ -112,8 +112,9 @@ where
         match msg {
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
+                    info!("Bft receives signed_proposal_encode {:?}", &encode);
                     let signed_proposal: SignedProposal = rlp::decode(&encode).or(Err(BftError::DecodeErr))?;
-                    info!("Bft receives signed_proposal {:?}", &signed_proposal);
+                    trace!("Bft receives signed_proposal {:?}", &signed_proposal);
                     self.check_and_save_proposal(&signed_proposal, &encode, true)?;
 
                     let proposal = signed_proposal.proposal;
@@ -135,7 +136,7 @@ where
             BftMsg::Vote(encode) => {
                 if self.consensus_power {
                     let signed_vote: SignedVote = rlp::decode(&encode).or(Err(BftError::DecodeErr))?;
-                    info!("Bft receives signed_vote {:?}", &signed_vote);
+                    trace!("Bft receives signed_vote {:?}", &signed_vote);
                     self.check_and_save_vote(&signed_vote, true)?;
 
                     let vote = signed_vote.vote;
@@ -161,7 +162,7 @@ where
             }
 
             BftMsg::Feed(feed) => {
-                info!("Bft receives feed {:?}", &feed);
+                trace!("Bft receives feed {:?}", &feed);
                 self.check_and_save_feed(feed, true)?;
 
                 if self.step == Step::ProposeWait {
@@ -170,7 +171,7 @@ where
             }
 
             BftMsg::Status(status) => {
-                info!("Bft receives status {:?}", &status);
+                trace!("Bft receives status {:?}", &status);
                 self.check_and_save_status(&status, true)?;
 
                 if self.try_handle_status(status) {
@@ -180,7 +181,7 @@ where
 
             #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
-                info!("Bft receives verify_resp {:?}", &verify_resp);
+                trace!("Bft receives verify_resp {:?}", &verify_resp);
                 self.check_and_save_verify_resp(&verify_resp, true)?;
 
                 if self.step == Step::VerifyWait {
@@ -449,7 +450,7 @@ where
             // goto new height directly and update authorty list
 
             self.authority_manage.receive_authorities_list(status.height, status.authority_list.clone());
-            info!("Bft updates authority_manage {:?}", self.authority_manage);
+            trace!("Bft updates authority_manage {:?}", self.authority_manage);
 
             if self.consensus_power &&
                 !status.authority_list.iter().any(|node| node.address == self.params.address) {
@@ -618,7 +619,7 @@ where
 
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
         self.function.transmit(msg);
-        debug!("Bft precommits to {:?}", block_hash);
+        info!("Bft precommits to {:?}", block_hash);
 
         self.set_timer(
             self.params.timer.get_precommit() * TIMEOUT_RETRANSE_COEF,
@@ -633,7 +634,7 @@ where
             round
         );
 
-        debug!(
+        info!(
             "Bft retransmits votes to proposal {:?}",
             self.last_commit_block_hash.clone().unwrap()
         );

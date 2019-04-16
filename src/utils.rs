@@ -159,7 +159,7 @@ impl<T> Bft<T>
         let round = proposal.round;
 
         if height < self.height - 1 {
-            info!("The height of proposal is {} which is obsolete compared to self.height {}!", height, self.height);
+            trace!("The height of proposal is {} which is obsolete compared to self.height {}!", height, self.height);
             return Err(BftError::ObsoleteMsg);
         }
 
@@ -187,6 +187,7 @@ impl<T> Bft<T>
         }
 
         let signed_proposal_hash = self.function.crypt_hash(encode);
+        info!("Bft calculates signed_proposal_hash {:?}", &signed_proposal_hash);
         self.check_block(block, &signed_proposal_hash, height, round)?;
         self.check_proposer(height, round, &address)?;
 
@@ -207,7 +208,7 @@ impl<T> Bft<T>
         let height = vote.height;
         let round = vote.round;
         if height < self.height - 1 {
-            warn!("The height of raw_bytes is {} which is obsolete compared to self.height {}!", height, self.height);
+            trace!("The height of raw_bytes is {} which is obsolete compared to self.height {}!", height, self.height);
             return Err(BftError::ObsoleteMsg);
         }
 
@@ -240,7 +241,7 @@ impl<T> Bft<T>
     pub(crate) fn check_and_save_status(&mut self, status: &Status, need_wal: bool) -> BftResult<()> {
         let height = status.height;
         if self.height > 0 && height < self.height - 1 {
-            warn!("The height of rich_status is {} which is obsolete compared to self.height {}!", height, self.height);
+            trace!("The height of rich_status is {} which is obsolete compared to self.height {}!", height, self.height);
             return Err(BftError::ObsoleteMsg);
         }
         if need_wal {
@@ -265,7 +266,7 @@ impl<T> Bft<T>
     pub(crate) fn check_and_save_feed(&mut self, feed: Feed, need_wal: bool) -> BftResult<()> {
         let height = feed.height;
         if height < self.height {
-            warn!("the height of block_txs is {}, while self.height is {}", height, self.height);
+            trace!("the height of block_txs is {}, while self.height is {}", height, self.height);
             return Err(BftError::ObsoleteMsg);
         }
         if need_wal {
@@ -353,7 +354,7 @@ impl<T> Bft<T>
             return true;
         }
         if height != proof.height + 1 {
-            error!("Bft check proof failed, the proof.height is {}", proof.height);
+            warn!("Bft check proof failed, the proof.height is {}", proof.height);
             return false;
         }
 
@@ -365,7 +366,7 @@ impl<T> Bft<T>
         let weight_sum: u64 = weight.iter().sum();
         let vote_sum: u64 = votes_weight.iter().sum();
         if vote_sum * 3 <= weight_sum * 2 {
-            error!("Bft check proof failed, the votes:weight is {}:{}", vote_sum, weight_sum);
+            warn!("Bft check proof failed, the votes:weight is {}:{}", vote_sum, weight_sum);
             return false;
         }
 
@@ -437,20 +438,20 @@ impl<T> Bft<T>
         }
 
         if vote.block_hash != block_hash.to_vec() {
-            error!("The lock votes of proposal {:?} contains vote for other proposal hash {:?}!", block_hash, vote.block_hash);
+            warn!("The lock votes of proposal {:?} contains vote for other proposal hash {:?}!", block_hash, vote.block_hash);
             return Err(BftError::MismatchingVote);
         }
 
         let p = &self.authority_manage;
         let mut authorities = &p.authorities;
         if height == p.authority_h_old {
-            info!("Bft sets the authority manage with old authorities!");
+            trace!("Bft sets the authority manage with old authorities!");
             authorities = &p.authorities_old;
         }
 
         let voter = &vote.voter;
         if !authorities.iter().any(|node| &node.address == voter) {
-            error!("The lock votes contains vote with invalid voter {:?}!", voter);
+            warn!("The lock votes contains vote with invalid voter {:?}!", voter);
             return Err(BftError::InvalidVoter);
         }
 
@@ -459,7 +460,7 @@ impl<T> Bft<T>
         let vote_hash = self.function.crypt_hash(&vote_encode);
         let address = self.function.check_sig(signature, &vote_hash).ok_or(BftError::CheckSigFailed)?;
         if &address != voter {
-            error!("The address recovers from the signature is {:?} which is mismatching with the sender {:?}!", &address, &voter);
+            warn!("The address recovers from the signature is {:?} which is mismatching with the sender {:?}!", &address, &voter);
             return Err(BftError::MismatchingVoter);
         }
 
@@ -476,11 +477,11 @@ impl<T> Bft<T>
         let p = &self.authority_manage;
         let mut authorities = &p.authorities;
         if height == p.authority_h_old {
-            info!("Bft sets the authority manage with old authorities!");
+            trace!("Bft sets the authority manage with old authorities!");
             authorities = &p.authorities_old;
         }
         if authorities.len() == 0 {
-            error!("The authority manage is empty!");
+            warn!("The authority manage is empty!");
             return Err(BftError::EmptyAuthManage);
         }
         let nonce = height + round;
@@ -489,7 +490,7 @@ impl<T> Bft<T>
         if proposer == address {
             Ok(())
         } else {
-            error!("The proposer {:?} is invalid, while the rightful proposer is {:?}", address, proposer);
+            warn!("The proposer {:?} is invalid, while the rightful proposer is {:?}", address, proposer);
             Err(BftError::InvalidProposer)
         }
     }
@@ -502,12 +503,12 @@ impl<T> Bft<T>
         let p = &self.authority_manage;
         let mut authorities = &p.authorities;
         if height == p.authority_h_old {
-            info!("Bft sets the authority manage with old authorities!");
+            trace!("Bft sets the authority manage with old authorities!");
             authorities = &p.authorities_old;
         }
 
         if !authorities.iter().any(|node| node.address == *address) {
-            error!("The lock votes contains vote with invalid voter {:?}!", address);
+            warn!("The lock votes contains vote with invalid voter {:?}!", address);
             return Err(BftError::InvalidVoter);
         }
 
