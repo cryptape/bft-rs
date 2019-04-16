@@ -294,7 +294,7 @@ impl<T> Bft<T>
         #[cfg(not(feature = "verify_req"))]
             {
                 if self.function.check_block(block, height)
-                    && self.function.check_transaction(block, proposal_hash, height, round){
+                    && self.function.check_txs(block, proposal_hash, height, round){
                     self.save_verify_res(&block_hash, true);
                     Ok(())
                 } else {
@@ -314,7 +314,7 @@ impl<T> Bft<T>
                 let sender = self.msg_sender.clone();
                 cross_thread::scope(|s|{
                     s.spawn(move |_|{
-                        let is_pass = function.check_transaction(block, proposal_hash, height, round);
+                        let is_pass = function.check_txs(block, proposal_hash, height, round);
                         let block_hash = function.crypt_hash(block);
                         let verify_resp = VerifyResp{is_pass, block_hash};
                         sender.send(BftMsg::VerifyResp(verify_resp)).unwrap();
