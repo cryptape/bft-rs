@@ -106,6 +106,7 @@ impl<T> Bft<T>
     }
 
     pub(crate) fn generate_proof(&mut self, lock_status: LockStatus) -> Proof {
+        info!("Bft generate proof with lock_status {:?}", lock_status);
         let block_hash = lock_status.block_hash;
         let lock_votes = lock_status.votes;
         let precommit_votes: HashMap<Address, Signature> = lock_votes.into_iter().map(|signed_vote| (signed_vote.vote.voter, signed_vote.signature)).collect();
