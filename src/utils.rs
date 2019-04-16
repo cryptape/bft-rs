@@ -273,9 +273,6 @@ impl<T> Bft<T>
             self.wal_log.save(height, LogType::Feed, &msg).or(Err(BftError::SaveWalErr))?;
         }
 
-        let block_hash = self.function.crypt_hash(&feed.block);
-        self.save_verify_res(&block_hash, true);
-
         self.feeds.insert(height, feed.block);
 
         if height > self.height{

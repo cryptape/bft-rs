@@ -410,6 +410,7 @@ where
         let lock_status = self.lock_status.clone().expect("No lock when commit!");
 
         let proof = self.generate_proof(lock_status.clone());
+        info!("Bft generate proof {:?}", proof);
         self.proof = Some(proof.clone());
 
         let proposal = self.proposals.get_proposal(self.height, self.round).unwrap();
