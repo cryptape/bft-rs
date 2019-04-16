@@ -418,17 +418,13 @@ impl Decodable for Proof {
 pub trait BftSupport: Sync + Send {
     /// A user-defined function for block validation.
     /// Every block bft received will call this function, even if the feed block.
-    /// If users want to validate the whole block before bft consensus process,
-    /// he should validate not only block/transaction format, block header, but also transaction legality here.
-    /// If users want transaction validation in parallel with bft consensus process,
-    /// he should turn on verify_req feature, and validate block/transaction format, block headers here.
+    /// Users should validate block format, block headers here.
     fn check_block(&self, block: &[u8], height: u64) -> bool;
     /// A user-defined function for transaction validation.
     /// Every block bft received will call this function, even if the feed block.
-    /// Users should turn on verify_req feature and return the result.
-    /// The transaction validation is in parallel with bft consensus process.
-    #[cfg(feature = "verify_req")]
-    fn check_transaction(&self, block: &[u8], height: u64, round: u64) -> bool;
+    /// Users should validate transactions here.
+    /// The [`proposal_hash`] is corresponding to the proposal of the [`proposal_hash`].
+    fn check_transaction(&self, block: &[u8], proposal_hash: &[u8], height: u64, round: u64) -> bool;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,
     /// users do not have to care about the structure of Proposal and Vote.

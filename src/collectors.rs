@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use lru_cache::LruCache;
 
+pub(crate) const CACHE_N: usize = 16;
+
 /// BFT vote collector
 #[derive(Debug, Clone)]
 pub(crate) struct VoteCollector {
@@ -18,7 +20,7 @@ impl VoteCollector {
     /// A function to create a new BFT vote collector.
     pub(crate) fn new() -> Self {
         VoteCollector {
-            votes: LruCache::new(16),
+            votes: LruCache::new(CACHE_N),
             prevote_count: HashMap::new(),
         }
     }
@@ -106,7 +108,7 @@ impl RoundCollector {
     /// A function to create a new round collector.
     pub(crate) fn new() -> Self {
         RoundCollector {
-            round_votes: LruCache::new(16),
+            round_votes: LruCache::new(CACHE_N),
         }
     }
 
@@ -234,7 +236,7 @@ pub(crate) struct ProposalCollector {
 impl ProposalCollector {
     pub(crate) fn new() -> Self {
         ProposalCollector {
-            proposals: LruCache::new(16),
+            proposals: LruCache::new(CACHE_N),
         }
     }
 
@@ -269,7 +271,7 @@ pub(crate) struct ProposalRoundCollector {
 impl ProposalRoundCollector {
     pub(crate) fn new() -> Self {
         ProposalRoundCollector {
-            round_proposals: LruCache::new(16),
+            round_proposals: LruCache::new(CACHE_N),
         }
     }
 

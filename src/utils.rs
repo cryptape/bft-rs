@@ -1,7 +1,7 @@
 use crate::*;
 use crate::{
     algorithm::{Bft, INIT_HEIGHT, INIT_ROUND},
-    collectors::{ProposalCollector, VoteCollector, RoundCollector},
+    collectors::{ProposalCollector, VoteCollector, RoundCollector, CACHE_N},
     error::BftError,
     objects::*,
     random::get_proposer,
@@ -173,19 +173,20 @@ impl<T> Bft<T>
 
         let block = &proposal.block;
 
-        // check_prehash should involved in check_block
-        self.check_block(block, height)?;
-        if need_wal {
-            let encode: Vec<u8> = rlp::encode(signed_proposal);
-            self.wal_log.save(height, LogType::Proposal, &encode).or(Err(BftError::SaveWalErr))?
+        // prevent too many high proposals flush out current proposal
+        if height < self.height + CACHE_N as u64 && round < self.round + CACHE_N  as u64{
+            if need_wal {
+                let encode: Vec<u8> = rlp::encode(signed_proposal);
+                self.wal_log.save(height, LogType::Proposal, &encode).or(Err(BftError::SaveWalErr))?
+            }
+            self.proposals.add(&proposal);
         }
 
-        self.proposals.add(&proposal);
-
-        if height > self.height {
+        if height > self.height || round >= self.round + CACHE_N  as u64{
             return Err(BftError::HigherMsg);
         }
 
+        self.check_block(block, &proposal_hash, height, round)?;
         self.check_proposer(height, round, &address)?;
 
         let block_hash = self.function.crypt_hash(block);
@@ -203,6 +204,7 @@ impl<T> Bft<T>
     pub(crate) fn check_and_save_vote(&mut self, signed_vote: &SignedVote, need_wal: bool) -> BftResult<()> {
         let vote = &signed_vote.vote;
         let height = vote.height;
+        let round = vote.round;
         if height < self.height - 1 {
             warn!("The height of raw_bytes is {} which is obsolete compared to self.height {}!", height, self.height);
             return Err(BftError::ObsoleteMsg);
@@ -215,15 +217,17 @@ impl<T> Bft<T>
             return Err(BftError::MismatchingVoter);
         }
 
-        if need_wal {
-            let encode: Vec<u8> = rlp::encode(signed_vote);
-            self.wal_log.save(height, LogType::Vote, &encode).or(Err(BftError::SaveWalErr))?;
+        // prevent too many high proposals flush out current proposal
+        if height < self.height + CACHE_N as u64 && round < self.round + CACHE_N as u64{
+            if need_wal {
+                let encode: Vec<u8> = rlp::encode(signed_vote);
+                self.wal_log.save(height, LogType::Vote, &encode).or(Err(BftError::SaveWalErr))?;
+            }
+            let vote_weight = self.get_vote_weight(vote.height, &vote.voter);
+            self.votes.add(&signed_vote, vote_weight, self.height);
         }
 
-        let vote_weight = self.get_vote_weight(vote.height, &vote.voter);
-        self.votes.add(&signed_vote, vote_weight, self.height);
-
-        if height > self.height {
+        if height > self.height || round >= self.round + CACHE_N as u64 {
             return Err(BftError::HigherMsg);
         }
 
@@ -276,7 +280,7 @@ impl<T> Bft<T>
         Ok(())
     }
 
-    pub(crate) fn check_block(&mut self, block: &[u8], height: u64) -> BftResult<()> {
+    pub(crate) fn check_block(&mut self, block: &[u8], proposal_hash: &[u8], height: u64, round: u64) -> BftResult<()> {
         let block_hash = self.function.crypt_hash(block);
         // search cache first
         if let Some(verify_res) = self.verify_results.get(&block_hash) {
@@ -289,7 +293,8 @@ impl<T> Bft<T>
 
         #[cfg(not(feature = "verify_req"))]
             {
-                if self.function.check_block(block, height) {
+                if self.function.check_block(block, height)
+                    && self.function.check_transaction(block, proposal_hash, height, round){
                     self.save_verify_res(&block_hash, true);
                     Ok(())
                 } else {
@@ -307,11 +312,9 @@ impl<T> Bft<T>
 
                 let mut function = self.function.clone();
                 let sender = self.msg_sender.clone();
-                let height = self.height;
-                let round = self.round;
                 cross_thread::scope(|s|{
                     s.spawn(move |_|{
-                        let is_pass = function.check_transaction(block, height, round);
+                        let is_pass = function.check_transaction(block, proposal_hash, height, round);
                         let block_hash = function.crypt_hash(block);
                         let verify_resp = VerifyResp{is_pass, block_hash};
                         sender.send(BftMsg::VerifyResp(verify_resp)).unwrap();
