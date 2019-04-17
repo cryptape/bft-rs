@@ -317,6 +317,7 @@ where
                         self.set_status(&status);
                         self.goto_new_height(status.height + 1);
                         self.flush_cache();
+                        self.new_round_start(true);
                     }
                 }
             }
@@ -484,10 +485,6 @@ where
             self.goto_new_height(status.height + 1);
             self.flush_cache();
 
-            info!(
-                "Bft receives status, goto new height {:?}",
-                status.height + 1
-            );
             return true;
         }
         false
@@ -719,6 +716,8 @@ where
         self.height = new_height;
         self.round = 0;
         self.htime = Instant::now();
+
+        info!("Bft receives status, goto new height {:?}", new_height);
     }
 
     #[inline]
