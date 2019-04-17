@@ -399,6 +399,7 @@ impl Decodable for Proof {
                 let key_list: Vec<Address> = r.list_at(3)?;
                 let value_list: Vec<Signature> = r.list_at(4)?;
                 if key_list.len() != value_list.len() {
+                    error!("Bft decode proof error, key_list_len {}, value_list_len{}", key_list.len(), value_list.len());
                     return Err(DecoderError::RlpIncorrectListLen);
                 }
                 let precommit_votes: HashMap<_, _> = key_list.into_iter().zip(value_list.into_iter()).collect();
@@ -409,7 +410,10 @@ impl Decodable for Proof {
                     precommit_votes,
                 })
             }
-            _ => Err(DecoderError::RlpInconsistentLengthAndData)
+            _ => {
+                error!("Bft decode proof error, the prototype is {:?}", r.prototype());
+                Err(DecoderError::RlpInconsistentLengthAndData)
+            }
         }
     }
 }

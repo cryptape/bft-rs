@@ -343,14 +343,10 @@ impl<T> Bft<T>
             if self.last_commit_round.is_some() && vote.round >= self.last_commit_round.unwrap() {
                 // deal with height fall behind one, round ge last commit round
                 let voter = vote.voter.clone();
-                let (add_flag, trans_flag) = self.determine_height_filter(&voter);
+                let trans_flag = self.filter_height(&voter);
 
-                if add_flag {
-                    self.height_filter
-                        .entry(voter)
-                        .or_insert_with(Instant::now);
-                }
                 if trans_flag {
+                    self.height_filter.insert(voter, Instant::now());
                     self.retransmit_vote(vote.round);
                 }
             }
@@ -358,23 +354,11 @@ impl<T> Bft<T>
         } else if vote.height == self.height && self.round != 0 && vote.round == self.round - 1 {
             // deal with equal height, round fall behind
             let voter = vote.voter.clone();
-            let (add_flag, trans_flag) = self.determine_round_filter(&voter);
+            let trans_flag = self.filter_round(&voter);
 
-            if add_flag {
-                self.round_filter.entry(voter).or_insert_with(Instant::now);
-            }
             if trans_flag {
-                let precommit = Vote{
-                    vote_type: VoteType::Precommit,
-                    height: vote.height,
-                    round: vote.round,
-                    block_hash: Vec::new(),
-                    voter: self.params.address.clone(),
-                };
-                let signed_precommit = self.build_signed_vote(&precommit);
-
-                info!("Bft finds some nodes fall behind, and sends nil vote to help them pursue");
-                self.send_bft_msg(BftMsg::Vote(rlp::encode(&signed_precommit)));
+                self.round_filter.insert(voter, Instant::now());
+                self.retransmit_nil_precommit(&vote);
             }
             return false;
         } else if vote.height == self.height
@@ -660,6 +644,20 @@ impl<T> Bft<T>
         self.function.transmit(BftMsg::Vote(rlp::encode(&signed_precommit)));
     }
 
+    fn retransmit_nil_precommit(&self, vote: &Vote) {
+        let precommit = Vote{
+            vote_type: VoteType::Precommit,
+            height: vote.height,
+            round: vote.round,
+            block_hash: Vec::new(),
+            voter: self.params.address.clone(),
+        };
+        let signed_precommit = self.build_signed_vote(&precommit);
+
+        info!("Bft finds some nodes fall behind, and sends nil vote to help them pursue");
+        self.function.transmit(BftMsg::Vote(rlp::encode(&signed_precommit)));
+    }
+
     #[inline]
     fn change_to_step(&mut self, step: Step) {
         self.step = step;
@@ -746,8 +744,7 @@ impl<T> Bft<T>
         false
     }
 
-    fn determine_height_filter(&self, voter: &Address) -> (bool, bool) {
-        let mut add_flag = false;
+    fn filter_height(&self, voter: &Address) -> bool {
         let mut trans_flag = false;
 
         if let Some(ins) = self.height_filter.get(voter) {
@@ -758,15 +755,12 @@ impl<T> Bft<T>
                     trans_flag = true;
                 }
         } else {
-            // never recvive retransmit message from the address
-            add_flag = true;
             trans_flag = true;
         }
-        (add_flag, trans_flag)
+        trans_flag
     }
 
-    fn determine_round_filter(&self, voter: &Address) -> (bool, bool) {
-        let mut add_flag = false;
+    fn filter_round(&self, voter: &Address) -> bool {
         let mut trans_flag = false;
 
         if let Some(ins) = self.round_filter.get(voter) {
@@ -777,11 +771,9 @@ impl<T> Bft<T>
                     trans_flag = true;
                 }
         } else {
-            // never recvive retransmit message from the address
-            add_flag = true;
             trans_flag = true;
         }
-        (add_flag, trans_flag)
+        trans_flag
     }
 
 
