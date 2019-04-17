@@ -28,12 +28,13 @@ pub enum BftError {
 
     CheckBlockFailed,
 
+    CheckTxFailed,
+
     NoConsensusPower,
 
     CheckSigFailed,
 
-//    FailedToSign,
-
+    //    FailedToSign,
     MismatchingProposer,
 
     MismatchingVoter,
@@ -47,5 +48,4 @@ pub enum BftError {
     CheckProofFailed,
 
     VoteError,
-
 }
