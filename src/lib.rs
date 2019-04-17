@@ -77,7 +77,7 @@ pub enum BftMsg {
     Proposal(Vec<u8>),
     Vote(Vec<u8>),
     Status(Status),
-    #[cfg(feature = "verify_req")]
+    #[cfg(feature = "async_check_txs")]
     VerifyResp(VerifyResp),
     Feed(Feed),
     Pause,
@@ -85,7 +85,7 @@ pub enum BftMsg {
     Clear,
 }
 
-#[cfg(feature = "verify_req")]
+#[cfg(feature = "async_check_txs")]
 #[derive(Clone, Eq, PartialEq)]
 pub enum VerifyResult {
     Approved,
@@ -235,7 +235,7 @@ impl Decodable for Feed {
 }
 
 /// The verify result.
-#[cfg(feature = "verify_req")]
+#[cfg(feature = "async_check_txs")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerifyResp {
     /// the response of verification
@@ -244,7 +244,7 @@ pub struct VerifyResp {
     pub block_hash: Hash,
 }
 
-#[cfg(feature = "verify_req")]
+#[cfg(feature = "async_check_txs")]
 impl Default for VerifyResp {
     fn default() -> Self {
         VerifyResp {
@@ -254,7 +254,7 @@ impl Default for VerifyResp {
     }
 }
 
-#[cfg(feature = "verify_req")]
+#[cfg(feature = "async_check_txs")]
 impl Encodable for VerifyResp {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(2).append(&self.is_pass)
@@ -262,7 +262,7 @@ impl Encodable for VerifyResp {
     }
 }
 
-#[cfg(feature = "verify_req")]
+#[cfg(feature = "async_check_txs")]
 impl Decodable for VerifyResp {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
