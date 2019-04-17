@@ -40,12 +40,12 @@ impl VoteCollector {
                     .get_mut(&height)
                     .unwrap()
                     .add(signed_vote, vote_weight) && height == current_height
-                {
-                    // update prevote count hashmap
-                    let counter = self.prevote_count.entry(round).or_insert(0);
-                    *counter += vote_weight;
-                    true
-                } else {
+                    {
+                        // update prevote count hashmap
+                        let counter = self.prevote_count.entry(round).or_insert(0);
+                        *counter += vote_weight;
+                        true
+                    } else {
                     // if add prevote fail, do not update prevote hashmap
                     false
                 }

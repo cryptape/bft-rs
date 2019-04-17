@@ -252,7 +252,7 @@ pub(crate) enum Step {
     /// A step to wait for more prevote if none of them reach 2/3.
     PrevoteWait,
     /// A step to wait for proposal verify result.
-    #[cfg(feature = "async_check_txs")]
+    #[cfg(feature = "verify_req")]
     VerifyWait,
     /// A step to transmit precommit and check precommit count.
     Precommit,
@@ -304,7 +304,7 @@ pub(crate) enum LogType {
     Vote,
     Status,
     Feed,
-    #[cfg(feature = "async_check_txs")]
+    #[cfg(feature = "verify_req")]
     VerifyResp,
 }
 
@@ -315,7 +315,7 @@ impl From<u8> for LogType {
             1 => LogType::Vote,
             2 => LogType::Status,
             3 => LogType::Feed,
-            #[cfg(feature = "async_check_txs")]
+            #[cfg(feature = "verify_req")]
             4 => LogType::VerifyResp,
             _ => panic!("Invalid vote type!"),
         }
@@ -329,7 +329,7 @@ impl Into<u8> for LogType {
             LogType::Vote => 1,
             LogType::Status => 2,
             LogType::Feed => 3,
-            #[cfg(feature = "async_check_txs")]
+            #[cfg(feature = "verify_req")]
             LogType::VerifyResp => 4,
         }
     }
@@ -544,7 +544,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "async_check_txs")]
+    #[cfg(feature = "verify_req")]
     fn test_verify_resp_rlp() {
         let verify_resp = VerifyResp{
             is_pass: false,

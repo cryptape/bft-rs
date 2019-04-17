@@ -7,7 +7,7 @@ use crate::{
     random::get_proposer,
     wal::Wal,
 };
-#[cfg(feature = "async_check_txs")]
+#[cfg(feature = "verify_req")]
 use crossbeam_utils::thread as cross_thread;
 use std::collections::HashMap;
 use std::fs;
@@ -63,7 +63,7 @@ impl<T> Bft<T>
                     info!("Load status message!");
                     self.send_bft_msg(BftMsg::Status(rlp::decode(&msg).unwrap()));
                 }
-                #[cfg(feature = "async_check_txs")]
+                #[cfg(feature = "verify_req")]
                 LogType::VerifyResp => {
                     info!("Load verify_resp message!");
                     self.send_bft_msg(BftMsg::VerifyResp(rlp::decode(&msg).unwrap()));
@@ -251,7 +251,7 @@ impl<T> Bft<T>
         Ok(())
     }
 
-    #[cfg(feature = "async_check_txs")]
+    #[cfg(feature = "verify_req")]
     pub(crate) fn check_and_save_verify_resp(&mut self, verify_resp: &VerifyResp, need_wal: bool) -> BftResult<()> {
         if need_wal {
             let msg: Vec<u8> = rlp::encode(verify_resp);
@@ -292,7 +292,7 @@ impl<T> Bft<T>
             }
         }
 
-        #[cfg(not(feature = "async_check_txs"))]
+        #[cfg(not(feature = "verify_req"))]
             {
                 if self.function.check_block(block, height)
                     && self.function.check_txs(block, proposal_hash, height, round){
@@ -304,7 +304,7 @@ impl<T> Bft<T>
                 }
             }
 
-        #[cfg(feature = "async_check_txs")]
+        #[cfg(feature = "verify_req")]
             {
                 if !self.function.check_block(block, height) {
                     self.save_verify_res(&block_hash, false);

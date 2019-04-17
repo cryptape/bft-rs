@@ -31,5 +31,4 @@ env_logger = "0.6.0"
 
 [features]
 default = []
-async_check_txs = []
-machine_gun = []
+verify_req = []

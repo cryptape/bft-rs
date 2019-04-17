@@ -20,10 +20,10 @@ pub(crate) const INIT_HEIGHT: u64 = 0;
 pub(crate) const INIT_ROUND: u64 = 0;
 const PROPOSAL_TIMES_COEF: u64 = 10;
 const TIMEOUT_RETRANSE_COEF: u32 = 15;
-const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 100;
-const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 100;
+const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;
+const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
 
-#[cfg(feature = "async_check_txs")]
+#[cfg(feature = "verify_req")]
 const VERIFY_AWAIT_COEF: u32 = 50;
 
 /// BFT state message.
@@ -50,7 +50,6 @@ pub struct Bft<T: BftSupport> {
     pub(crate) feeds: HashMap<u64, Vec<u8>>,
     pub(crate) verify_results: HashMap<Hash, bool>,
     pub(crate) proof: Option<Proof>,
-    pub(crate) status: Option<Status>,
     pub(crate) proposals: ProposalCollector,
     pub(crate) votes: VoteCollector,
     pub(crate) wal_log: Wal,
@@ -60,48 +59,9 @@ pub struct Bft<T: BftSupport> {
 }
 
 impl<T> Bft<T>
-where
-    T: BftSupport + 'static,
+    where
+        T: BftSupport + 'static,
 {
-    fn initialize(
-        s: Sender<BftMsg>,
-        r: Receiver<BftMsg>,
-        ts: Sender<TimeoutInfo>,
-        tn: Receiver<TimeoutInfo>,
-        f: T,
-        local_address: Hash,
-        wal_path: &str,
-    ) -> Self {
-        info!("Bft Address: {:?}, wal_path: {}", local_address, wal_path);
-        Bft {
-            msg_sender: s,
-            msg_receiver: r,
-            timer_seter: ts,
-            timer_notity: tn,
-            height: INIT_HEIGHT,
-            round: INIT_ROUND,
-            step: Step::default(),
-            block_hash: None,
-            lock_status: None,
-            height_filter: HashMap::new(),
-            round_filter: HashMap::new(),
-            last_commit_round: None,
-            last_commit_block_hash: None,
-            htime: Instant::now(),
-            params: BftParams::new(local_address),
-            feeds: HashMap::new(),
-            verify_results: HashMap::new(),
-            proof: Some(Proof::default()),
-            status: None,
-            authority_manage: AuthorityManage::new(),
-            proposals: ProposalCollector::new(),
-            votes: VoteCollector::new(),
-            wal_log: Wal::new(wal_path).unwrap(),
-            function: Arc::new(f),
-            consensus_power: false,
-        }
-    }
-
     /// A function to start a BFT state machine.
     pub fn start(s: Sender<BftMsg>, r: Receiver<BftMsg>, f: T, local_address: Address, wal_path: &str) {
         // define message channel and timeout channel
@@ -218,7 +178,7 @@ where
                 }
             }
 
-            #[cfg(feature = "async_check_txs")]
+            #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
                 trace!("Bft receives verify_resp {:?}", &verify_resp);
                 self.check_and_save_verify_resp(&verify_resp, true)?;
@@ -276,14 +236,14 @@ where
                 }
                 // next do precommit
                 self.change_to_step(Step::Precommit);
-                #[cfg(feature = "async_check_txs")]
-                {
-                    let verify_result = self.check_verify();
-                    if verify_result == VerifyResult::Undetermined {
-                        self.change_to_step(Step::VerifyWait);
-                        return;
+                #[cfg(feature = "verify_req")]
+                    {
+                        let verify_result = self.check_verify();
+                        if verify_result == VerifyResult::Undetermined {
+                            self.change_to_step(Step::VerifyWait);
+                            return;
+                        }
                     }
-                }
 
                 self.transmit_precommit();
                 self.handle_precommit();
@@ -299,7 +259,7 @@ where
                 self.new_round_start(true);
             }
 
-            #[cfg(feature = "async_check_txs")]
+            #[cfg(feature = "verify_req")]
             Step::VerifyWait => {
                 // clean fsave info
                 self.clean_polc();
@@ -309,18 +269,45 @@ where
                 self.transmit_precommit();
                 self.handle_precommit();
             }
-
-            Step::CommitWait => {
-                if let Some(status) = self.status.clone() {
-                    if status.height == self.height {
-                        self.set_status(&status);
-                        self.goto_new_height(status.height + 1);
-                        self.flush_cache();
-                        self.new_round_start(true);
-                    }
-                }
-            }
             _ => error!("Invalid Timeout Info!"),
+        }
+    }
+
+    fn initialize(
+        s: Sender<BftMsg>,
+        r: Receiver<BftMsg>,
+        ts: Sender<TimeoutInfo>,
+        tn: Receiver<TimeoutInfo>,
+        f: T,
+        local_address: Hash,
+        wal_path: &str,
+    ) -> Self {
+        info!("Bft Address: {:?}, wal_path: {}", local_address, wal_path);
+        Bft {
+            msg_sender: s,
+            msg_receiver: r,
+            timer_seter: ts,
+            timer_notity: tn,
+            height: INIT_HEIGHT,
+            round: INIT_ROUND,
+            step: Step::default(),
+            block_hash: None,
+            lock_status: None,
+            height_filter: HashMap::new(),
+            round_filter: HashMap::new(),
+            last_commit_round: None,
+            last_commit_block_hash: None,
+            htime: Instant::now(),
+            params: BftParams::new(local_address),
+            feeds: HashMap::new(),
+            verify_results: HashMap::new(),
+            proof: Some(Proof::default()),
+            authority_manage: AuthorityManage::new(),
+            proposals: ProposalCollector::new(),
+            votes: VoteCollector::new(),
+            wal_log: Wal::new(wal_path).unwrap(),
+            function: Arc::new(f),
+            consensus_power: false,
         }
     }
 
@@ -412,7 +399,7 @@ where
             PrecommitRes::Proposal => {
                 self.change_to_step(Step::Commit);
                 self.handle_commit();
-//                self.change_to_step(Step::CommitWait);
+                self.change_to_step(Step::CommitWait);
             }
             _ => {}
         }
@@ -459,31 +446,34 @@ where
                 self.last_commit_block_hash = None;
                 self.last_commit_round = None;
             }
+            // goto new height directly and update authorty list
 
-            #[cfg(not(feature = "machine_gun"))]
-                {
-                    if status.height == self.height {
-                        let cost_time = Instant::now() - self.htime;
-                        let interval = self.params.timer.get_total_duration();
-                        let mut tv = Duration::new(0, 0);
-                        if cost_time < interval {
-                            tv = interval - cost_time;
-                        }
-                        self.status = Some(status.clone());
-                        self.change_to_step(Step::CommitWait);
-                        info!(
-                            "Bft receives status at h: {}, r: {}, cost time: {:?}",
-                            self.height, self.round, cost_time
-                        );
-                        self.set_timer(tv, Step::CommitWait);
-                        return false;
-                    }
-                }
+            self.authority_manage.receive_authorities_list(status.height, status.authority_list.clone());
+            trace!("Bft updates authority_manage {:?}", self.authority_manage);
 
-            self.set_status(&status);
+            if self.consensus_power &&
+                !status.authority_list.iter().any(|node| node.address == self.params.address) {
+                info!("Bft loses consensus power in height {} and stops the bft-rs process!", status.height);
+                self.consensus_power = false;
+            } else if !self.consensus_power
+                && status.authority_list.iter().any(|node| node.address == self.params.address) {
+                info!("Bft accesses consensus power in height {} and starts the bft-rs process!", status.height);
+                self.consensus_power = true;
+            }
+
+            if let Some(interval) = status.interval {
+                // update the bft interval
+                self.params.timer.set_total_duration(interval);
+            }
+
             self.goto_new_height(status.height + 1);
+
             self.flush_cache();
 
+            info!(
+                "Bft receives rich status, goto new height {:?}",
+                status.height + 1
+            );
             return true;
         }
         false
@@ -715,8 +705,6 @@ where
         self.height = new_height;
         self.round = 0;
         self.htime = Instant::now();
-
-        info!("Bft receives status, goto new height {:?}", new_height);
     }
 
     #[inline]
@@ -766,9 +754,9 @@ where
             // had received retransmit message from the address
             if (Instant::now() - *ins)
                 > self.params.timer.get_prevote() * TIMEOUT_LOW_HEIGHT_MESSAGE_COEF
-            {
-                trans_flag = true;
-            }
+                {
+                    trans_flag = true;
+                }
         } else {
             // never recvive retransmit message from the address
             add_flag = true;
@@ -785,9 +773,9 @@ where
             // had received retransmit message from the address
             if (Instant::now() - *ins)
                 > self.params.timer.get_prevote() * TIMEOUT_LOW_ROUND_MESSAGE_COEF
-            {
-                trans_flag = true;
-            }
+                {
+                    trans_flag = true;
+                }
         } else {
             // never recvive retransmit message from the address
             add_flag = true;
@@ -803,38 +791,38 @@ where
 
         if proposal.lock_round.is_some()
             && (self.lock_status.is_none()
-                || self.lock_status.clone().unwrap().round <= proposal.lock_round.unwrap())
-        {
-            // receive a proposal with a later PoLC
-            info!(
-                "Bft handles a proposal with the PoLC that proposal is {:?}, lock round is {:?}, lock votes are {:?}",
-                block_hash,
-                proposal.lock_round,
-                proposal.lock_votes
-            );
+            || self.lock_status.clone().unwrap().round <= proposal.lock_round.unwrap())
+            {
+                // receive a proposal with a later PoLC
+                info!(
+                    "Bft handles a proposal with the PoLC that proposal is {:?}, lock round is {:?}, lock votes are {:?}",
+                    block_hash,
+                    proposal.lock_round,
+                    proposal.lock_votes
+                );
 
-            if self.round < proposal.round {
-                self.round_filter.clear();
-                self.round = proposal.round;
-            }
+                if self.round < proposal.round {
+                    self.round_filter.clear();
+                    self.round = proposal.round;
+                }
 
-            self.block_hash = Some(block_hash.clone());
-            self.lock_status = Some(LockStatus {
-                block_hash,
-                round: proposal.lock_round.unwrap(),
-                votes: proposal.lock_votes,
-            });
-        } else if proposal.lock_round.is_none()
+                self.block_hash = Some(block_hash.clone());
+                self.lock_status = Some(LockStatus {
+                    block_hash,
+                    round: proposal.lock_round.unwrap(),
+                    votes: proposal.lock_votes,
+                });
+            } else if proposal.lock_round.is_none()
             && self.lock_status.is_none()
             && proposal.round == self.round
-        {
-            // receive a proposal without PoLC
-            info!(
-                "Bft handles a proposal without PoLC, the proposal is {:?}",
-                block_hash
-            );
-            self.block_hash = Some(block_hash);
-        } else {
+            {
+                // receive a proposal without PoLC
+                info!(
+                    "Bft handles a proposal without PoLC, the proposal is {:?}",
+                    block_hash
+                );
+                self.block_hash = Some(block_hash);
+            } else {
             info!("Bft handles a proposal with an earlier PoLC");
             return;
         }
@@ -854,26 +842,6 @@ where
             self.round,
             hash.to_owned()
         );
-    }
-
-    fn set_status(&mut self, status: &Status) {
-        self.authority_manage.receive_authorities_list(status.height, status.authority_list.clone());
-        trace!("Bft updates authority_manage {:?}", self.authority_manage);
-
-        if self.consensus_power &&
-            !status.authority_list.iter().any(|node| node.address == self.params.address) {
-            info!("Bft loses consensus power in height {} and stops the bft-rs process!", status.height);
-            self.consensus_power = false;
-        } else if !self.consensus_power
-            && status.authority_list.iter().any(|node| node.address == self.params.address) {
-            info!("Bft accesses consensus power in height {} and starts the bft-rs process!", status.height);
-            self.consensus_power = true;
-        }
-
-        if let Some(interval) = status.interval {
-            // update the bft interval
-            self.params.timer.set_total_duration(interval);
-        }
     }
 
     #[inline]
@@ -909,47 +877,47 @@ where
         );
 
         if let Some(prevote_set) =
-            self.votes
-                .get_voteset(self.height, self.round, &VoteType::Prevote)
-        {
-            let mut tv = if self.cal_all_vote(prevote_set.count) {
-                Duration::new(0, 0)
-            } else {
-                self.params.timer.get_prevote()
-            };
+        self.votes
+            .get_voteset(self.height, self.round, &VoteType::Prevote)
+            {
+                let mut tv = if self.cal_all_vote(prevote_set.count) {
+                    Duration::new(0, 0)
+                } else {
+                    self.params.timer.get_prevote()
+                };
 
-            for (hash, count) in &prevote_set.votes_by_proposal {
-                if self.cal_above_threshold(*count) {
-                    if self.lock_status.is_some()
-                        && self.lock_status.clone().unwrap().round < self.round
-                    {
-                        if hash.is_empty() {
-                            // receive +2/3 prevote to nil, clean lock info
-                            info!(
-                                "Bft collects over 2/3 prevotes to nil at height {:?}, round {:?}",
-                                self.height,
-                                self.round
-                            );
-                            self.clean_polc();
-                            self.block_hash = None;
-                        } else {
-                            // receive a later PoLC, update lock info
+                for (hash, count) in &prevote_set.votes_by_proposal {
+                    if self.cal_above_threshold(*count) {
+                        if self.lock_status.is_some()
+                            && self.lock_status.clone().unwrap().round < self.round
+                            {
+                                if hash.is_empty() {
+                                    // receive +2/3 prevote to nil, clean lock info
+                                    info!(
+                                        "Bft collects over 2/3 prevotes to nil at height {:?}, round {:?}",
+                                        self.height,
+                                        self.round
+                                    );
+                                    self.clean_polc();
+                                    self.block_hash = None;
+                                } else {
+                                    // receive a later PoLC, update lock info
+                                    self.set_polc(&hash, &prevote_set);
+                                }
+                            }
+                        if self.lock_status.is_none() && !hash.is_empty() {
+                            // receive a PoLC, lock the proposal
                             self.set_polc(&hash, &prevote_set);
                         }
+                        tv = Duration::new(0, 0);
+                        break;
                     }
-                    if self.lock_status.is_none() && !hash.is_empty() {
-                        // receive a PoLC, lock the proposal
-                        self.set_polc(&hash, &prevote_set);
-                    }
-                    tv = Duration::new(0, 0);
-                    break;
                 }
+                if self.step == Step::Prevote {
+                    self.set_timer(tv, Step::PrevoteWait);
+                }
+                return true;
             }
-            if self.step == Step::Prevote {
-                self.set_timer(tv, Step::PrevoteWait);
-            }
-            return true;
-        }
         false
     }
 
@@ -990,7 +958,7 @@ where
         PrecommitRes::Above
     }
 
-    #[cfg(feature = "async_check_txs")]
+    #[cfg(feature = "verify_req")]
     fn check_verify(&mut self) -> VerifyResult {
         if let Some(lock_status) = self.lock_status.clone() {
             let block_hash = lock_status.block_hash;
@@ -1047,7 +1015,7 @@ where
         self.votes.clear_prevote_count();
         self.clean_feeds();
 
-        #[cfg(feature = "async_check_txs")]
+        #[cfg(feature = "verify_req")]
             self.verify_results.clear();
     }
 

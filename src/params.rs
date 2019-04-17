@@ -50,10 +50,6 @@ impl BftTimer {
         self.total_duration.set(duration);
     }
 
-    pub(crate) fn get_total_duration(&self) -> Duration {
-        Duration::from_millis(self.total_duration.get())
-    }
-
     /// A function to get propose wait duration.
     pub(crate) fn get_propose(&self) -> Duration {
         Duration::from_millis(self.total_duration.get() * self.propose.0 / self.propose.1)
