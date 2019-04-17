@@ -248,6 +248,7 @@ where
     }
 
     fn timeout_process(&mut self, tminfo: &TimeoutInfo) {
+        info!("Bft time precess {:?}", tminfo);
         if tminfo.height < self.height {
             return;
         }
