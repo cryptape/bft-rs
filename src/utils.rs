@@ -1,7 +1,7 @@
 use crate::*;
 use crate::{
     algorithm::{Bft, INIT_HEIGHT, INIT_ROUND},
-    collectors::{ProposalCollector, VoteCollector, RoundCollector, CACHE_N},
+    collectors::{ProposalCollector, RoundCollector, VoteCollector, CACHE_N},
     error::BftError,
     objects::*,
     random::get_proposer,
@@ -14,8 +14,8 @@ use std::fs;
 use std::time::Instant;
 
 impl<T> Bft<T>
-    where
-        T: BftSupport + 'static,
+where
+    T: BftSupport + 'static,
 {
     pub(crate) fn clear(&mut self) {
         self.height = INIT_HEIGHT;
@@ -73,20 +73,22 @@ impl<T> Bft<T>
         info!("Bft successfully processes the whole wal log!");
     }
 
-    pub(crate) fn build_signed_proposal(&self, proposal: &Proposal) -> SignedProposal{
+    pub(crate) fn build_signed_proposal(&self, proposal: &Proposal) -> SignedProposal {
         let encode = rlp::encode(proposal);
         let hash = self.function.crypt_hash(&encode);
+        // TODO: handler error.
         let signature = self.function.sign(&hash).unwrap();
 
-        SignedProposal{
+        SignedProposal {
             proposal: proposal.clone(),
             signature,
         }
     }
 
-    pub(crate) fn build_signed_vote(&self, vote: &Vote) -> SignedVote{
-        let encode =  rlp::encode(vote);
+    pub(crate) fn build_signed_vote(&self, vote: &Vote) -> SignedVote {
+        let encode = rlp::encode(vote);
         let hash = self.function.crypt_hash(&encode);
+        // TODO: handler error.
         let signature = self.function.sign(&hash).unwrap();
         SignedVote {
             vote: vote.clone(),
@@ -95,11 +97,15 @@ impl<T> Bft<T>
     }
 
     pub(crate) fn get_vote_weight(&self, height: u64, address: &Address) -> u64 {
-        if height != self.height{
+        if height != self.height {
             return 1u64;
         }
-        if let Some(node) = self.authority_manage.authorities.iter()
-            .find(|node| node.address == *address){
+        if let Some(node) = self
+            .authority_manage
+            .authorities
+            .iter()
+            .find(|node| node.address == *address)
+        {
             return node.vote_weight as u64;
         }
         1u64
@@ -108,8 +114,11 @@ impl<T> Bft<T>
     pub(crate) fn generate_proof(&mut self, lock_status: LockStatus) -> Proof {
         let block_hash = lock_status.block_hash;
         let lock_votes = lock_status.votes;
-        let precommit_votes: HashMap<Address, Signature> = lock_votes.into_iter().map(|signed_vote| (signed_vote.vote.voter, signed_vote.signature)).collect();
-        Proof{
+        let precommit_votes: HashMap<Address, Signature> = lock_votes
+            .into_iter()
+            .map(|signed_vote| (signed_vote.vote.voter, signed_vote.signature))
+            .collect();
+        Proof {
             height: self.height,
             round: lock_status.round,
             block_hash,
@@ -130,14 +139,18 @@ impl<T> Bft<T>
 
         if let Some(round_proposals) = round_proposals {
             for (_, signed_proposal) in round_proposals.round_proposals.iter() {
-                self.msg_sender.send(BftMsg::Proposal(rlp::encode(signed_proposal))).unwrap();
+                self.msg_sender
+                    .send(BftMsg::Proposal(rlp::encode(signed_proposal)))
+                    .unwrap();
             }
         };
 
         for (_, step_votes) in round_collector.round_votes.iter() {
             for (_, vote_set) in step_votes.step_votes.iter() {
                 for (_, signed_vote) in vote_set.votes_by_sender.iter() {
-                    self.msg_sender.send(BftMsg::Vote(rlp::encode(signed_vote))).unwrap();
+                    self.msg_sender
+                        .send(BftMsg::Vote(rlp::encode(signed_vote)))
+                        .unwrap();
                 }
             }
         }
@@ -150,39 +163,61 @@ impl<T> Bft<T>
                 return;
             }
         }
-        self.verify_results.entry(block_hash.to_vec()).or_insert(is_pass);
+        self.verify_results
+            .entry(block_hash.to_vec())
+            .or_insert(is_pass);
     }
 
-    pub(crate) fn check_and_save_proposal(&mut self, signed_proposal: &SignedProposal, encode: &[u8], need_wal: bool) -> BftResult<()> {
+    pub(crate) fn check_and_save_proposal(
+        &mut self,
+        signed_proposal: &SignedProposal,
+        encode: &[u8],
+        need_wal: bool,
+    ) -> BftResult<()> {
         let proposal = &signed_proposal.proposal;
         let height = proposal.height;
         let round = proposal.round;
 
         if height < self.height - 1 {
-            trace!("The height of proposal is {} which is obsolete compared to self.height {}!", height, self.height);
+            trace!(
+                "The height of proposal is {} which is obsolete compared to self.height {}!",
+                height,
+                self.height
+            );
             return Err(BftError::ObsoleteMsg);
         }
 
         let proposal_encode = rlp::encode(proposal);
         let proposal_hash = self.function.crypt_hash(&proposal_encode);
-        let address = self.function.check_sig(&signed_proposal.signature, &proposal_hash).ok_or(BftError::CheckSigFailed)?;
+        let address = self
+            .function
+            .check_sig(&signed_proposal.signature, &proposal_hash)
+            .map_err(|_e| {
+                // TODO: print error
+                BftError::CheckSigFailed
+            })?;
         if proposal.proposer != address {
-            warn!("Bft expects proposer's address {:?} while get {:?} from check_sig", proposal.proposer, address);
+            warn!(
+                "Bft expects proposer's address {:?} while get {:?} from check_sig",
+                proposal.proposer, address
+            );
             return Err(BftError::MismatchingProposer);
         }
 
         let block = &proposal.block;
 
         // prevent too many high proposals flush out current proposal
-        if height < self.height + CACHE_N as u64 && round < self.round + CACHE_N  as u64{
+        if height < self.height + CACHE_N as u64 && round < self.round + CACHE_N as u64 {
             if need_wal {
                 let encode: Vec<u8> = rlp::encode(signed_proposal);
-                self.wal_log.save(height, LogType::Proposal, &encode).or(Err(BftError::SaveWalErr))?
+                self.wal_log
+                    .save(height, LogType::Proposal, &encode)
+                    .or(Err(BftError::SaveWalErr))?
             }
             self.proposals.add(&proposal);
         }
 
-        if height > self.height || round >= self.round + CACHE_N  as u64{
+        if height > self.height || round >= self.round + CACHE_N as u64 {
             return Err(BftError::HigherMsg);
         }
 
@@ -202,27 +237,43 @@ impl<T> Bft<T>
         Ok(())
     }
 
-    pub(crate) fn check_and_save_vote(&mut self, signed_vote: &SignedVote, need_wal: bool) -> BftResult<()> {
+    pub(crate) fn check_and_save_vote(
+        &mut self,
+        signed_vote: &SignedVote,
+        need_wal: bool,
+    ) -> BftResult<()> {
         let vote = &signed_vote.vote;
         let height = vote.height;
         let round = vote.round;
         if height < self.height - 1 {
-            trace!("The height of raw_bytes is {} which is obsolete compared to self.height {}!", height, self.height);
+            trace!(
+                "The height of raw_bytes is {} which is obsolete compared to self.height {}!",
+                height,
+                self.height
+            );
             return Err(BftError::ObsoleteMsg);
         }
 
         let vote_encode = rlp::encode(vote);
         let vote_hash = self.function.crypt_hash(&vote_encode);
-        let address = self.function.check_sig(&signed_vote.signature, &vote_hash).ok_or(BftError::CheckSigFailed)?;
+        let address = self
+            .function
+            .check_sig(&signed_vote.signature, &vote_hash)
+            .map_err(|_e| {
+                // TODO: print error
+                BftError::CheckSigFailed
+            })?;
         if vote.voter != address {
             return Err(BftError::MismatchingVoter);
         }
 
         // prevent too many high proposals flush out current proposal
-        if height < self.height + CACHE_N as u64 && round < self.round + CACHE_N as u64{
+        if height < self.height + CACHE_N as u64 && round < self.round + CACHE_N as u64 {
             if need_wal {
                 let encode: Vec<u8> = rlp::encode(signed_vote);
-                self.wal_log.save(height, LogType::Vote, &encode).or(Err(BftError::SaveWalErr))?;
+                self.wal_log
+                    .save(height, LogType::Vote, &encode)
+                    .or(Err(BftError::SaveWalErr))?;
             }
             let vote_weight = self.get_vote_weight(vote.height, &vote.voter);
             self.votes.add(&signed_vote, vote_weight, self.height);
@@ -237,25 +288,41 @@ impl<T> Bft<T>
         Ok(())
     }
 
-    pub(crate) fn check_and_save_status(&mut self, status: &Status, need_wal: bool) -> BftResult<()> {
+    pub(crate) fn check_and_save_status(
+        &mut self,
+        status: &Status,
+        need_wal: bool,
+    ) -> BftResult<()> {
         let height = status.height;
         if self.height > 0 && height < self.height - 1 {
-            trace!("The height of rich_status is {} which is obsolete compared to self.height {}!", height, self.height);
+            trace!(
+                "The height of rich_status is {} which is obsolete compared to self.height {}!",
+                height,
+                self.height
+            );
             return Err(BftError::ObsoleteMsg);
         }
         if need_wal {
             let msg: Vec<u8> = rlp::encode(status);
-            self.wal_log.save(height + 1, LogType::Status, &msg).or( Err(BftError::SaveWalErr))?;
+            self.wal_log
+                .save(height + 1, LogType::Status, &msg)
+                .or(Err(BftError::SaveWalErr))?;
         }
 
         Ok(())
     }
 
     #[cfg(feature = "verify_req")]
-    pub(crate) fn check_and_save_verify_resp(&mut self, verify_resp: &VerifyResp, need_wal: bool) -> BftResult<()> {
+    pub(crate) fn check_and_save_verify_resp(
+        &mut self,
+        verify_resp: &VerifyResp,
+        need_wal: bool,
+    ) -> BftResult<()> {
         if need_wal {
             let msg: Vec<u8> = rlp::encode(verify_resp);
-            self.wal_log.save(self.height, LogType::VerifyResp, &msg).or( Err(BftError::SaveWalErr))?;
+            self.wal_log
+                .save(self.height, LogType::VerifyResp, &msg)
+                .or(Err(BftError::SaveWalErr))?;
         }
         self.save_verify_res(&verify_resp.block_hash, verify_resp.is_pass);
 
@@ -265,69 +332,106 @@ impl<T> Bft<T>
     pub(crate) fn check_and_save_feed(&mut self, feed: Feed, need_wal: bool) -> BftResult<()> {
         let height = feed.height;
         if height < self.height {
-            trace!("the height of block_txs is {}, while self.height is {}", height, self.height);
+            trace!(
+                "the height of block_txs is {}, while self.height is {}",
+                height,
+                self.height
+            );
             return Err(BftError::ObsoleteMsg);
         }
         if need_wal {
             let msg: Vec<u8> = rlp::encode(&feed);
-            self.wal_log.save(height, LogType::Feed, &msg).or(Err(BftError::SaveWalErr))?;
+            self.wal_log
+                .save(height, LogType::Feed, &msg)
+                .or(Err(BftError::SaveWalErr))?;
         }
 
         self.feeds.insert(height, feed.block);
 
-        if height > self.height{
+        if height > self.height {
             return Err(BftError::HigherMsg);
         }
         Ok(())
     }
 
-    pub(crate) fn check_block(&mut self, block: &[u8], proposal_hash: &[u8], height: u64, round: u64) -> BftResult<()> {
+    pub(crate) fn check_block(
+        &mut self,
+        block: &[u8],
+        proposal_hash: &[u8],
+        height: u64,
+        round: u64,
+    ) -> BftResult<()> {
         let block_hash = self.function.crypt_hash(block);
         // search cache first
         if let Some(verify_res) = self.verify_results.get(&block_hash) {
             if *verify_res {
                 return Ok(());
-            }else {
+            } else {
                 return Err(BftError::CheckBlockFailed);
             }
         }
 
         #[cfg(not(feature = "verify_req"))]
+        {
+            if self.function.check_block(block, height).map_err(|_e| {
+                // TODO: print error
+                BftError::CheckBlockFailed
+            })? && self
+                .function
+                .check_txs(block, proposal_hash, height, round)
+                .map_err(|_e| {
+                    // TODO: print error
+                    BftError::CheckTxFailed
+                })?
             {
-                if self.function.check_block(block, height)
-                    && self.function.check_txs(block, proposal_hash, height, round){
-                    self.save_verify_res(&block_hash, true);
-                    Ok(())
-                } else {
-                    self.save_verify_res(&block_hash, false);
-                    Err(BftError::CheckBlockFailed)
-                }
+                self.save_verify_res(&block_hash, true);
+                Ok(())
+            } else {
+                self.save_verify_res(&block_hash, false);
+                Err(BftError::CheckBlockFailed)
             }
+        }
 
         #[cfg(feature = "verify_req")]
-            {
-                if !self.function.check_block(block, height) {
-                    self.save_verify_res(&block_hash, false);
-                    return Err(BftError::CheckBlockFailed);
-                }
-
-                let mut function = self.function.clone();
-                let sender = self.msg_sender.clone();
-                cross_thread::scope(|s|{
-                    s.spawn(move |_|{
-                        let is_pass = function.check_txs(block, proposal_hash, height, round);
-                        let block_hash = function.crypt_hash(block);
-                        let verify_resp = VerifyResp{is_pass, block_hash};
-                        sender.send(BftMsg::VerifyResp(verify_resp)).unwrap();
-                    });
-                }).unwrap();
-                Ok(())
+        {
+            if !self.function.check_block(block, height).map_err(|_e| {
+                // TODO: print error
+                BftError::CheckBlockFailed
+            })? {
+                self.save_verify_res(&block_hash, false);
+                return Err(BftError::CheckBlockFailed);
             }
+
+            let mut function = self.function.clone();
+            let sender = self.msg_sender.clone();
+            cross_thread::scope(|s| {
+                s.spawn(move |_| {
+                    let is_pass = match function.check_txs(block, proposal_hash, height, round) {
+                        Ok(is_pass) => is_pass,
+                        Err(e) => {
+                            // TODO: print error
+                            false
+                        }
+                    };
+                    let block_hash = function.crypt_hash(block);
+                    let verify_resp = VerifyResp {
+                        is_pass,
+                        block_hash,
+                    };
+                    sender.send(BftMsg::VerifyResp(verify_resp)).unwrap();
+                });
+            })
+            .unwrap();
+            Ok(())
+        }
     }
 
     pub(crate) fn check_proof(&mut self, height: u64, proof: &Proof) -> BftResult<()> {
         if height != self.height {
-            error!("The height {} is less than self.height {}, which should not happen!", height, self.height);
+            error!(
+                "The height {} is less than self.height {}, which should not happen!",
+                height, self.height
+            );
             return Err(BftError::ShouldNotHappen);
         }
 
@@ -337,7 +441,7 @@ impl<T> Bft<T>
             authorities = &p.authorities_old;
         }
 
-        if !self.check_proof_only(&proof, height, authorities){
+        if !self.check_proof_only(&proof, height, authorities) {
             return Err(BftError::CheckProofFailed);
         }
 
@@ -348,30 +452,50 @@ impl<T> Bft<T>
         Ok(())
     }
 
-    pub(crate) fn check_proof_only(&self, proof: &Proof, height: u64, authorities: &[Node]) -> bool {
+    pub(crate) fn check_proof_only(
+        &self,
+        proof: &Proof,
+        height: u64,
+        authorities: &[Node],
+    ) -> bool {
         if proof.height == 0 {
             return true;
         }
         if height != proof.height + 1 {
-            warn!("Bft check proof failed, the proof.height is {}", proof.height);
+            warn!(
+                "Bft check proof failed, the proof.height is {}",
+                proof.height
+            );
             return false;
         }
 
-        let weight: Vec<u64> = authorities.iter().map(|node| node.vote_weight as u64).collect();
-        let vote_addresses : Vec<Address> = proof.precommit_votes.iter().map(|(voter, _)| voter.clone()).collect();
-        let votes_weight: Vec<u64> = authorities.iter()
+        let weight: Vec<u64> = authorities
+            .iter()
+            .map(|node| node.vote_weight as u64)
+            .collect();
+        let vote_addresses: Vec<Address> = proof
+            .precommit_votes
+            .iter()
+            .map(|(voter, _)| voter.clone())
+            .collect();
+        let votes_weight: Vec<u64> = authorities
+            .iter()
             .filter(|node| vote_addresses.contains(&node.address))
-            .map(|node| node.vote_weight as u64).collect();
+            .map(|node| node.vote_weight as u64)
+            .collect();
         let weight_sum: u64 = weight.iter().sum();
         let vote_sum: u64 = votes_weight.iter().sum();
         if vote_sum * 3 <= weight_sum * 2 {
-            warn!("Bft check proof failed, the votes:weight is {}:{}", vote_sum, weight_sum);
+            warn!(
+                "Bft check proof failed, the votes:weight is {}:{}",
+                vote_sum, weight_sum
+            );
             return false;
         }
 
         proof.precommit_votes.iter().all(|(voter, sig)| {
             if authorities.iter().any(|node| node.address == *voter) {
-                let vote = Vote{
+                let vote = Vote {
                     vote_type: VoteType::Precommit,
                     height: proof.height,
                     round: proof.round,
@@ -379,7 +503,10 @@ impl<T> Bft<T>
                     voter: voter.clone(),
                 };
                 let msg = rlp::encode(&vote);
-                if let Some(address) = self.function.check_sig(sig, &self.function.crypt_hash(&msg)) {
+                if let Ok(address) = self
+                    .function
+                    .check_sig(sig, &self.function.crypt_hash(&msg))
+                {
                     return address == *voter;
                 }
             }
@@ -387,10 +514,17 @@ impl<T> Bft<T>
         })
     }
 
-    pub(crate) fn check_lock_votes(&mut self, proposal: &Proposal, block_hash: &[u8]) -> BftResult<()> {
+    pub(crate) fn check_lock_votes(
+        &mut self,
+        proposal: &Proposal,
+        block_hash: &[u8],
+    ) -> BftResult<()> {
         let height = proposal.height;
-        if height < self.height - 1 || height > self.height{
-            error!("The proposal's height is {} compared to self.height {}, which should not happen!", height, self.height);
+        if height < self.height - 1 || height > self.height {
+            error!(
+                "The proposal's height is {} compared to self.height {}, which should not happen!",
+                height, self.height
+            );
             return Err(BftError::ShouldNotHappen);
         }
 
@@ -412,11 +546,20 @@ impl<T> Bft<T>
             authorities = &p.authorities_old;
         }
 
-        let weight: Vec<u64> = authorities.iter().map(|node| node.vote_weight as u64).collect();
-        let vote_addresses : Vec<Address> = proposal.lock_votes.iter().map(|signed_vote| signed_vote.vote.voter.clone()).collect();
-        let votes_weight: Vec<u64> = authorities.iter()
+        let weight: Vec<u64> = authorities
+            .iter()
+            .map(|node| node.vote_weight as u64)
+            .collect();
+        let vote_addresses: Vec<Address> = proposal
+            .lock_votes
+            .iter()
+            .map(|signed_vote| signed_vote.vote.voter.clone())
+            .collect();
+        let votes_weight: Vec<u64> = authorities
+            .iter()
             .filter(|node| vote_addresses.contains(&node.address))
-            .map(|node| node.vote_weight as u64).collect();
+            .map(|node| node.vote_weight as u64)
+            .collect();
         let weight_sum: u64 = weight.iter().sum();
         let vote_sum: u64 = votes_weight.iter().sum();
         if vote_sum * 3 > weight_sum * 2 {
@@ -425,9 +568,18 @@ impl<T> Bft<T>
         Err(BftError::NotEnoughVotes)
     }
 
-    pub(crate) fn check_vote(&mut self, height: u64, round: u64, block_hash: &[u8], signed_vote: &SignedVote) -> BftResult<Address> {
+    pub(crate) fn check_vote(
+        &mut self,
+        height: u64,
+        round: u64,
+        block_hash: &[u8],
+        signed_vote: &SignedVote,
+    ) -> BftResult<Address> {
         if height < self.height - 1 {
-            error!("The vote's height {} is less than self.height {} - 1, which should not happen!", height, self.height);
+            error!(
+                "The vote's height {} is less than self.height {} - 1, which should not happen!",
+                height, self.height
+            );
             return Err(BftError::ShouldNotHappen);
         }
 
@@ -437,7 +589,10 @@ impl<T> Bft<T>
         }
 
         if vote.block_hash != block_hash.to_vec() {
-            warn!("The lock votes of proposal {:?} contains vote for other proposal hash {:?}!", block_hash, vote.block_hash);
+            warn!(
+                "The lock votes of proposal {:?} contains vote for other proposal hash {:?}!",
+                block_hash, vote.block_hash
+            );
             return Err(BftError::MismatchingVote);
         }
 
@@ -450,14 +605,23 @@ impl<T> Bft<T>
 
         let voter = &vote.voter;
         if !authorities.iter().any(|node| &node.address == voter) {
-            warn!("The lock votes contains vote with invalid voter {:?}!", voter);
+            warn!(
+                "The lock votes contains vote with invalid voter {:?}!",
+                voter
+            );
             return Err(BftError::InvalidVoter);
         }
 
         let signature = &signed_vote.signature;
         let vote_encode = rlp::encode(vote);
         let vote_hash = self.function.crypt_hash(&vote_encode);
-        let address = self.function.check_sig(signature, &vote_hash).ok_or(BftError::CheckSigFailed)?;
+        let address = self
+            .function
+            .check_sig(signature, &vote_hash)
+            .map_err(|_e| {
+                // TODO: print log
+                BftError::CheckSigFailed
+            })?;
         if &address != voter {
             warn!("The address recovers from the signature is {:?} which is mismatching with the sender {:?}!", &address, &voter);
             return Err(BftError::MismatchingVoter);
@@ -468,9 +632,17 @@ impl<T> Bft<T>
         Ok(address)
     }
 
-    pub(crate) fn check_proposer(&self, height: u64, round: u64, address: &Address) -> BftResult<()> {
-        if height < self.height - 1 || height > self.height{
-            error!("The proposer's height is {} compared to self.height {}, which should not happen!", height, self.height);
+    pub(crate) fn check_proposer(
+        &self,
+        height: u64,
+        round: u64,
+        address: &Address,
+    ) -> BftResult<()> {
+        if height < self.height - 1 || height > self.height {
+            error!(
+                "The proposer's height is {} compared to self.height {}, which should not happen!",
+                height, self.height
+            );
             return Err(BftError::ShouldNotHappen);
         }
         let p = &self.authority_manage;
@@ -484,19 +656,31 @@ impl<T> Bft<T>
             return Err(BftError::EmptyAuthManage);
         }
         let nonce = height + round;
-        let weight: Vec<u64> = authorities.iter().map(|node| node.proposal_weight as u64).collect();
-        let proposer: &Address = &authorities.get(get_proposer(nonce, &weight)).unwrap().address;
+        let weight: Vec<u64> = authorities
+            .iter()
+            .map(|node| node.proposal_weight as u64)
+            .collect();
+        let proposer: &Address = &authorities
+            .get(get_proposer(nonce, &weight))
+            .unwrap()
+            .address;
         if proposer == address {
             Ok(())
         } else {
-            warn!("The proposer {:?} is invalid, while the rightful proposer is {:?}", address, proposer);
+            warn!(
+                "The proposer {:?} is invalid, while the rightful proposer is {:?}",
+                address, proposer
+            );
             Err(BftError::InvalidProposer)
         }
     }
 
     pub(crate) fn check_voter(&self, height: u64, address: &Address) -> BftResult<()> {
-        if height < self.height - 1 || height > self.height{
-            error!("The height is {} compared to self.height {}, which should not happen!", height, self.height);
+        if height < self.height - 1 || height > self.height {
+            error!(
+                "The height is {} compared to self.height {}, which should not happen!",
+                height, self.height
+            );
             return Err(BftError::ShouldNotHappen);
         }
         let p = &self.authority_manage;
@@ -507,7 +691,10 @@ impl<T> Bft<T>
         }
 
         if !authorities.iter().any(|node| node.address == *address) {
-            warn!("The lock votes contains vote with invalid voter {:?}!", address);
+            warn!(
+                "The lock votes contains vote with invalid voter {:?}!",
+                address
+            );
             return Err(BftError::InvalidVoter);
         }
 
@@ -518,5 +705,4 @@ impl<T> Bft<T>
     pub(crate) fn send_bft_msg(&self, msg: BftMsg) {
         self.msg_sender.send(msg).unwrap();
     }
-
 }

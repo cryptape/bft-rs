@@ -21,10 +21,10 @@ use crate::{
     objects::{Vote, VoteType},
 };
 
-use rlp::{Encodable, Decodable, DecoderError, Prototype, Rlp, RlpStream};
+use crossbeam::crossbeam_channel::{unbounded, Sender};
+use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 use std::collections::HashMap;
 use std::hash::{Hash as Hashable, Hasher};
-use crossbeam::crossbeam_channel::{unbounded, Sender};
 
 /// The core algorithm of the BFT state machine.
 pub mod algorithm;
@@ -54,21 +54,25 @@ pub type Signature = Vec<u8>;
 
 pub type BftResult<T> = ::std::result::Result<T, BftError>;
 
-pub struct BftActuator (Sender<BftMsg>);
+pub struct BftActuator(Sender<BftMsg>);
 
 impl BftActuator {
     /// A function to create a new Bft actuator and start the BFT state machine.
     pub fn new<T: BftSupport + 'static>(support: T, address: Address, wal_path: &str) -> Self {
         let (sender, internal_receiver) = unbounded();
-        Bft::start(sender.clone(), internal_receiver, support, address, wal_path);
+        Bft::start(
+            sender.clone(),
+            internal_receiver,
+            support,
+            address,
+            wal_path,
+        );
         BftActuator(sender)
     }
 
     /// A function for sending msg to the BFT state machine.
     pub fn send(&self, msg: BftMsg) -> BftResult<()> {
-        self.0
-            .send(msg)
-            .map_err(|_| BftError::SendMsgErr)
+        self.0.send(msg).map_err(|_| BftError::SendMsgErr)
     }
 }
 
@@ -119,7 +123,8 @@ impl Default for Commit {
 
 impl Encodable for Commit {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(4).append(&self.height)
+        s.begin_list(4)
+            .append(&self.height)
             .append(&self.block)
             .append(&self.proof)
             .append(&self.address);
@@ -134,14 +139,14 @@ impl Decodable for Commit {
                 let block: Vec<u8> = r.val_at(1)?;
                 let proof: Proof = r.val_at(2)?;
                 let address: Address = r.val_at(3)?;
-                Ok(Commit{
+                Ok(Commit {
                     height,
                     block,
                     proof,
                     address,
                 })
             }
-            _ => Err(DecoderError::RlpInconsistentLengthAndData)
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
     }
 }
@@ -169,7 +174,8 @@ impl Default for Status {
 
 impl Encodable for Status {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(3).append(&self.height)
+        s.begin_list(3)
+            .append(&self.height)
             .append(&self.interval)
             .append_list(&self.authority_list);
     }
@@ -182,13 +188,13 @@ impl Decodable for Status {
                 let height: u64 = r.val_at(0)?;
                 let interval: Option<u64> = r.val_at(1)?;
                 let authority_list: Vec<Node> = r.list_at(2)?;
-                Ok(Status{
+                Ok(Status {
                     height,
                     interval,
                     authority_list,
                 })
             }
-            _ => Err(DecoderError::RlpInconsistentLengthAndData)
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
     }
 }
@@ -213,8 +219,7 @@ impl Default for Feed {
 
 impl Encodable for Feed {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(2).append(&self.height)
-            .append(&self.block);
+        s.begin_list(2).append(&self.height).append(&self.block);
     }
 }
 
@@ -224,12 +229,9 @@ impl Decodable for Feed {
             Prototype::List(2) => {
                 let height: u64 = r.val_at(0)?;
                 let block: Vec<u8> = r.val_at(1)?;
-                Ok(Feed{
-                    height,
-                    block,
-                })
+                Ok(Feed { height, block })
             }
-            _ => Err(DecoderError::RlpInconsistentLengthAndData)
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
     }
 }
@@ -257,7 +259,8 @@ impl Default for VerifyResp {
 #[cfg(feature = "verify_req")]
 impl Encodable for VerifyResp {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(2).append(&self.is_pass)
+        s.begin_list(2)
+            .append(&self.is_pass)
             .append(&self.block_hash);
     }
 }
@@ -269,12 +272,12 @@ impl Decodable for VerifyResp {
             Prototype::List(2) => {
                 let is_pass: bool = r.val_at(0)?;
                 let block_hash: Hash = r.val_at(1)?;
-                Ok(VerifyResp{
+                Ok(VerifyResp {
                     is_pass,
                     block_hash,
                 })
             }
-            _ => Err(DecoderError::RlpInconsistentLengthAndData)
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
     }
 }
@@ -292,7 +295,8 @@ pub struct Node {
 
 impl Encodable for Node {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(3).append(&self.address)
+        s.begin_list(3)
+            .append(&self.address)
             .append(&self.proposal_weight)
             .append(&self.vote_weight);
     }
@@ -305,13 +309,13 @@ impl Decodable for Node {
                 let address: Address = r.val_at(0)?;
                 let proposal_weight: u32 = r.val_at(1)?;
                 let vote_weight: u32 = r.val_at(2)?;
-                Ok(Node{
+                Ok(Node {
                     address,
                     proposal_weight,
                     vote_weight,
                 })
             }
-            _ => Err(DecoderError::RlpInconsistentLengthAndData)
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
     }
 }
@@ -370,7 +374,8 @@ impl Encodable for Proof {
             .append(&self.height)
             .append(&self.round)
             .append(&self.block_hash);
-        let mut key_values: Vec<(Address, Vec<u8>)> = self.precommit_votes.clone().into_iter().collect();
+        let mut key_values: Vec<(Address, Vec<u8>)> =
+            self.precommit_votes.clone().into_iter().collect();
         key_values.sort();
         let mut key_list: Vec<Address> = vec![];
         let mut value_list: Vec<Vec<u8>> = vec![];
@@ -399,11 +404,16 @@ impl Decodable for Proof {
                 let key_list: Vec<Address> = r.list_at(3)?;
                 let value_list: Vec<Signature> = r.list_at(4)?;
                 if key_list.len() != value_list.len() {
-                    error!("Bft decode proof error, key_list_len {}, value_list_len{}", key_list.len(), value_list.len());
+                    error!(
+                        "Bft decode proof error, key_list_len {}, value_list_len{}",
+                        key_list.len(),
+                        value_list.len()
+                    );
                     return Err(DecoderError::RlpIncorrectListLen);
                 }
-                let precommit_votes: HashMap<_, _> = key_list.into_iter().zip(value_list.into_iter()).collect();
-                Ok(Proof{
+                let precommit_votes: HashMap<_, _> =
+                    key_list.into_iter().zip(value_list.into_iter()).collect();
+                Ok(Proof {
                     height,
                     round,
                     block_hash,
@@ -411,7 +421,10 @@ impl Decodable for Proof {
                 })
             }
             _ => {
-                error!("Bft decode proof error, the prototype is {:?}", r.prototype());
+                error!(
+                    "Bft decode proof error, the prototype is {:?}",
+                    r.prototype()
+                );
                 Err(DecoderError::RlpInconsistentLengthAndData)
             }
         }
@@ -420,15 +433,23 @@ impl Decodable for Proof {
 
 /// User-defined functions.
 pub trait BftSupport: Sync + Send {
+    type Error: ::std::fmt::Debug;
+
     /// A user-defined function for block validation.
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate block format, block headers here.
-    fn check_block(&self, block: &[u8], height: u64) -> bool;
+    fn check_block(&self, block: &[u8], height: u64) -> Result<bool, Self::Error>;
     /// A user-defined function for transactions validation.
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate transactions here.
     /// The [`proposal_hash`] is corresponding to the proposal of the [`proposal_hash`].
-    fn check_txs(&self, block: &[u8], signed_proposal_hash: &[u8], height: u64, round: u64) -> bool;
+    fn check_txs(
+        &self,
+        block: &[u8],
+        signed_proposal_hash: &[u8],
+        height: u64,
+        round: u64,
+    ) -> Result<bool, Self::Error>;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,
     /// users do not have to care about the structure of Proposal and Vote.
@@ -436,14 +457,14 @@ pub trait BftSupport: Sync + Send {
     /// A user-defined function for processing the reaching-consensus block.
     /// Users could execute the block inside and add it into chain.
     /// The height of proof inside the commit equals to block height.
-    fn commit(&self, commit: Commit);
+    fn commit(&self, commit: Commit) -> Result<(), Self::Error>;
     /// A user-defined function for feeding the bft consensus.
     /// The new block provided will feed for bft consensus of giving [`height`]
-    fn get_block(&self, height: u64) -> Option<Vec<u8>>;
+    fn get_block(&self, height: u64) -> Result<Vec<u8>, Self::Error>;
     /// A user-defined function for signing a [`hash`].
-    fn sign(&self, hash: &[u8]) -> Option<Signature>;
+    fn sign(&self, hash: &[u8]) -> Result<Signature, Self::Error>;
     /// A user-defined function for checking a [`signature`].
-    fn check_sig(&self, signature: &[u8], hash: &[u8]) -> Option<Address>;
+    fn check_sig(&self, signature: &[u8], hash: &[u8]) -> Result<Address, Self::Error>;
     /// A user-defined function for hashing a [`msg`].
     fn crypt_hash(&self, msg: &[u8]) -> Vec<u8>;
 }
@@ -452,9 +473,13 @@ pub trait BftSupport: Sync + Send {
 /// The input [`height`] is the height of block involving the proof.
 /// The input [`authorities`] is the authority_list for the proof.
 /// The fn [`crypt_hash`], [`check_sig`], [`hash`] are user-defined.
-pub fn check_proof(proof: &Proof, height: u64, authorities: &[Node],
-                   crypt_hash: fn(msg: &[u8]) -> Vec<u8>,
-                   check_sig: fn(signature: &[u8], hash: &[u8]) -> Option<Address>) -> bool {
+pub fn check_proof(
+    proof: &Proof,
+    height: u64,
+    authorities: &[Node],
+    crypt_hash: fn(msg: &[u8]) -> Vec<u8>,
+    check_sig: fn(signature: &[u8], hash: &[u8]) -> Option<Address>,
+) -> bool {
     if proof.height == 0 {
         return true;
     }
@@ -462,11 +487,20 @@ pub fn check_proof(proof: &Proof, height: u64, authorities: &[Node],
         return false;
     }
 
-    let weight: Vec<u64> = authorities.iter().map(|node| node.vote_weight as u64).collect();
-    let vote_addresses : Vec<Address> = proof.precommit_votes.iter().map(|(sender, _)| sender.clone()).collect();
-    let votes_weight: Vec<u64> = authorities.iter()
+    let weight: Vec<u64> = authorities
+        .iter()
+        .map(|node| node.vote_weight as u64)
+        .collect();
+    let vote_addresses: Vec<Address> = proof
+        .precommit_votes
+        .iter()
+        .map(|(sender, _)| sender.clone())
+        .collect();
+    let votes_weight: Vec<u64> = authorities
+        .iter()
         .filter(|node| vote_addresses.contains(&node.address))
-        .map(|node| node.vote_weight as u64).collect();
+        .map(|node| node.vote_weight as u64)
+        .collect();
     let weight_sum: u64 = weight.iter().sum();
     let vote_sum: u64 = votes_weight.iter().sum();
     if vote_sum * 3 <= weight_sum * 2 {
@@ -475,7 +509,7 @@ pub fn check_proof(proof: &Proof, height: u64, authorities: &[Node],
 
     proof.precommit_votes.iter().all(|(voter, sig)| {
         if authorities.iter().any(|node| node.address == *voter) {
-            let vote = Vote{
+            let vote = Vote {
                 vote_type: VoteType::Precommit,
                 height: proof.height,
                 round: proof.round,

@@ -27,14 +27,17 @@ pub(crate) struct Wal {
     height_fs: BTreeMap<u64, File>,
     pub(crate) dir: String,
     current_height: u64,
-    ifile: File,    // store off-line height
+    ifile: File, // store off-line height
 }
 
 impl Wal {
     pub(crate) fn new(dir: &str) -> Result<Wal, io::Error> {
         let fss = read_dir(&dir);
         if fss.is_err() {
-            DirBuilder::new().recursive(true).create(dir).expect("Create wal directory failed!");
+            DirBuilder::new()
+                .recursive(true)
+                .create(dir)
+                .expect("Create wal directory failed!");
         }
 
         let file_path = dir.to_string() + "/" + "index";
@@ -109,7 +112,7 @@ impl Wal {
         self.height_fs.insert(height, fs);
 
         if height > DELETE_FILE_INTERVAL {
-            let saved_height_fs= self.height_fs.split_off(&(height - DELETE_FILE_INTERVAL));
+            let saved_height_fs = self.height_fs.split_off(&(height - DELETE_FILE_INTERVAL));
             {
                 for (height, _) in self.height_fs.iter() {
                     let delfilename = Wal::get_file_path(&self.dir, *height);
@@ -175,7 +178,10 @@ impl Wal {
             if res_fsize.is_err() {
                 return vec_out;
             }
-            let expect_str = format!("Get size of buf of wal file {:?} of height {} failed!", fs, *height);
+            let expect_str = format!(
+                "Get size of buf of wal file {:?} of height {} failed!",
+                fs, *height
+            );
             let fsize = res_fsize.expect(&expect_str);
             if fsize <= 5 {
                 return vec_out;
@@ -198,7 +204,10 @@ impl Wal {
                 if index + bodylen > fsize {
                     break;
                 }
-                vec_out.push((LogType::from(mtype), vec_buf[index..index + bodylen].to_vec()));
+                vec_out.push((
+                    LogType::from(mtype),
+                    vec_buf[index..index + bodylen].to_vec(),
+                ));
                 index += bodylen;
             }
         }
