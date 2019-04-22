@@ -66,7 +66,7 @@ where
     pub fn start(
         s: Sender<BftMsg>,
         r: Receiver<BftMsg>,
-        f: T,
+        f: Arc<T>,
         local_address: Address,
         wal_path: &str,
     ) {
@@ -287,7 +287,7 @@ where
         r: Receiver<BftMsg>,
         ts: Sender<TimeoutInfo>,
         tn: Receiver<TimeoutInfo>,
-        f: T,
+        f: Arc<T>,
         local_address: Hash,
         wal_path: &str,
     ) -> Self {
@@ -315,7 +315,7 @@ where
             proposals: ProposalCollector::new(),
             votes: VoteCollector::new(),
             wal_log: Wal::new(wal_path).unwrap(),
-            function: Arc::new(f),
+            function: f,
             consensus_power: false,
         }
     }
