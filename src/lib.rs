@@ -25,6 +25,7 @@ use crossbeam::crossbeam_channel::{unbounded, Sender};
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 use std::collections::HashMap;
 use std::hash::{Hash as Hashable, Hasher};
+use std::sync::Arc;
 
 /// The core algorithm of the BFT state machine.
 pub mod algorithm;
@@ -58,7 +59,7 @@ pub struct BftActuator(Sender<BftMsg>);
 
 impl BftActuator {
     /// A function to create a new Bft actuator and start the BFT state machine.
-    pub fn new<T: BftSupport + 'static>(support: T, address: Address, wal_path: &str) -> Self {
+    pub fn new<T: BftSupport + 'static>(support: Arc<T>, address: Address, wal_path: &str) -> Self {
         let (sender, internal_receiver) = unbounded();
         Bft::start(
             sender.clone(),
