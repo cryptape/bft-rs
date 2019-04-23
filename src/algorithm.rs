@@ -128,11 +128,11 @@ where
                         if let Some(prop) = self.handle_proposal(proposal) {
                             self.set_proposal(prop);
                             if self.step == Step::ProposeWait {
-                                self.change_to_step(Step::Prevote);
+//                                self.change_to_step(Step::Prevote);
                                 self.transmit_prevote();
-                                if self.check_prevote_count() {
-                                    self.change_to_step(Step::PrevoteWait);
-                                }
+//                                if self.check_prevote_count() {
+//                                    self.change_to_step(Step::PrevoteWait);
+//                                }
                             }
                         }
                     }
@@ -199,7 +199,7 @@ where
                         self.change_to_step(Step::VerifyWait);
                     } else {
                         self.transmit_precommit();
-                        self.handle_precommit();
+//                        self.handle_precommit();
                     }
                 }
             }
@@ -255,7 +255,7 @@ where
                 }
 
                 self.transmit_precommit();
-                self.handle_precommit();
+//                self.handle_precommit();
             }
             Step::Precommit => {
                 self.transmit_prevote();
@@ -276,7 +276,7 @@ where
                 // next do precommit
                 self.change_to_step(Step::Precommit);
                 self.transmit_precommit();
-                self.handle_precommit();
+//                self.handle_precommit();
             }
             _ => error!("Invalid Timeout Info!"),
         }
@@ -587,6 +587,8 @@ where
             self.height, self.round
         );
 
+        self.change_to_step(Step::Prevote);
+
         let vote = Vote {
             vote_type: VoteType::Prevote,
             height: self.height,
@@ -596,11 +598,13 @@ where
         };
         let signed_vote = self.build_signed_vote(&vote);
 
-        let vote_weight = self.get_vote_weight(self.height, &vote.voter);
-        let _ = self.votes.add(&signed_vote, vote_weight, self.height);
+//        let vote_weight = self.get_vote_weight(self.height, &vote.voter);
+//        let _ = self.votes.add(&signed_vote, vote_weight, self.height);
 
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
-        self.function.transmit(msg);
+
+        self.function.transmit(msg.clone());
+        self.send_bft_msg(msg);
         info!("Bft prevotes to {:?}", block_hash);
 
         self.set_timer(
@@ -631,11 +635,12 @@ where
         };
         let signed_vote = self.build_signed_vote(&vote);
 
-        let vote_weight = self.get_vote_weight(self.height, &vote.voter);
-        let _ = self.votes.add(&signed_vote, vote_weight, self.height);
+//        let vote_weight = self.get_vote_weight(self.height, &vote.voter);
+//        let _ = self.votes.add(&signed_vote, vote_weight, self.height);
 
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
-        self.function.transmit(msg);
+        self.function.transmit(msg.clone());
+        self.send_bft_msg(msg);
         info!("Bft precommits to {:?}", block_hash);
 
         self.set_timer(
@@ -722,7 +727,7 @@ where
 
             if self.try_transmit_proposal() {
                 self.transmit_prevote();
-                self.change_to_step(Step::Prevote);
+//                self.change_to_step(Step::Prevote);
             } else {
                 self.change_to_step(Step::ProposeWait);
             }
