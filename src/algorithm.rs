@@ -411,14 +411,16 @@ where
             address: proposal.proposer.clone(),
         };
 
-        self.function.commit(commit).unwrap();
-
         info!(
             "Bft commits {:?} at height {:?}, consumes consensus time {:?}",
             lock_status.block_hash,
             self.height,
             Instant::now() - self.htime
         );
+
+        if let Ok(status) = self.function.commit(commit){
+            self.send_bft_msg(BftMsg::Status(status));
+        }
 
         self.last_commit_round = Some(self.round);
         self.last_commit_block_hash = Some(self.function.crypt_hash(&proposal.block));

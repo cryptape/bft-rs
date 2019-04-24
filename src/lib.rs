@@ -435,11 +435,10 @@ impl Decodable for Proof {
 /// User-defined functions.
 pub trait BftSupport: Sync + Send {
     type Error: ::std::fmt::Debug;
-
     /// A user-defined function for block validation.
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate block format, block headers here.
-    fn check_block(&self, block: &[u8], height: u64) -> Result<bool, Self::Error>;
+    fn check_block(&self, block: &[u8], height: u64) -> Result<(), Self::Error>;
     /// A user-defined function for transactions validation.
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate transactions here.
@@ -450,7 +449,7 @@ pub trait BftSupport: Sync + Send {
         signed_proposal_hash: &[u8],
         height: u64,
         round: u64,
-    ) -> Result<bool, Self::Error>;
+    ) -> Result<(), Self::Error>;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,
     /// users do not have to care about the structure of Proposal and Vote.
@@ -458,7 +457,7 @@ pub trait BftSupport: Sync + Send {
     /// A user-defined function for processing the reaching-consensus block.
     /// Users could execute the block inside and add it into chain.
     /// The height of proof inside the commit equals to block height.
-    fn commit(&self, commit: Commit) -> Result<(), Self::Error>;
+    fn commit(&self, commit: Commit) -> Result<Status, Self::Error>;
     /// A user-defined function for feeding the bft consensus.
     /// The new block provided will feed for bft consensus of giving [`height`]
     fn get_block(&self, height: u64) -> Result<Vec<u8>, Self::Error>;

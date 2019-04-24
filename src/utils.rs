@@ -376,13 +376,13 @@ where
             if self.function.check_block(block, height).map_err(|e| {
                 error!("Bft call check_block function encounters {:?}", e);
                 BftError::CheckBlockFailed
-            })? && self
+            }).and(Ok(true))? && self
                 .function
                 .check_txs(block, proposal_hash, height, round)
                 .map_err(|e| {
                     error!("Bft call check_txs function encounters {:?}", e);
                     BftError::CheckTxFailed
-                })?
+                }).and(Ok(true))?
             {
                 self.save_verify_res(&block_hash, true);
                 Ok(())
@@ -397,7 +397,7 @@ where
             if !self.function.check_block(block, height).map_err(|e| {
                 error!("Bft call check_block function encounters {:?}", e);
                 BftError::CheckBlockFailed
-            })? {
+            }).and(Ok(true))? {
                 self.save_verify_res(&block_hash, false);
                 return Err(BftError::CheckBlockFailed);
             }
@@ -407,7 +407,7 @@ where
             cross_thread::scope(|s| {
                 s.spawn(move |_| {
                     let is_pass = match function.check_txs(block, proposal_hash, height, round) {
-                        Ok(is_pass) => is_pass,
+                        Ok(_) => true,
                         Err(e) => {
                             error!("Bft call check_txs function encounters {:?}", e);
                             false
