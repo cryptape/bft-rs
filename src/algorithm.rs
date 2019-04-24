@@ -700,6 +700,7 @@ where
         }
         if self.is_proposer() {
             if new_round {
+                self.feeds.clear();
                 let function = self.function.clone();
                 let sender = self.msg_sender.clone();
                 let height = self.height;
