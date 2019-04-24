@@ -192,8 +192,8 @@ where
         let address = self
             .function
             .check_sig(&signed_proposal.signature, &proposal_hash)
-            .map_err(|_e| {
-                // TODO: print error
+            .map_err(|e| {
+                error!("Bft call check_sig function encounters {:?}", e);
                 BftError::CheckSigFailed
             })?;
         if proposal.proposer != address {
@@ -259,8 +259,8 @@ where
         let address = self
             .function
             .check_sig(&signed_vote.signature, &vote_hash)
-            .map_err(|_e| {
-                // TODO: print error
+            .map_err(|e| {
+                error!("Bft call check_sig function encounters {:?}", e);
                 BftError::CheckSigFailed
             })?;
         if vote.voter != address {
@@ -373,14 +373,14 @@ where
 
         #[cfg(not(feature = "verify_req"))]
         {
-            if self.function.check_block(block, height).map_err(|_e| {
-                // TODO: print error
+            if self.function.check_block(block, height).map_err(|e| {
+                error!("Bft call check_block function encounters {:?}", e);
                 BftError::CheckBlockFailed
             })? && self
                 .function
                 .check_txs(block, proposal_hash, height, round)
-                .map_err(|_e| {
-                    // TODO: print error
+                .map_err(|e| {
+                    error!("Bft call check_txs function encounters {:?}", e);
                     BftError::CheckTxFailed
                 })?
             {
@@ -394,8 +394,8 @@ where
 
         #[cfg(feature = "verify_req")]
         {
-            if !self.function.check_block(block, height).map_err(|_e| {
-                // TODO: print error
+            if !self.function.check_block(block, height).map_err(|e| {
+                error!("Bft call check_block function encounters {:?}", e);
                 BftError::CheckBlockFailed
             })? {
                 self.save_verify_res(&block_hash, false);
@@ -409,7 +409,7 @@ where
                     let is_pass = match function.check_txs(block, proposal_hash, height, round) {
                         Ok(is_pass) => is_pass,
                         Err(e) => {
-                            // TODO: print error
+                            error!("Bft call check_txs function encounters {:?}", e);
                             false
                         }
                     };
@@ -618,8 +618,8 @@ where
         let address = self
             .function
             .check_sig(signature, &vote_hash)
-            .map_err(|_e| {
-                // TODO: print log
+            .map_err(|e| {
+                error!("Bft call crypt_hash function encounters {:?}", e);
                 BftError::CheckSigFailed
             })?;
         if &address != voter {
