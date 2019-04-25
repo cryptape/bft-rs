@@ -709,7 +709,10 @@ where
 
         self.height = new_height;
         self.round = 0;
-        self.htime = Instant::now();
+
+        let now = Instant::now();
+        info!("Bft goto new height, last height cost {:?} to reach consensus", now - self.htime);
+        self.htime = now;
     }
 
     #[inline]
