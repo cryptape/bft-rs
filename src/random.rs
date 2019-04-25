@@ -1,7 +1,7 @@
 use rand_core::{RngCore, SeedableRng};
 use rand_pcg::Pcg64Mcg as Pcg;
 
-pub(crate) fn get_proposer(seed: u64, weight: &[u64]) -> usize {
+pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
     let sum: u64 = weight.iter().sum();
     let x = u64::max_value() / sum;
 
@@ -23,10 +23,10 @@ pub(crate) fn get_proposer(seed: u64, weight: &[u64]) -> usize {
 
 #[cfg(test)]
 mod test {
-    use super::get_proposer;
+    use super::get_index;
 
     #[test]
-    fn test_rand_proposer() {
+    fn test_get_index() {
         let weight = vec![1u64, 2u64, 1u64, 10u64];
         let mut count_0 = 0;
         let mut count_1 = 0;
@@ -34,8 +34,8 @@ mod test {
         let mut count_3 = 0;
         for x in 0..1000 {
             let seed = x as u64;
-            let index_1 = get_proposer(seed, &weight);
-            let index_2 = get_proposer(seed, &weight);
+            let index_1 = get_index(seed, &weight);
+            let index_2 = get_index(seed, &weight);
             match index_1 {
                 0 => count_0 += 1,
                 1 => count_1 += 1,

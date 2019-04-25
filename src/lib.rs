@@ -17,7 +17,7 @@ extern crate rlp;
 
 use crate::{
     algorithm::Bft,
-    error::BftError,
+    error::{BftError, BftResult},
     objects::{Vote, VoteType},
 };
 
@@ -26,6 +26,8 @@ use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 use std::collections::HashMap;
 use std::hash::{Hash as Hashable, Hasher};
 use std::sync::Arc;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
+
 
 /// The core algorithm of the BFT state machine.
 pub mod algorithm;
@@ -53,7 +55,13 @@ pub type Hash = Vec<u8>;
 /// Type for signature.
 pub type Signature = Vec<u8>;
 
-pub type BftResult<T> = ::std::result::Result<T, BftError>;
+pub type Block = Vec<u8>;
+
+pub type Encode = Vec<u8>;
+
+pub type Height = u64;
+
+pub type Round = u64;
 
 pub struct BftActuator(Sender<BftMsg>);
 
@@ -73,14 +81,15 @@ impl BftActuator {
 
     /// A function for sending msg to the BFT state machine.
     pub fn send(&self, msg: BftMsg) -> BftResult<()> {
-        self.0.send(msg).map_err(|_| BftError::SendMsgErr)
+        let info = format!("{:?} by BftActuator", &msg);
+        self.0.send(msg).map_err(|_| BftError::SendMsgErr(info))
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum BftMsg {
-    Proposal(Vec<u8>),
-    Vote(Vec<u8>),
+    Proposal(Encode),
+    Vote(Encode),
     Status(Status),
     #[cfg(feature = "verify_req")]
     VerifyResp(VerifyResp),
@@ -99,16 +108,27 @@ pub enum VerifyResult {
 }
 
 /// A reaching consensus result of a giving height.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Commit {
     /// the commit height
-    pub height: u64,
+    pub height: Height,
     /// the reaching-consensus block content
-    pub block: Vec<u8>,
+    pub block: Block,
     /// a proof for the above block
     pub proof: Proof,
     /// the address of the reaching-consensus proposer
     pub address: Address,
+}
+
+impl Debug for Commit {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Commit {{ height: {}, block: {:?}, proof: {:?}, address: {:?}}}",
+               self.height,
+               &self.block[0..5],
+               self.proof,
+               &self.address[0..5],
+        )
+    }
 }
 
 impl Default for Commit {
@@ -136,8 +156,8 @@ impl Decodable for Commit {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
             Prototype::List(4) => {
-                let height: u64 = r.val_at(0)?;
-                let block: Vec<u8> = r.val_at(1)?;
+                let height: Height = r.val_at(0)?;
+                let block: Block = r.val_at(1)?;
                 let proof: Proof = r.val_at(2)?;
                 let address: Address = r.val_at(3)?;
                 Ok(Commit {
@@ -156,7 +176,7 @@ impl Decodable for Commit {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Status {
     /// the height of status
-    pub height: u64,
+    pub height: Height,
     /// time interval of next height. If it is none, maintain the old interval
     pub interval: Option<u64>,
     /// a new authority list for next height
@@ -186,7 +206,7 @@ impl Decodable for Status {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
             Prototype::List(3) => {
-                let height: u64 = r.val_at(0)?;
+                let height: Height = r.val_at(0)?;
                 let interval: Option<u64> = r.val_at(1)?;
                 let authority_list: Vec<Node> = r.list_at(2)?;
                 Ok(Status {
@@ -201,12 +221,21 @@ impl Decodable for Status {
 }
 
 /// A feed block for a giving height.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Feed {
     /// the height of the block
-    pub height: u64,
+    pub height: Height,
     /// the content of the block
-    pub block: Vec<u8>,
+    pub block: Block,
+}
+
+impl Debug for Feed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Feed {{ height: {}, block: {:?}}}",
+               self.height,
+               &self.block[0..5],
+        )
+    }
 }
 
 impl Default for Feed {
@@ -228,8 +257,8 @@ impl Decodable for Feed {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
             Prototype::List(2) => {
-                let height: u64 = r.val_at(0)?;
-                let block: Vec<u8> = r.val_at(1)?;
+                let height: Height = r.val_at(0)?;
+                let block: Block = r.val_at(1)?;
                 Ok(Feed { height, block })
             }
             _ => Err(DecoderError::RlpInconsistentLengthAndData),
@@ -239,12 +268,22 @@ impl Decodable for Feed {
 
 /// The verify result.
 #[cfg(feature = "verify_req")]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct VerifyResp {
     /// the response of verification
     pub is_pass: bool,
     /// block hash
-    pub block_hash: Hash,
+    pub round: Round,
+}
+
+#[cfg(feature = "verify_req")]
+impl Debug for VerifyResp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "VerifyResp {{ is_pass: {}, round: {:?}}}",
+               self.is_pass,
+               self.round,
+        )
+    }
 }
 
 #[cfg(feature = "verify_req")]
@@ -252,7 +291,7 @@ impl Default for VerifyResp {
     fn default() -> Self {
         VerifyResp {
             is_pass: false,
-            block_hash: vec![],
+            round: 0u64,
         }
     }
 }
@@ -262,7 +301,7 @@ impl Encodable for VerifyResp {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(2)
             .append(&self.is_pass)
-            .append(&self.block_hash);
+            .append(&self.round);
     }
 }
 
@@ -272,10 +311,10 @@ impl Decodable for VerifyResp {
         match r.prototype()? {
             Prototype::List(2) => {
                 let is_pass: bool = r.val_at(0)?;
-                let block_hash: Hash = r.val_at(1)?;
+                let round: Round = r.val_at(1)?;
                 Ok(VerifyResp {
                     is_pass,
-                    block_hash,
+                    round,
                 })
             }
             _ => Err(DecoderError::RlpInconsistentLengthAndData),
@@ -284,7 +323,7 @@ impl Decodable for VerifyResp {
 }
 
 /// The bft Node
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node {
     /// the address of node
     pub address: Address,
@@ -292,6 +331,16 @@ pub struct Node {
     pub proposal_weight: u32,
     /// the weight for calculating vote
     pub vote_weight: u32,
+}
+
+impl Debug for Node {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Node {{ address: {:?}, weight: {}/{}}}",
+               &self.address[0..5],
+               self.proposal_weight,
+               self.vote_weight,
+        )
+    }
 }
 
 impl Encodable for Node {
@@ -337,16 +386,26 @@ impl Node {
 }
 
 /// Proof
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Proof {
     /// proof height
-    pub height: u64,
+    pub height: Height,
     /// the round reaching consensus
-    pub round: u64,
+    pub round: Round,
     /// the block_hash reaching consensus
     pub block_hash: Hash,
     /// the voters and corresponding signatures
     pub precommit_votes: HashMap<Address, Signature>,
+}
+
+impl Debug for Proof {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Proof {{ height: {}, round: {}, block_hash: {:?}}}",
+               self.height,
+               self.round,
+               &self.block_hash[0..5],
+        )
+    }
 }
 
 impl Default for Proof {
@@ -399,9 +458,9 @@ impl Decodable for Proof {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
             Prototype::List(5) => {
-                let height: u64 = r.val_at(0)?;
-                let round: u64 = r.val_at(1)?;
-                let block_hash: Vec<u8> = r.val_at(2)?;
+                let height: Height = r.val_at(0)?;
+                let round: Round = r.val_at(1)?;
+                let block_hash: Hash = r.val_at(2)?;
                 let key_list: Vec<Address> = r.list_at(3)?;
                 let value_list: Vec<Signature> = r.list_at(4)?;
                 if key_list.len() != value_list.len() {

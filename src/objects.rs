@@ -16,23 +16,35 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use crate::*;
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct Proposal {
     /// The height of proposal.
-    pub(crate) height: u64,
+    pub(crate) height: Height,
     /// The round of proposal.
-    pub(crate) round: u64,
+    pub(crate) round: Round,
     /// The proposal content.
-    pub(crate) block: Vec<u8>,
+    pub(crate) block: Block,
     ///
     pub(crate) proof: Proof,
     /// A lock round of the proposal.
-    pub(crate) lock_round: Option<u64>,
+    pub(crate) lock_round: Option<Round>,
     /// The lock votes of the proposal.
     pub(crate) lock_votes: Vec<SignedVote>,
     /// The address of proposer.
     pub(crate) proposer: Address,
+}
+
+impl Debug for Proposal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Proposal {{ height: {}, round: {}, block: {:?}, proposer: {:?}}}",
+               self.height,
+               self.round,
+               &self.block[0..5],
+               &self.proposer[0..5],
+        )
+    }
 }
 
 impl Encodable for Proposal {
@@ -52,13 +64,13 @@ impl Decodable for Proposal {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
             Prototype::List(7) => {
-                let height: u64 = r.val_at(0)?;
-                let round: u64 = r.val_at(1)?;
-                let block: Vec<u8> = r.val_at(2)?;
+                let height: Height = r.val_at(0)?;
+                let round: Round = r.val_at(1)?;
+                let block: Block = r.val_at(2)?;
                 let proof: Proof = r.val_at(3)?;
-                let lock_round: Option<u64> = r.val_at(4)?;
+                let lock_round: Option<Round> = r.val_at(4)?;
                 let lock_votes: Vec<SignedVote> = r.list_at(5)?;
-                let proposer: Vec<u8> = r.val_at(6)?;
+                let proposer: Address = r.val_at(6)?;
                 Ok(Proposal {
                     height,
                     round,
@@ -78,12 +90,21 @@ impl Decodable for Proposal {
 /// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
 /// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
 /// the proposal. Therefore, these must have same variant of `Option`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct SignedProposal {
     /// The height of proposal.
     pub(crate) proposal: Proposal,
 
     pub(crate) signature: Signature,
+}
+
+impl Debug for SignedProposal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "SignedProposal {{ proposal: {:?}, signature: {:?}}}",
+               self.proposal,
+               &self.signature[0..5],
+        )
+    }
 }
 
 impl Encodable for SignedProposal {
@@ -111,18 +132,30 @@ impl Decodable for SignedProposal {
 }
 
 /// A vote to a proposal.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub(crate) struct Vote {
     /// Prevote vote or precommit vote
     pub(crate) vote_type: VoteType,
     /// The height of vote
-    pub(crate) height: u64,
+    pub(crate) height: Height,
     /// The round of vote
-    pub(crate) round: u64,
+    pub(crate) round: Round,
     /// The vote proposal
     pub(crate) block_hash: Hash,
     /// The address of voter
     pub(crate) voter: Address,
+}
+
+impl Debug for Vote {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Vote {{ vote_type: {:?}, height: {}, round: {}, block_hash: {:?}, voter: {:?}}}",
+               self.vote_type,
+               self.height,
+               self.round,
+               &self.block_hash[0..5],
+               &self.voter[0..5],
+        )
+    }
 }
 
 impl Encodable for Vote {
@@ -143,9 +176,9 @@ impl Decodable for Vote {
             Prototype::List(5) => {
                 let vote_type: u8 = r.val_at(0)?;
                 let vote_type: VoteType = VoteType::from(vote_type);
-                let height: u64 = r.val_at(1)?;
-                let round: u64 = r.val_at(2)?;
-                let block_hash: Vec<u8> = r.val_at(3)?;
+                let height: Height = r.val_at(1)?;
+                let round: Round = r.val_at(2)?;
+                let block_hash: Hash = r.val_at(3)?;
                 let voter: Address = r.val_at(4)?;
                 Ok(Vote {
                     vote_type,
@@ -161,12 +194,21 @@ impl Decodable for Vote {
 }
 
 /// A vote to a proposal.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub(crate) struct SignedVote {
     /// Prevote vote or precommit vote
     pub(crate) vote: Vote,
     ///
     pub(crate) signature: Signature,
+}
+
+impl Debug for SignedVote {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "SignedVote {{ vote: {:?}, signature: {:?}}}",
+               self.vote,
+               &self.signature[0..5],
+        )
+    }
 }
 
 impl Encodable for SignedVote {
@@ -194,7 +236,7 @@ pub(crate) struct LockStatus {
     /// The lock proposal
     pub(crate) block_hash: Hash,
     /// The lock round
-    pub(crate) round: u64,
+    pub(crate) round: Round,
     /// The lock votes.
     pub(crate) votes: Vec<SignedVote>,
 }

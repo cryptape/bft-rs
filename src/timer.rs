@@ -1,4 +1,5 @@
 use crate::objects::Step;
+use crate::{Height, Round};
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -12,9 +13,9 @@ pub(crate) struct TimeoutInfo {
     /// A timeval of a timer.
     pub(crate) timeval: Instant,
     /// The height of the timer.
-    pub(crate) height: u64,
+    pub(crate) height: Height,
     /// The round of the timer.
-    pub(crate) round: u64,
+    pub(crate) round: Round,
     /// The step of the timer.
     pub(crate) step: Step,
 }

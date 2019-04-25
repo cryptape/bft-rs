@@ -1,51 +1,65 @@
+
+pub type BftResult<T> = ::std::result::Result<T, BftError>;
 /// Error for Bft actuator.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BftError {
     /// Send message error.
-    SendMsgErr,
+    SendMsgErr(String),
     /// Receive message error.
-    RecvMsgErr,
+    RecvMsgErr(String),
     /// Message type error.
-    MsgTypeErr,
+    MsgTypeErr(String),
     /// Unreachable error.
-    Unreachable,
+    Unreachable(String),
 
-    DecodeErr,
+    DecodeErr(String),
 
-    ObsoleteMsg,
+    ObsoleteMsg(String),
 
-    HigherMsg,
+    HigherMsg(String),
 
-    SaveWalErr,
+    SaveWalErr(String),
 
-    ShouldNotHappen,
+    ShouldNotHappen(String),
 
-    EmptyAuthManage,
+    EmptyAuthManage(String),
 
-    InvalidProposer,
+    InvalidSender(String),
 
-    InvalidVoter,
+    CheckBlockFailed(String),
 
-    CheckBlockFailed,
+    CheckTxFailed(String),
 
-    CheckTxFailed,
+    NoConsensusPower(String),
 
-    NoConsensusPower,
+    CheckSigFailed(String),
 
-    CheckSigFailed,
+    SignFailed(String),
 
-    //    FailedToSign,
-    MismatchingProposer,
+    CommitFailed(String),
 
-    MismatchingVoter,
+    RepeatLockVote(String),
 
-    MismatchingVote,
+    NotEnoughVotes(String),
 
-    RepeatLockVote,
+    CheckProofFailed(String),
 
-    NotEnoughVotes,
+    CheckLockVotesFailed(String),
 
-    CheckProofFailed,
+    VoteError(String),
 
-    VoteError,
+    RecvMsgAgain(String),
+
+    NotReady(String),
+}
+
+pub(crate) fn handle_error<T>(result: BftResult<T>) {
+    if let Err(error) = result {
+        match error {
+            BftError::NotReady(_) => info!("{:?}", error),
+            BftError::CheckProofFailed(_) => warn!("Bft encounters {:?}", error),
+            BftError::Unreachable(_) => error!("Bft encounters {:?}", error),
+            _ => {}
+        }
+    }
 }
