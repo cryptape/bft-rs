@@ -173,8 +173,9 @@ where
             for (_, signed_proposal) in round_proposals.round_proposals.iter() {
                 let encode = rlp::encode(signed_proposal);
                 let msg = BftMsg::Proposal(encode);
-                self.msg_sender.send(msg.clone())
-                    .map_err(|_| BftError::SendMsgErr(format!("{:?}", msg)))?;
+                let info = format!("{:?}", &msg);
+                self.msg_sender.send(msg)
+                    .map_err(|_| BftError::SendMsgErr(info))?;
             }
         };
 
@@ -183,8 +184,9 @@ where
                 for (_, signed_vote) in vote_set.votes_by_sender.iter() {
                     let encode = rlp::encode(signed_vote);
                     let msg = BftMsg::Proposal(encode);
-                    self.msg_sender.send(msg.clone())
-                        .map_err(|_| BftError::SendMsgErr(format!("{:?}", msg)))?;
+                    let info = format!("{:?}", &msg);
+                    self.msg_sender.send(msg)
+                        .map_err(|_| BftError::SendMsgErr(info))?;
                 }
             }
         }
