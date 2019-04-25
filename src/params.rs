@@ -64,4 +64,8 @@ impl BftTimer {
     pub(crate) fn get_precommit(&self) -> Duration {
         Duration::from_millis(self.total_duration.get() * self.precommit.0 / self.precommit.1)
     }
+
+    pub(crate) fn get_total_duration(&self) -> Duration {
+        Duration::from_millis(self.total_duration.get())
+    }
 }

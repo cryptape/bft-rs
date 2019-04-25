@@ -37,6 +37,8 @@ pub enum BftError {
     RecvMsgAgain(String),
 
     NotReady(String),
+
+    ObsoleteTimer(String),
 }
 
 pub(crate) fn handle_error<T>(result: BftResult<T>) {
@@ -61,6 +63,8 @@ pub(crate) fn handle_error<T>(result: BftResult<T>) {
             | BftError::CommitFailed(_)
             | BftError::SaveWalErr(_)
             | BftError::SignFailed(_) => error!("Bft encounters {:?}", error),
+
+            BftError::ObsoleteTimer(_) => {}
         }
     }
 }

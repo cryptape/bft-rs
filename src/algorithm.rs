@@ -47,6 +47,7 @@ pub struct Bft<T: BftSupport> {
     pub(crate) htime: Instant,
     // caches
     pub(crate) feed: Option<Block>,
+    pub(crate) status: Option<Status>,
     pub(crate) verify_results: HashMap<Round, bool>,
     pub(crate) proof: Option<Proof>,
     pub(crate) proposals: ProposalCollector,
@@ -174,7 +175,6 @@ where
                 trace!("Bft receives status {:?}", &status);
                 self.check_and_save_status(&status, true)?;
                 self.handle_status(status)?;
-                self.new_round_start(true)?;
             }
 
             #[cfg(feature = "verify_req")]
@@ -207,15 +207,15 @@ where
 
     fn timeout_process(&mut self, tminfo: TimeoutInfo) -> BftResult<()>{
         if tminfo.height < self.height {
-            return Err(BftError::ObsoleteMsg(
+            return Err(BftError::ObsoleteTimer(
                 format!("TimeoutInfo height: {} < self.height: {}", tminfo.height, self.height)));
         }
         if tminfo.height == self.height && tminfo.round < self.round {
-            return Err(BftError::ObsoleteMsg(
+            return Err(BftError::ObsoleteTimer(
                 format!("TimeoutInfo round: {} < self.round: {}", tminfo.round, self.round)));
         }
         if tminfo.height == self.height && tminfo.round == self.round && tminfo.step != self.step {
-            return Err(BftError::ObsoleteMsg(
+            return Err(BftError::ObsoleteTimer(
                 format!("TimeoutInfo step: {:?} != self.step: {:?}", tminfo.step, self.step)));
         }
 
@@ -269,6 +269,13 @@ where
                 self.change_to_step(Step::Precommit);
                 self.transmit_precommit()?;
             }
+
+            Step::CommitWait => {
+                self.set_status(&self.status.clone().unwrap());
+                self.goto_new_height(self.height + 1);
+                self.new_round_start(true)?;
+                self.flush_cache()?;
+            }
             _ => error!("Invalid Timeout Info!"),
         }
 
@@ -304,6 +311,7 @@ where
             feed: None,
             verify_results: HashMap::new(),
             proof: Some(Proof::default()),
+            status: None,
             authority_manage: AuthorityManage::new(),
             proposals: ProposalCollector::new(),
             votes: VoteCollector::new(),
@@ -375,7 +383,6 @@ where
             PrecommitRes::Proposal => {
                 self.change_to_step(Step::Commit);
                 self.handle_commit()?;
-                self.change_to_step(Step::CommitWait);
             }
             _ => {}
         }
@@ -424,48 +431,32 @@ where
 
         // receive a rich status that height ge self.height is the only way to go to new height
         if status.height >= self.height {
+            self.status = Some(status.clone());
+
+            #[cfg(not(feature = "machine_gun"))]
+                {
+                    if status.height == self.height {
+                        let cost_time = Instant::now() - self.htime;
+                        let interval = self.params.timer.get_total_duration();
+                        let mut tv = Duration::new(0, 0);
+                        if cost_time < interval {
+                            tv = interval - cost_time;
+                        }
+                        self.change_to_step(Step::CommitWait);
+                        self.set_timer(tv, Step::CommitWait);
+                        return Ok(());
+                    }
+                }
+
             if status.height > self.height {
                 // recvive higher status, clean last commit info then go to new height
                 self.last_commit_block_hash = None;
                 self.last_commit_round = None;
             }
-            // goto new height directly and update authorty list
 
-            self.authority_manage
-                .receive_authorities_list(status.height, status.authority_list.clone());
-            trace!("Bft updates authority_manage {:?}", self.authority_manage);
-
-            if self.consensus_power
-                && !status
-                    .authority_list
-                    .iter()
-                    .any(|node| node.address == self.params.address)
-            {
-                info!(
-                    "Bft loses consensus power in height {} and stops the bft-rs process!",
-                    status.height
-                );
-                self.consensus_power = false;
-            } else if !self.consensus_power
-                && status
-                    .authority_list
-                    .iter()
-                    .any(|node| node.address == self.params.address)
-            {
-                info!(
-                    "Bft accesses consensus power in height {} and starts the bft-rs process!",
-                    status.height
-                );
-                self.consensus_power = true;
-            }
-
-            if let Some(interval) = status.interval {
-                // update the bft interval
-                self.params.timer.set_total_duration(interval);
-            }
-
+            self.set_status(&status);
             self.goto_new_height(status.height + 1);
-
+            self.new_round_start(true)?;
             self.flush_cache()?;
 
             info!(
@@ -830,6 +821,41 @@ where
     pub(crate) fn set_proof(&mut self, proof: &Proof) {
         if self.proof.is_none() || self.proof.iter().next().unwrap().height != self.height - 1 {
             self.proof = Some(proof.clone());
+        }
+    }
+
+    fn set_status(&mut self, status: &Status) {
+        self.authority_manage
+            .receive_authorities_list(status.height, status.authority_list.clone());
+        trace!("Bft updates authority_manage {:?}", self.authority_manage);
+
+        if self.consensus_power
+            && !status
+            .authority_list
+            .iter()
+            .any(|node| node.address == self.params.address)
+        {
+            info!(
+                "Bft loses consensus power in height {} and stops the bft-rs process!",
+                status.height
+            );
+            self.consensus_power = false;
+        } else if !self.consensus_power
+            && status
+            .authority_list
+            .iter()
+            .any(|node| node.address == self.params.address)
+        {
+            info!(
+                "Bft accesses consensus power in height {} and starts the bft-rs process!",
+                status.height
+            );
+            self.consensus_power = true;
+        }
+
+        if let Some(interval) = status.interval {
+            // update the bft interval
+            self.params.timer.set_total_duration(interval);
         }
     }
 
