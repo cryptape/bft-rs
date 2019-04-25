@@ -531,13 +531,16 @@ pub trait BftSupport: Sync + Send {
 /// A public function for proof validation.
 /// The input [`height`] is the height of block involving the proof.
 /// The input [`authorities`] is the authority_list for the proof.
-/// The fn [`crypt_hash`], [`check_sig`], [`hash`] are user-defined.
+/// The fn [`crypt_hash`], [`check_sig`] are user-defined.
+/// signature of the functions:
+/// - [`crypt_hash`]: `fn(msg: &[u8]) -> Vec<u8>`
+/// - [`check_sig`]:  `fn(signature: &[u8], hash: &[u8]) -> Option<Address>`
 pub fn check_proof(
     proof: &Proof,
     height: u64,
     authorities: &[Node],
-    crypt_hash: fn(msg: &[u8]) -> Vec<u8>,
-    check_sig: fn(signature: &[u8], hash: &[u8]) -> Option<Address>,
+    crypt_hash: impl Fn(&[u8]) -> Vec<u8>,
+    check_sig: impl Fn(&[u8], &[u8]) -> Option<Address>,
 ) -> bool {
     if proof.height == 0 {
         return true;
