@@ -828,6 +828,8 @@ where
     }
 
     pub(crate) fn set_proof(&mut self, proof: &Proof) {
+        info!("{:?}, {:?}", &self.proof, self.proof.iter().next());
+
         if self.proof.is_none() || self.proof.iter().next().unwrap().height != proof.height - 1 {
             self.proof = Some(proof.clone());
         }
