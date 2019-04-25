@@ -488,7 +488,7 @@ where
             for signed_vote in &proposal.lock_votes {
                 let voter = self.check_vote(height, lock_round, block_hash, signed_vote)?;
                 if let Some(_) = map.insert(voter, 1) {
-                    return Err(BftError::RepeatLockVote(format!("vote repeat of {:?} in {:?} with lock_votes {:?}", signed_vote, proposal, &proposal.lock_votes)));
+                    return Err(BftError::CheckLockVotesFailed(format!("vote repeat of {:?} in {:?} with lock_votes {:?}", signed_vote, proposal, &proposal.lock_votes)));
                 }
             }
         } else {
@@ -505,7 +505,7 @@ where
         if get_votes_weight(authorities, &vote_addresses) * 3 > get_total_weight(authorities) * 2 {
             return Ok(());
         }
-        Err(BftError::NotEnoughVotes(format!("{:?} with lock_votes {:?}", proposal, &proposal.lock_votes)))
+        Err(BftError::CheckLockVotesFailed(format!("less than 2/3+ weight of {:?} with lock_votes {:?}", proposal, &proposal.lock_votes)))
     }
 
     pub(crate) fn check_vote(

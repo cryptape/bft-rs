@@ -7,10 +7,6 @@ pub enum BftError {
     SendMsgErr(String),
     /// Receive message error.
     RecvMsgErr(String),
-    /// Message type error.
-    MsgTypeErr(String),
-    /// Unreachable error.
-    Unreachable(String),
 
     DecodeErr(String),
 
@@ -22,15 +18,11 @@ pub enum BftError {
 
     ShouldNotHappen(String),
 
-    EmptyAuthManage(String),
-
     InvalidSender(String),
 
     CheckBlockFailed(String),
 
     CheckTxFailed(String),
-
-    NoConsensusPower(String),
 
     CheckSigFailed(String),
 
@@ -38,15 +30,9 @@ pub enum BftError {
 
     CommitFailed(String),
 
-    RepeatLockVote(String),
-
-    NotEnoughVotes(String),
-
     CheckProofFailed(String),
 
     CheckLockVotesFailed(String),
-
-    VoteError(String),
 
     RecvMsgAgain(String),
 
@@ -56,10 +42,25 @@ pub enum BftError {
 pub(crate) fn handle_error<T>(result: BftResult<T>) {
     if let Err(error) = result {
         match error {
-            BftError::NotReady(_) => info!("{:?}", error),
-            BftError::CheckProofFailed(_) => warn!("Bft encounters {:?}", error),
-            BftError::Unreachable(_) => error!("Bft encounters {:?}", error),
-            _ => {}
+            BftError::NotReady(_)
+            | BftError::ObsoleteMsg(_)
+            | BftError::HigherMsg(_)
+            | BftError::RecvMsgAgain(_) => info!("Bft encounters {:?}", error),
+
+            BftError::CheckProofFailed(_)
+            | BftError::CheckBlockFailed(_)
+            | BftError::CheckLockVotesFailed(_)
+            | BftError::CheckSigFailed(_)
+            | BftError::CheckTxFailed(_)
+            | BftError::DecodeErr(_)
+            | BftError::InvalidSender(_) => warn!("Bft encounters {:?}", error),
+
+            BftError::ShouldNotHappen(_)
+            | BftError::SendMsgErr(_)
+            | BftError::RecvMsgErr(_)
+            | BftError::CommitFailed(_)
+            | BftError::SaveWalErr(_)
+            | BftError::SignFailed(_) => error!("Bft encounters {:?}", error),
         }
     }
 }
