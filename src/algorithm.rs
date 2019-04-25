@@ -163,7 +163,7 @@ where
             }
 
             BftMsg::Feed(feed) => {
-                trace!("Bft receives feed {:?}", &feed);
+                info!("Bft receives feed {:?}", &feed);
                 self.check_and_save_feed(&feed, true)?;
 
                 if self.step == Step::ProposeWait {
@@ -485,7 +485,7 @@ where
                 self.params.timer.get_propose() * 2u32.pow(coef as u32),
                 Step::ProposeWait,
             );
-            return Err(BftError::NotReady(format!("transmit proposal")));
+            return Err(BftError::NotReady(format!("transmit proposal (feed: {:?}, proof: {:?} lock_status: {:?})", self.feed, self.proof, self.lock_status)));
         }
 
         let msg = if self.lock_status.is_some() {
