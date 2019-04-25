@@ -402,7 +402,7 @@ where
                 return Err(BftError::CheckBlockFailed);
             }
 
-            let mut function = self.function.clone();
+            let function = self.function.clone();
             let sender = self.msg_sender.clone();
             cross_thread::scope(|s| {
                 s.spawn(move |_| {
