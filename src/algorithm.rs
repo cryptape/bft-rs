@@ -116,7 +116,7 @@ where
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
                     let signed_proposal: SignedProposal = rlp::decode(&encode)
-                        .or(Err(BftError::DecodeErr(format!("encode {:?} of signed_proposal", &encode[0..5]))))?;
+                        .or(Err(BftError::DecodeErr("signed_proposal".to_string())))?;
                     trace!("Bft receives {:?}", &signed_proposal);
                     self.check_and_save_proposal(&signed_proposal, &encode, true)?;
 
@@ -134,7 +134,7 @@ where
             BftMsg::Vote(encode) => {
                 if self.consensus_power {
                     let signed_vote: SignedVote = rlp::decode(&encode)
-                            .or(Err(BftError::DecodeErr(format!("encode {:?} of vote", &encode[0..5]))))?;
+                            .or(Err(BftError::DecodeErr("signed_vote".to_string())))?;
                     trace!("Bft receives {:?}", &signed_vote);
                     self.check_and_save_vote(&signed_vote, true)?;
 

@@ -122,11 +122,9 @@ pub struct Commit {
 
 impl Debug for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Commit {{ height: {}, block: {:?}, proof: {:?}, address: {:?}}}",
+        write!(f, "Commit {{ height: {}, address: {:?}}}",
                self.height,
-               &self.block[0..5],
-               self.proof,
-               &self.address[0..5],
+               self.address,
         )
     }
 }
@@ -231,9 +229,8 @@ pub struct Feed {
 
 impl Debug for Feed {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Feed {{ height: {}, block: {:?}}}",
-               self.height,
-               &self.block[0..5],
+        write!(f, "Feed {{ height: {}}}",
+               self.height
         )
     }
 }
@@ -336,7 +333,7 @@ pub struct Node {
 impl Debug for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Node {{ address: {:?}, weight: {}/{}}}",
-               &self.address[0..5],
+               self.address,
                self.proposal_weight,
                self.vote_weight,
         )
@@ -403,7 +400,7 @@ impl Debug for Proof {
         write!(f, "Proof {{ height: {}, round: {}, block_hash: {:?}}}",
                self.height,
                self.round,
-               &self.block_hash[0..5],
+               self.block_hash,
         )
     }
 }
