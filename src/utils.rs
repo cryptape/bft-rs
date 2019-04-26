@@ -63,6 +63,10 @@ where
                     info!("Load status {:?}!", &msg);
                     let _rst = self.send_bft_msg(BftMsg::Status(rlp::decode(&msg).unwrap()));
                 }
+                LogType::Proof => {
+                    info!("Load proof {:?}!", &msg);
+                    let _rst = self.send_bft_msg(BftMsg::Clear(rlp::decode(&msg).unwrap()));
+                }
                 #[cfg(feature = "verify_req")]
                 LogType::VerifyResp => {
                     info!("Load verify_resp {:?}!", &msg);
@@ -324,9 +328,12 @@ where
         if self.height > 0 && height < self.height - 1 {
             return Err(BftError::ObsoleteMsg(format!("{:?}", status)));
         }
-        if need_wal {
+        if need_wal && height == self.height {
             self.wal_log
-                .save(height + 1, LogType::Status, &rlp::encode(status))
+                .save(self.height + 1, LogType::Proof, &rlp::encode(&self.proof))
+                .or(Err(BftError::SaveWalErr(format!("{:?}", &self.proof))))?;
+            self.wal_log
+                .save(self.height + 1, LogType::Status, &rlp::encode(status))
                 .or(Err(BftError::SaveWalErr(format!("{:?}", status))))?;
         }
 

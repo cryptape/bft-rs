@@ -336,6 +336,7 @@ pub(crate) enum LogType {
     Proposal,
     Vote,
     Status,
+    Proof,
     Feed,
     #[cfg(feature = "verify_req")]
     VerifyResp,
@@ -347,9 +348,10 @@ impl From<u8> for LogType {
             0 => LogType::Proposal,
             1 => LogType::Vote,
             2 => LogType::Status,
-            3 => LogType::Feed,
+            3 => LogType::Proof,
+            4 => LogType::Feed,
             #[cfg(feature = "verify_req")]
-            4 => LogType::VerifyResp,
+            5 => LogType::VerifyResp,
             _ => panic!("Invalid vote type!"),
         }
     }
@@ -361,9 +363,10 @@ impl Into<u8> for LogType {
             LogType::Proposal => 0,
             LogType::Vote => 1,
             LogType::Status => 2,
-            LogType::Feed => 3,
+            LogType::Proof => 3,
+            LogType::Feed => 4,
             #[cfg(feature = "verify_req")]
-            LogType::VerifyResp => 4,
+            LogType::VerifyResp => 5,
         }
     }
 }
