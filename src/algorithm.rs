@@ -412,6 +412,7 @@ where
         let lock_status = self.lock_status.clone().expect("No lock when commit!");
 
         let proof = self.generate_proof(lock_status.clone());
+        info!("Bft generate {:?}", &proof);
         self.proof = Some(proof.clone());
 
         let signed_proposal = self.proposals.get_proposal(self.height, self.round).ok_or(
@@ -760,10 +761,11 @@ where
 
     fn is_proposer(&self) -> BftResult<bool> {
         let proposer = self.get_proposer(self.height, self.round)?;
+        info!("Bft chooses proposer {:?} at height {}, round {}", proposer, self.height, self.round);
 
         if self.params.address == *proposer {
             info!(
-                "Bft becomes proposer at height {:?}, round {:?}",
+                "Bft becomes proposer at height {}, round {}",
                 self.height, self.round
             );
             return Ok(true);
@@ -860,6 +862,7 @@ where
     pub(crate) fn set_proof(&mut self, proof: &Proof) {
         if self.proof.is_none() || self.proof.iter().next().unwrap().height != self.height - 1 {
             self.proof = Some(proof.clone());
+            info!("set proof {:?}", proof);
         }
     }
 

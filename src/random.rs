@@ -14,7 +14,6 @@ pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
     for (index, w) in weight.iter().enumerate() {
         acc += *w;
         if res < acc * x {
-            info!("randomly choose index: {}", index);
             return index;
         }
     }
