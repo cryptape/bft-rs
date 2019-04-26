@@ -235,7 +235,7 @@ where
         // prevent too many higher proposals flush out current proposal
         // because self.height - 1 is allowed, so judge height < self.height + CACHE_N - 1
         if height < self.height + CACHE_N - 1 && round < self.round + CACHE_N {
-            self.proposals.add(&proposal)?;
+            self.proposals.add(&signed_proposal)?;
             if need_wal {
                 self.wal_log
                     .save(height, LogType::Proposal, &rlp::encode(signed_proposal))

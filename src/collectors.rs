@@ -1,4 +1,4 @@
-use crate::objects::{Proposal, SignedVote, VoteType};
+use crate::objects::{SignedProposal, SignedVote, VoteType};
 use crate::{Address, Hash, Height, Round};
 
 use std::collections::HashMap;
@@ -243,23 +243,24 @@ impl ProposalCollector {
         }
     }
 
-    pub(crate) fn add(&mut self, proposal: &Proposal) -> BftResult<()> {
+    pub(crate) fn add(&mut self, signed_proposal: &SignedProposal) -> BftResult<()> {
+        let proposal = &signed_proposal.proposal;
         let height = proposal.height;
         let round = proposal.round;
         if self.proposals.contains_key(&height) {
             self.proposals
                 .get_mut(&height)
                 .unwrap()
-                .add(round, proposal)?
+                .add(round, signed_proposal)?
         } else {
             let mut round_proposals = ProposalRoundCollector::new();
-            round_proposals.add(round, proposal)?;
+            round_proposals.add(round, signed_proposal)?;
             self.proposals.insert(height, round_proposals);
         }
         Ok(())
     }
 
-    pub(crate) fn get_proposal(&mut self, height: Height, round: Round) -> Option<Proposal> {
+    pub(crate) fn get_proposal(&mut self, height: Height, round: Round) -> Option<SignedProposal> {
         self.proposals
             .get_mut(&height)
             .and_then(|prc| prc.get_proposal(round))
@@ -268,7 +269,7 @@ impl ProposalCollector {
 
 #[derive(Debug)]
 pub(crate) struct ProposalRoundCollector {
-    pub round_proposals: LruCache<Round, Proposal>,
+    pub round_proposals: LruCache<Round, SignedProposal>,
 }
 
 impl ProposalRoundCollector {
@@ -278,15 +279,15 @@ impl ProposalRoundCollector {
         }
     }
 
-    pub(crate) fn add(&mut self, round: Round, proposal: &Proposal) -> BftResult<()> {
+    pub(crate) fn add(&mut self, round: Round, signed_proposal: &SignedProposal) -> BftResult<()> {
         if self.round_proposals.contains_key(&round) {
-            return Err(BftError::RecvMsgAgain(format!("signed_proposal with height: {}, round: {}", proposal.height, round)));
+            return Err(BftError::RecvMsgAgain(format!("{:?}", signed_proposal)));
         }
-        self.round_proposals.insert(round, proposal.clone());
+        self.round_proposals.insert(round, signed_proposal.clone());
         Ok(())
     }
 
-    pub(crate) fn get_proposal(&mut self, round: Round) -> Option<Proposal> {
+    pub(crate) fn get_proposal(&mut self, round: Round) -> Option<SignedProposal> {
         self.round_proposals.get_mut(&round).cloned()
     }
 }

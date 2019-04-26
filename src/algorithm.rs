@@ -395,10 +395,11 @@ where
         let proof = self.generate_proof(lock_status.clone());
         self.proof = Some(proof.clone());
 
-        let proposal = self
+        let signed_proposal = self
             .proposals
             .get_proposal(self.height, self.round)
             .ok_or(BftError::ShouldNotHappen("can not fetch proposal from cache when handle commit".to_string()))?;
+        let proposal = signed_proposal.proposal;
 
         let commit = Commit {
             height: self.height,
@@ -495,10 +496,11 @@ where
             let lock_round = lock_status.round;
             let lock_votes = lock_status.votes;
 
-            let lock_proposal = self
+            let lock_signed_proposal = self
                 .proposals
                 .get_proposal(self.height, lock_round)
                 .expect("Can not get lock_proposal, it should not happen!");
+            let lock_proposal = lock_signed_proposal.proposal;
 
             let block = lock_proposal.block;
 
@@ -711,7 +713,7 @@ where
         self.round = 0;
 
         let now = Instant::now();
-        info!("Bft goto new height, last height cost {:?} to reach consensus", now - self.htime);
+        info!("Bft goto new height {}, last height cost {:?} to reach consensus", new_height, now - self.htime);
         self.htime = now;
     }
 
