@@ -77,9 +77,10 @@ where
         let encode = rlp::encode(proposal);
         let hash = self.function.crypt_hash(&encode);
 
-        let signature = self.function.sign(&hash).map_err(|e| {
-            BftError::SignFailed(format!("{:?} of {:?}", e, proposal))
-        })?;
+        let signature = self
+            .function
+            .sign(&hash)
+            .map_err(|e| BftError::SignFailed(format!("{:?} of {:?}", e, proposal)))?;
 
         Ok(SignedProposal {
             proposal: proposal.clone(),
@@ -91,9 +92,10 @@ where
         let encode = rlp::encode(vote);
         let hash = self.function.crypt_hash(&encode);
 
-        let signature = self.function.sign(&hash).map_err(|e| {
-            BftError::SignFailed(format!("{:?} of {:?}", e, vote))
-        })?;
+        let signature = self
+            .function
+            .sign(&hash)
+            .map_err(|e| BftError::SignFailed(format!("{:?} of {:?}", e, vote)))?;
 
         Ok(SignedVote {
             vote: vote.clone(),
@@ -116,7 +118,7 @@ where
         1u64
     }
 
-    fn get_authorities(&self, height: u64) -> BftResult<&Vec<Node>>{
+    fn get_authorities(&self, height: u64) -> BftResult<&Vec<Node>> {
         let p = &self.authority_manage;
         let mut authorities = &p.authorities;
         if height == p.authority_h_old {
@@ -124,7 +126,9 @@ where
             authorities = &p.authorities_old;
         }
         if authorities.len() == 0 {
-            return Err(BftError::ShouldNotHappen("the authority_list is empty".to_string()));
+            return Err(BftError::ShouldNotHappen(
+                "the authority_list is empty".to_string(),
+            ));
         }
         Ok(authorities)
     }
@@ -158,7 +162,7 @@ where
         }
     }
 
-    pub(crate) fn flush_cache(&mut self) -> BftResult<()>{
+    pub(crate) fn flush_cache(&mut self) -> BftResult<()> {
         let proposals = &mut self.proposals.proposals;
         let round_proposals = proposals.get_mut(&self.height);
         let votes = &mut self.votes.votes;
@@ -174,7 +178,8 @@ where
                 let encode = rlp::encode(signed_proposal);
                 let msg = BftMsg::Proposal(encode);
                 let info = format!("{:?}", &msg);
-                self.msg_sender.send(msg)
+                self.msg_sender
+                    .send(msg)
                     .map_err(|_| BftError::SendMsgErr(info))?;
             }
         };
@@ -183,9 +188,10 @@ where
             for (_, vote_set) in step_votes.step_votes.iter() {
                 for (_, signed_vote) in vote_set.votes_by_sender.iter() {
                     let encode = rlp::encode(signed_vote);
-                    let msg = BftMsg::Proposal(encode);
+                    let msg = BftMsg::Vote(encode);
                     let info = format!("{:?}", &msg);
-                    self.msg_sender.send(msg)
+                    self.msg_sender
+                        .send(msg)
                         .map_err(|_| BftError::SendMsgErr(info))?;
                 }
             }
@@ -195,15 +201,16 @@ where
     }
 
     #[cfg(feature = "verify_req")]
-    pub(crate) fn save_verify_res(&mut self, round: Round, is_pass: bool) -> BftResult<()>{
+    pub(crate) fn save_verify_res(&mut self, round: Round, is_pass: bool) -> BftResult<()> {
         if self.verify_results.contains_key(&round) {
             if is_pass != *self.verify_results.get(&round).unwrap() {
-                return Err(BftError::ShouldNotHappen(format!("get conflict verify result of round: {}", round)));
+                return Err(BftError::ShouldNotHappen(format!(
+                    "get conflict verify result of round: {}",
+                    round
+                )));
             }
         }
-        self.verify_results
-            .entry(round)
-            .or_insert(is_pass);
+        self.verify_results.entry(round).or_insert(is_pass);
         Ok(())
     }
 
@@ -223,12 +230,16 @@ where
 
         let address = self
             .function
-            .check_sig(&signed_proposal.signature, &self.function.crypt_hash(&rlp::encode(proposal)))
-            .map_err(|e| {
-                BftError::CheckSigFailed(format!("{:?} of {:?}", e, signed_proposal))
-            })?;
+            .check_sig(
+                &signed_proposal.signature,
+                &self.function.crypt_hash(&rlp::encode(proposal)),
+            )
+            .map_err(|e| BftError::CheckSigFailed(format!("{:?} of {:?}", e, signed_proposal)))?;
         if proposal.proposer != address {
-            return Err(BftError::InvalidSender(format!("recovers {:?} of {:?}", address, signed_proposal)));
+            return Err(BftError::InvalidSender(format!(
+                "recovers {:?} of {:?}",
+                address, signed_proposal
+            )));
         }
 
         // TODO: filter higher proposals to prevent flooding
@@ -243,7 +254,7 @@ where
             }
         }
 
-        if height > self.height || (height == self.height && round >= self.round + CACHE_N){
+        if height > self.height || (height == self.height && round >= self.round + CACHE_N) {
             return Err(BftError::HigherMsg(format!("{:?}", signed_proposal)));
         }
 
@@ -276,11 +287,12 @@ where
         let address = self
             .function
             .check_sig(&signed_vote.signature, &vote_hash)
-            .map_err(|e| {
-                BftError::CheckSigFailed(format!("{:?} of {:?}", e, signed_vote))
-            })?;
+            .map_err(|e| BftError::CheckSigFailed(format!("{:?} of {:?}", e, signed_vote)))?;
         if vote.voter != address {
-            return Err(BftError::InvalidSender(format!("recovers {:?} of {:?}", address, signed_vote)));
+            return Err(BftError::InvalidSender(format!(
+                "recovers {:?} of {:?}",
+                address, signed_vote
+            )));
         }
 
         // prevent too many high proposals flush out current proposal
@@ -368,21 +380,23 @@ where
 
         #[cfg(not(feature = "verify_req"))]
         {
-            self.function.check_block(block, height).map_err(|e| {
-                BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal))
-            })?;
-            self.function.check_txs(block, proposal_hash, height, round)
-                .map_err(|e| {
-                    BftError::CheckTxFailed(format!("{:?} of {:?}", e, proposal))
-                })?;
+            self.function
+                .check_block(block, height)
+                .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
+            self.function
+                .check_txs(block, proposal_hash, height, round)
+                .map_err(|e| BftError::CheckTxFailed(format!("{:?} of {:?}", e, proposal)))?;
             Ok(())
         }
 
         #[cfg(feature = "verify_req")]
         {
-            if let Err(e) = self.function.check_block(block, height){
+            if let Err(e) = self.function.check_block(block, height) {
                 self.save_verify_res(round, false)?;
-                return Err(BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)));
+                return Err(BftError::CheckBlockFailed(format!(
+                    "{:?} of {:?}",
+                    e, proposal
+                )));
             }
 
             let function = self.function.clone();
@@ -392,15 +406,17 @@ where
                     let is_pass = match function.check_txs(block, proposal_hash, height, round) {
                         Ok(_) => true,
                         Err(e) => {
-                            warn!("Bft encounters BftError::CheckTxsFailed({:?} of {:?})", e, proposal);
+                            warn!(
+                                "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
+                                e, proposal
+                            );
                             false
                         }
                     };
-                    let verify_resp = VerifyResp {
-                        is_pass,
-                        round,
-                    };
-                    sender.send(BftMsg::VerifyResp(verify_resp)).expect("cross_thread send verify_resp failed!");
+                    let verify_resp = VerifyResp { is_pass, round };
+                    sender
+                        .send(BftMsg::VerifyResp(verify_resp))
+                        .expect("cross_thread send verify_resp failed!");
                 });
             })
             .unwrap();
@@ -410,7 +426,10 @@ where
 
     pub(crate) fn check_proof(&mut self, height: u64, proof: &Proof) -> BftResult<()> {
         if height != self.height {
-            return Err(BftError::ShouldNotHappen(format!("check_proof for {:?}", proof)));
+            return Err(BftError::ShouldNotHappen(format!(
+                "check_proof for {:?}",
+                proof
+            )));
         }
 
         let authorities = self.get_authorities(height)?;
@@ -430,7 +449,10 @@ where
             return Ok(());
         }
         if height != proof.height + 1 {
-            return Err(BftError::CheckProofFailed(format!("height {} can not check for {:?}", height, proof)));
+            return Err(BftError::CheckProofFailed(format!(
+                "height {} can not check for {:?}",
+                height, proof
+            )));
         }
 
         let vote_addresses: Vec<Address> = proof
@@ -440,15 +462,24 @@ where
             .collect();
 
         if get_votes_weight(authorities, &vote_addresses) * 3 <= get_total_weight(authorities) * 2 {
-            return Err(BftError::CheckProofFailed(format!("not reach 2/3+ weight for {:?}", proof)));
+            return Err(BftError::CheckProofFailed(format!(
+                "not reach 2/3+ weight for {:?}",
+                proof
+            )));
         }
 
-        let authority_addresses: Vec<Address> = authorities.iter().map(|node| node.address.clone()).collect();
+        let authority_addresses: Vec<Address> = authorities
+            .iter()
+            .map(|node| node.address.clone())
+            .collect();
         let mut map = HashMap::new();
-        for (voter, sig) in proof.precommit_votes.clone(){
+        for (voter, sig) in proof.precommit_votes.clone() {
             // check repeat
             if let Some(_) = map.insert(voter.clone(), 1) {
-                return Err(BftError::CheckProofFailed(format!("vote repeat of {:?} in {:?}", &voter, proof)));
+                return Err(BftError::CheckProofFailed(format!(
+                    "vote repeat of {:?} in {:?}",
+                    &voter, proof
+                )));
             }
 
             if authority_addresses.contains(&voter) {
@@ -463,12 +494,20 @@ where
                 let address = self
                     .function
                     .check_sig(&sig, &self.function.crypt_hash(&msg))
-                    .map_err(|e| BftError::CheckProofFailed(format!("{:?}, sig {:?} in {:?}", e, sig, proof)))?;
+                    .map_err(|e| {
+                        BftError::CheckProofFailed(format!("{:?}, sig {:?} in {:?}", e, sig, proof))
+                    })?;
                 if address != voter {
-                    return Err(BftError::CheckProofFailed(format!("recover {:?} by voter {:?} in {:?}", &address, &voter, proof)));
+                    return Err(BftError::CheckProofFailed(format!(
+                        "recover {:?} by voter {:?} in {:?}",
+                        &address, &voter, proof
+                    )));
                 }
             } else {
-                return Err(BftError::CheckProofFailed(format!("voter {:?} invalid in {:?}", &voter, proof)));
+                return Err(BftError::CheckProofFailed(format!(
+                    "voter {:?} invalid in {:?}",
+                    &voter, proof
+                )));
             }
         }
 
@@ -482,7 +521,10 @@ where
     ) -> BftResult<()> {
         let height = proposal.height;
         if height < self.height - 1 || height > self.height {
-            return Err(BftError::ShouldNotHappen(format!("check_lock_votes for {:?}", proposal)));
+            return Err(BftError::ShouldNotHappen(format!(
+                "check_lock_votes for {:?}",
+                proposal
+            )));
         }
 
         let mut map = HashMap::new();
@@ -490,7 +532,10 @@ where
             for signed_vote in &proposal.lock_votes {
                 let voter = self.check_vote(height, lock_round, block_hash, signed_vote)?;
                 if let Some(_) = map.insert(voter, 1) {
-                    return Err(BftError::CheckLockVotesFailed(format!("vote repeat of {:?} in {:?} with lock_votes {:?}", signed_vote, proposal, &proposal.lock_votes)));
+                    return Err(BftError::CheckLockVotesFailed(format!(
+                        "vote repeat of {:?} in {:?} with lock_votes {:?}",
+                        signed_vote, proposal, &proposal.lock_votes
+                    )));
                 }
             }
         } else {
@@ -507,7 +552,10 @@ where
         if get_votes_weight(authorities, &vote_addresses) * 3 > get_total_weight(authorities) * 2 {
             return Ok(());
         }
-        Err(BftError::CheckLockVotesFailed(format!("less than 2/3+ weight of {:?} with lock_votes {:?}", proposal, &proposal.lock_votes)))
+        Err(BftError::CheckLockVotesFailed(format!(
+            "less than 2/3+ weight of {:?} with lock_votes {:?}",
+            proposal, &proposal.lock_votes
+        )))
     }
 
     pub(crate) fn check_vote(
@@ -518,12 +566,18 @@ where
         signed_vote: &SignedVote,
     ) -> BftResult<Address> {
         if height < self.height - 1 {
-            return Err(BftError::ShouldNotHappen(format!("check_vote for {:?}", signed_vote)));
+            return Err(BftError::ShouldNotHappen(format!(
+                "check_vote for {:?}",
+                signed_vote
+            )));
         }
 
         let vote = &signed_vote.vote;
         if vote.height != height || vote.round != round {
-            return Err(BftError::CheckLockVotesFailed(format!("vote {:?} mismatching height: {} or round: {}", signed_vote, height, round)));
+            return Err(BftError::CheckLockVotesFailed(format!(
+                "vote {:?} mismatching height: {} or round: {}",
+                signed_vote, height, round
+            )));
         }
 
         if vote.block_hash != block_hash.to_vec() {
@@ -531,13 +585,19 @@ where
                 "The lock votes of proposal {:?} contains vote for other proposal hash {:?}!",
                 block_hash, vote.block_hash
             );
-            return Err(BftError::CheckLockVotesFailed(format!("vote {:?} not for rightful block_hash {:?}", vote, block_hash)));
+            return Err(BftError::CheckLockVotesFailed(format!(
+                "vote {:?} not for rightful block_hash {:?}",
+                vote, block_hash
+            )));
         }
 
         let authorities = self.get_authorities(height)?;
         let voter = &vote.voter;
         if !authorities.iter().any(|node| &node.address == voter) {
-            return Err(BftError::CheckLockVotesFailed(format!("the voter {:?} not in authorities", voter)));
+            return Err(BftError::CheckLockVotesFailed(format!(
+                "the voter {:?} not in authorities",
+                voter
+            )));
         }
 
         let signature = &signed_vote.signature;
@@ -546,11 +606,17 @@ where
             .function
             .check_sig(signature, &vote_hash)
             .map_err(|e| {
-                BftError::CheckLockVotesFailed(format!("check sig failed with {:?} of {:?}", e, signed_vote))
+                BftError::CheckLockVotesFailed(format!(
+                    "check sig failed with {:?} of {:?}",
+                    e, signed_vote
+                ))
             })?;
         if &address != voter {
             warn!("The address recovers from the signature is {:?} which is mismatching with the sender {:?}!", &address, &voter);
-            return Err(BftError::CheckLockVotesFailed(format!("recover {:?} of {:?}", &address, signed_vote)));
+            return Err(BftError::CheckLockVotesFailed(format!(
+                "recover {:?} of {:?}",
+                &address, signed_vote
+            )));
         }
 
         let vote_weight = self.get_vote_weight(height, &voter);
@@ -558,22 +624,25 @@ where
         Ok(address)
     }
 
-    pub(crate) fn check_proposer(
-        &self,
-        proposal: &Proposal,
-    ) -> BftResult<()> {
+    pub(crate) fn check_proposer(&self, proposal: &Proposal) -> BftResult<()> {
         let height = proposal.height;
         let round = proposal.round;
         let address = &proposal.proposer;
 
         if height < self.height - 1 || height > self.height {
-            return Err(BftError::ShouldNotHappen(format!("check_proposer for {:?}", proposal)));
+            return Err(BftError::ShouldNotHappen(format!(
+                "check_proposer for {:?}",
+                proposal
+            )));
         }
         let proposer = self.get_proposer(height, round)?;
         if proposer == address {
             Ok(())
         } else {
-            Err(BftError::InvalidSender(format!("the rightful proposer is {:?} by {:?}", proposer, proposal)))
+            Err(BftError::InvalidSender(format!(
+                "the rightful proposer is {:?} by {:?}",
+                proposer, proposal
+            )))
         }
     }
 
@@ -582,22 +651,30 @@ where
         let voter = &vote.voter;
 
         if height < self.height - 1 || height > self.height {
-            return Err(BftError::ShouldNotHappen(format!("check_voter for {:?}", vote)));
+            return Err(BftError::ShouldNotHappen(format!(
+                "check_voter for {:?}",
+                vote
+            )));
         }
 
         let authorities = self.get_authorities(height)?;
 
         if !authorities.iter().any(|node| node.address == *voter) {
-            return Err(BftError::InvalidSender(format!("the {:?} of {:?} not in authorities", voter, vote)));
+            return Err(BftError::InvalidSender(format!(
+                "the {:?} of {:?} not in authorities",
+                voter, vote
+            )));
         }
 
         Ok(())
     }
 
     #[inline]
-    pub(crate) fn send_bft_msg(&self, msg: BftMsg) -> BftResult<()>{
+    pub(crate) fn send_bft_msg(&self, msg: BftMsg) -> BftResult<()> {
         let info = format!("{:?}", &msg);
-        self.msg_sender.send(msg).map_err(|_| BftError::SendMsgErr(info))
+        self.msg_sender
+            .send(msg)
+            .map_err(|_| BftError::SendMsgErr(info))
     }
 
     #[inline]

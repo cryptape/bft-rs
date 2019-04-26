@@ -24,10 +24,9 @@ use crate::{
 use crossbeam::crossbeam_channel::{unbounded, Sender};
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::hash::{Hash as Hashable, Hasher};
 use std::sync::Arc;
-use std::fmt::{Debug, Formatter, Result as FmtResult};
-
 
 /// The core algorithm of the BFT state machine.
 pub mod algorithm;
@@ -122,9 +121,10 @@ pub struct Commit {
 
 impl Debug for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Commit {{ height: {}, address: {:?}}}",
-               self.height,
-               self.address,
+        write!(
+            f,
+            "Commit {{ height: {}, address: {:?}}}",
+            self.height, self.address,
         )
     }
 }
@@ -229,9 +229,7 @@ pub struct Feed {
 
 impl Debug for Feed {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Feed {{ height: {}}}",
-               self.height
-        )
+        write!(f, "Feed {{ height: {}}}", self.height)
     }
 }
 
@@ -276,9 +274,10 @@ pub struct VerifyResp {
 #[cfg(feature = "verify_req")]
 impl Debug for VerifyResp {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "VerifyResp {{ is_pass: {}, round: {:?}}}",
-               self.is_pass,
-               self.round,
+        write!(
+            f,
+            "VerifyResp {{ is_pass: {}, round: {:?}}}",
+            self.is_pass, self.round,
         )
     }
 }
@@ -296,9 +295,7 @@ impl Default for VerifyResp {
 #[cfg(feature = "verify_req")]
 impl Encodable for VerifyResp {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(2)
-            .append(&self.is_pass)
-            .append(&self.round);
+        s.begin_list(2).append(&self.is_pass).append(&self.round);
     }
 }
 
@@ -309,10 +306,7 @@ impl Decodable for VerifyResp {
             Prototype::List(2) => {
                 let is_pass: bool = r.val_at(0)?;
                 let round: Round = r.val_at(1)?;
-                Ok(VerifyResp {
-                    is_pass,
-                    round,
-                })
+                Ok(VerifyResp { is_pass, round })
             }
             _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
@@ -332,10 +326,10 @@ pub struct Node {
 
 impl Debug for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Node {{ address: {:?}, weight: {}/{}}}",
-               self.address,
-               self.proposal_weight,
-               self.vote_weight,
+        write!(
+            f,
+            "Node {{ address: {:?}, weight: {}/{}}}",
+            self.address, self.proposal_weight, self.vote_weight,
         )
     }
 }
@@ -397,10 +391,10 @@ pub struct Proof {
 
 impl Debug for Proof {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Proof {{ height: {}, round: {}, block_hash: {:?}}}",
-               self.height,
-               self.round,
-               self.block_hash,
+        write!(
+            f,
+            "Proof {{ height: {}, round: {}, block_hash: {:?}}}",
+            self.height, self.round, self.block_hash,
         )
     }
 }

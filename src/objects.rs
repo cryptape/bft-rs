@@ -38,10 +38,10 @@ pub(crate) struct Proposal {
 
 impl Debug for Proposal {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Proposal {{ height: {}, round: {}, proposer: {:?}}}",
-               self.height,
-               self.round,
-               self.proposer,
+        write!(
+            f,
+            "Proposal {{ height: {}, round: {}, proposer: {:?}}}",
+            self.height, self.round, self.proposer,
         )
     }
 }
@@ -99,9 +99,10 @@ pub(crate) struct SignedProposal {
 
 impl Debug for SignedProposal {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "SignedProposal {{ proposal: {:?}, signature: {:?}}}",
-               self.proposal,
-               self.signature,
+        write!(
+            f,
+            "SignedProposal {{ proposal: {:?}, signature: {:?}}}",
+            self.proposal, self.signature,
         )
     }
 }
@@ -147,12 +148,10 @@ pub(crate) struct Vote {
 
 impl Debug for Vote {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Vote {{ vote_type: {:?}, height: {}, round: {}, block_hash: {:?}, voter: {:?}}}",
-               self.vote_type,
-               self.height,
-               self.round,
-               self.block_hash,
-               self.voter,
+        write!(
+            f,
+            "Vote {{ vote_type: {:?}, height: {}, round: {}, block_hash: {:?}, voter: {:?}}}",
+            self.vote_type, self.height, self.round, self.block_hash, self.voter,
         )
     }
 }
@@ -203,9 +202,10 @@ pub(crate) struct SignedVote {
 
 impl Debug for SignedVote {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "SignedVote {{ vote: {:?}, signature: {:?}}}",
-               self.vote,
-               self.signature,
+        write!(
+            f,
+            "SignedVote {{ vote: {:?}, signature: {:?}}}",
+            self.vote, self.signature,
         )
     }
 }

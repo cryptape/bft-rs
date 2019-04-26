@@ -1,7 +1,7 @@
 use crate::*;
 use crate::{
     collectors::{ProposalCollector, VoteCollector, VoteSet},
-    error::{BftError, BftResult, handle_error},
+    error::{handle_error, BftError, BftResult},
     objects::*,
     params::BftParams,
     timer::{TimeoutInfo, WaitTimer},
@@ -89,25 +89,23 @@ where
         // start main loop module.
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
-            .spawn(move || {
-                loop {
-                    let mut get_timer_msg = Err(RecvError);
-                    let mut get_msg = Err(RecvError);
+            .spawn(move || loop {
+                let mut get_timer_msg = Err(RecvError);
+                let mut get_msg = Err(RecvError);
 
-                    select! {
-                        recv(engine.timer_notity) -> msg => get_timer_msg = msg,
-                        recv(engine.msg_receiver) -> msg => get_msg = msg,
-                    }
-
-                    let mut result = Ok(());
-                    if let Ok(msg) = get_timer_msg{
-                        result = engine.timeout_process(msg);
-                    }
-                    if let Ok(msg) = get_msg {
-                        result = engine.process(msg);
-                    }
-                    handle_error(result);
+                select! {
+                    recv(engine.timer_notity) -> msg => get_timer_msg = msg,
+                    recv(engine.msg_receiver) -> msg => get_msg = msg,
                 }
+
+                let mut result = Ok(());
+                if let Ok(msg) = get_timer_msg {
+                    result = engine.timeout_process(msg);
+                }
+                if let Ok(msg) = get_msg {
+                    result = engine.process(msg);
+                }
+                handle_error(result);
             })
             .expect("Bft starts main-thread failed!");
     }
@@ -116,8 +114,9 @@ where
         match msg {
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
-                    let signed_proposal: SignedProposal = rlp::decode(&encode)
-                        .map_err(|e| BftError::DecodeErr(format!("signed_proposal encounters {:?}", e)))?;
+                    let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
+                        BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
+                    })?;
                     trace!("Bft receives {:?}", &signed_proposal);
                     self.check_and_save_proposal(&signed_proposal, &encode, true)?;
 
@@ -134,8 +133,9 @@ where
 
             BftMsg::Vote(encode) => {
                 if self.consensus_power {
-                    let signed_vote: SignedVote = rlp::decode(&encode)
-                        .map_err(|e| BftError::DecodeErr(format!("signed_vote encounters {:?}", e)))?;
+                    let signed_vote: SignedVote = rlp::decode(&encode).map_err(|e| {
+                        BftError::DecodeErr(format!("signed_vote encounters {:?}", e))
+                    })?;
                     trace!("Bft receives {:?}", &signed_vote);
                     self.check_and_save_vote(&signed_vote, true)?;
 
@@ -148,12 +148,12 @@ where
                                     self.change_to_step(Step::PrevoteWait);
                                 }
                             }
-                        },
+                        }
                         VoteType::Precommit => {
                             if self.step < Step::Precommit {
                                 self.handle_vote(vote.clone())?;
                             }
-                            if self.step == Step::Precommit || self.step == Step::PrecommitWait{
+                            if self.step == Step::Precommit || self.step == Step::PrecommitWait {
                                 self.handle_vote(vote)?;
                                 self.handle_precommit()?;
                             }
@@ -205,18 +205,24 @@ where
         Ok(())
     }
 
-    fn timeout_process(&mut self, tminfo: TimeoutInfo) -> BftResult<()>{
+    fn timeout_process(&mut self, tminfo: TimeoutInfo) -> BftResult<()> {
         if tminfo.height < self.height {
-            return Err(BftError::ObsoleteTimer(
-                format!("TimeoutInfo height: {} < self.height: {}", tminfo.height, self.height)));
+            return Err(BftError::ObsoleteTimer(format!(
+                "TimeoutInfo height: {} < self.height: {}",
+                tminfo.height, self.height
+            )));
         }
         if tminfo.height == self.height && tminfo.round < self.round {
-            return Err(BftError::ObsoleteTimer(
-                format!("TimeoutInfo round: {} < self.round: {}", tminfo.round, self.round)));
+            return Err(BftError::ObsoleteTimer(format!(
+                "TimeoutInfo round: {} < self.round: {}",
+                tminfo.round, self.round
+            )));
         }
         if tminfo.height == self.height && tminfo.round == self.round && tminfo.step != self.step {
-            return Err(BftError::ObsoleteTimer(
-                format!("TimeoutInfo step: {:?} != self.step: {:?}", tminfo.step, self.step)));
+            return Err(BftError::ObsoleteTimer(format!(
+                "TimeoutInfo step: {:?} != self.step: {:?}",
+                tminfo.step, self.step
+            )));
         }
 
         match tminfo.step {
@@ -323,13 +329,20 @@ where
 
     fn handle_proposal(&self, proposal: &Proposal) -> BftResult<()> {
         if proposal.height == self.height - 1 {
-            if self.last_commit_round.is_some() && proposal.round >= self.last_commit_round.unwrap() {
+            if self.last_commit_round.is_some() && proposal.round >= self.last_commit_round.unwrap()
+            {
                 // deal with height fall behind one, round ge last commit round
                 self.retransmit_lower_votes(proposal.round)?;
             }
-            return Err(BftError::ObsoleteMsg(format!("1 height lower of {:?}", proposal)));
+            return Err(BftError::ObsoleteMsg(format!(
+                "1 height lower of {:?}",
+                proposal
+            )));
         } else if proposal.round < self.round {
-            return Err(BftError::ObsoleteMsg(format!("lower round of {:?}", proposal)));
+            return Err(BftError::ObsoleteMsg(format!(
+                "lower round of {:?}",
+                proposal
+            )));
         }
 
         Ok(())
@@ -352,7 +365,10 @@ where
                     self.retransmit_lower_votes(vote.round)?;
                 }
             }
-            return Err(BftError::ObsoleteMsg(format!("1 height lower of {:?}", &vote)));
+            return Err(BftError::ObsoleteMsg(format!(
+                "1 height lower of {:?}",
+                &vote
+            )));
         } else if vote.height == self.height && self.round != 0 && vote.round == self.round - 1 {
             // deal with equal height, round fall behind
             let voter = vote.voter.clone();
@@ -362,14 +378,17 @@ where
                 self.round_filter.insert(voter, Instant::now());
                 self.retransmit_nil_precommit(&vote)?;
             }
-            return Err(BftError::ObsoleteMsg(format!("1 round lower of {:?}", &vote)));
+            return Err(BftError::ObsoleteMsg(format!(
+                "1 round lower of {:?}",
+                &vote
+            )));
         } else if vote.height == self.height && vote.round >= self.round {
-            return Ok(())
+            return Ok(());
         }
         Err(BftError::ObsoleteMsg(format!("{:?}", &vote)))
     }
 
-    fn handle_precommit(&mut self) -> BftResult<()>{
+    fn handle_precommit(&mut self) -> BftResult<()> {
         let result = self.check_precommit_count();
         match result {
             PrecommitRes::Above => self.change_to_step(Step::PrecommitWait),
@@ -389,16 +408,17 @@ where
         Ok(())
     }
 
-    fn handle_commit(&mut self) -> BftResult<()>{
+    fn handle_commit(&mut self) -> BftResult<()> {
         let lock_status = self.lock_status.clone().expect("No lock when commit!");
 
         let proof = self.generate_proof(lock_status.clone());
         self.proof = Some(proof.clone());
 
-        let signed_proposal = self
-            .proposals
-            .get_proposal(self.height, self.round)
-            .ok_or(BftError::ShouldNotHappen("can not fetch proposal from cache when handle commit".to_string()))?;
+        let signed_proposal = self.proposals.get_proposal(self.height, self.round).ok_or(
+            BftError::ShouldNotHappen(
+                "can not fetch proposal from cache when handle commit".to_string(),
+            ),
+        )?;
         let proposal = signed_proposal.proposal;
 
         let commit = Commit {
@@ -415,7 +435,8 @@ where
             Instant::now() - self.htime
         );
 
-        self.function.commit(commit.clone())
+        self.function
+            .commit(commit.clone())
             .map_err(|e| BftError::CommitFailed(format!("{:?} of {:?}", e, &commit)))
             .and_then(|status| self.send_bft_msg(BftMsg::Status(status)))?;
 
@@ -435,19 +456,19 @@ where
             self.status = Some(status.clone());
 
             #[cfg(not(feature = "machine_gun"))]
-                {
-                    if status.height == self.height {
-                        let cost_time = Instant::now() - self.htime;
-                        let interval = self.params.timer.get_total_duration();
-                        let mut tv = Duration::new(0, 0);
-                        if cost_time < interval {
-                            tv = interval - cost_time;
-                        }
-                        self.change_to_step(Step::CommitWait);
-                        self.set_timer(tv, Step::CommitWait);
-                        return Ok(());
+            {
+                if status.height == self.height {
+                    let cost_time = Instant::now() - self.htime;
+                    let interval = self.params.timer.get_total_duration();
+                    let mut tv = Duration::new(0, 0);
+                    if cost_time < interval {
+                        tv = interval - cost_time;
                     }
+                    self.change_to_step(Step::CommitWait);
+                    self.set_timer(tv, Step::CommitWait);
+                    return Ok(());
                 }
+            }
 
             if status.height > self.height {
                 // recvive higher status, clean last commit info then go to new height
@@ -486,7 +507,10 @@ where
                 self.params.timer.get_propose() * 2u32.pow(coef as u32),
                 Step::ProposeWait,
             );
-            return Err(BftError::NotReady(format!("transmit proposal (feed: {:?}, proof: {:?} lock_status: {:?})", self.feed, self.proof, self.lock_status)));
+            return Err(BftError::NotReady(format!(
+                "transmit proposal (feed: {:?}, proof: {:?} lock_status: {:?})",
+                self.feed, self.proof, self.lock_status
+            )));
         }
 
         let msg = if self.lock_status.is_some() {
@@ -518,7 +542,10 @@ where
             BftMsg::Proposal(rlp::encode(&signed_proposal))
         } else {
             // if is not locked, transmit the cached proposal
-            let block = self.feed.clone().expect("Have checked before, should not happen!");
+            let block = self
+                .feed
+                .clone()
+                .expect("Have checked before, should not happen!");
             let block_hash = self.function.crypt_hash(&block);
             self.block_hash = Some(block_hash.clone());
             info!("Bft is ready to transmit new Proposal");
@@ -545,7 +572,7 @@ where
         Ok(())
     }
 
-    fn transmit_prevote(&mut self) -> BftResult<()>{
+    fn transmit_prevote(&mut self) -> BftResult<()> {
         let block_hash = if let Some(lock_status) = self.lock_status.clone() {
             lock_status.block_hash
         } else if let Some(block_hash) = self.block_hash.clone() {
@@ -583,7 +610,7 @@ where
         Ok(())
     }
 
-    fn transmit_precommit(&mut self) -> BftResult<()>{
+    fn transmit_precommit(&mut self) -> BftResult<()> {
         let block_hash = if let Some(lock_status) = self.lock_status.clone() {
             lock_status.block_hash
         } else {
@@ -617,7 +644,7 @@ where
         Ok(())
     }
 
-    fn retransmit_lower_votes(&self, round: u64) -> BftResult<()>{
+    fn retransmit_lower_votes(&self, round: u64) -> BftResult<()> {
         info!(
             "Bft finds some nodes are at low height, retransmit votes of height {:?}, round {:?}",
             self.height - 1,
@@ -653,7 +680,7 @@ where
         Ok(())
     }
 
-    fn retransmit_nil_precommit(&self, vote: &Vote) -> BftResult<()>{
+    fn retransmit_nil_precommit(&self, vote: &Vote) -> BftResult<()> {
         let precommit = Vote {
             vote_type: VoteType::Precommit,
             height: vote.height,
@@ -676,7 +703,10 @@ where
 
     fn new_round_start(&mut self, new_round: bool) -> BftResult<()> {
         if self.step != Step::ProposeWait {
-            info!("Bft starts height {:?}, round{:?}", self.height, self.round);
+            info!(
+                "Bft starts height {:?}, round {:?}",
+                self.height, self.round
+            );
         }
         self.change_to_step(Step::ProposeWait);
 
@@ -713,7 +743,11 @@ where
         self.round = 0;
 
         let now = Instant::now();
-        info!("Bft goto new height {}, last height cost {:?} to reach consensus", new_height, now - self.htime);
+        info!(
+            "Bft goto new height {}, last height cost {:?} to reach consensus",
+            new_height,
+            now - self.htime
+        );
         self.htime = now;
     }
 
@@ -836,9 +870,9 @@ where
 
         if self.consensus_power
             && !status
-            .authority_list
-            .iter()
-            .any(|node| node.address == self.params.address)
+                .authority_list
+                .iter()
+                .any(|node| node.address == self.params.address)
         {
             info!(
                 "Bft loses consensus power in height {} and stops the bft-rs process!",
@@ -847,9 +881,9 @@ where
             self.consensus_power = false;
         } else if !self.consensus_power
             && status
-            .authority_list
-            .iter()
-            .any(|node| node.address == self.params.address)
+                .authority_list
+                .iter()
+                .any(|node| node.address == self.params.address)
         {
             info!(
                 "Bft accesses consensus power in height {} and starts the bft-rs process!",

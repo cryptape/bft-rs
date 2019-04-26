@@ -3,8 +3,8 @@ use crate::{Address, Hash, Height, Round};
 
 use std::collections::HashMap;
 
+use crate::error::{BftError, BftResult};
 use lru_cache::LruCache;
-use crate::error::{BftResult, BftError};
 
 pub(crate) const CACHE_N: u64 = 16;
 
