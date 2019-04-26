@@ -117,7 +117,7 @@ where
                     let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
                         BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                     })?;
-                    info!("Bft receives {:?}", &signed_proposal);
+                    info!("Bft receives {:?}", &encode);
                     self.check_and_save_proposal(&signed_proposal, &encode, true)?;
 
                     let proposal = signed_proposal.proposal;
@@ -136,7 +136,7 @@ where
                     let signed_vote: SignedVote = rlp::decode(&encode).map_err(|e| {
                         BftError::DecodeErr(format!("signed_vote encounters {:?}", e))
                     })?;
-                    info!("Bft receives {:?}", &signed_vote);
+                    info!("Bft receives {:?}", &encode);
                     self.check_and_save_vote(&signed_vote, true)?;
 
                     let vote = signed_vote.vote;
@@ -197,8 +197,8 @@ where
 
             BftMsg::Start => self.consensus_power = true,
 
-            BftMsg::Clear => {
-                self.clear();
+            BftMsg::Clear(proof) => {
+                self.clear(proof);
             }
         }
 

@@ -95,7 +95,7 @@ pub enum BftMsg {
     Feed(Feed),
     Pause,
     Start,
-    Clear,
+    Clear(Proof),
 }
 
 #[cfg(feature = "verify_req")]

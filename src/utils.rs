@@ -17,7 +17,7 @@ impl<T> Bft<T>
 where
     T: BftSupport + 'static,
 {
-    pub(crate) fn clear(&mut self) {
+    pub(crate) fn clear(&mut self, proof: Proof) {
         self.height = INIT_HEIGHT;
         self.round = INIT_ROUND;
         self.step = Step::default();
@@ -30,7 +30,7 @@ where
         self.htime = Instant::now();
         self.feed = None;
         self.verify_results.clear();
-        self.proof = None;
+        self.proof = Some(proof);
         self.authority_manage = AuthorityManage::new();
         self.proposals = ProposalCollector::new();
         self.votes = VoteCollector::new();
