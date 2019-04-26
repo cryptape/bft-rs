@@ -75,7 +75,6 @@ where
         let (timer2bft, bft4timer) = unbounded();
 
         let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, f, local_address, wal_path);
-        engine.load_wal_log();
 
         // start timer module.
         let _timer_thread = thread::Builder::new()
@@ -85,6 +84,8 @@ where
                 timer.start();
             })
             .expect("Bft starts time-thread failed!");
+
+        engine.load_wal_log();
 
         // start main loop module.
         let _main_thread = thread::Builder::new()
