@@ -117,7 +117,7 @@ where
                     let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
                         BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                     })?;
-                    trace!("Bft receives {:?}", &signed_proposal);
+                    info!("Bft receives {:?}", &signed_proposal);
                     self.check_and_save_proposal(&signed_proposal, &encode, true)?;
 
                     let proposal = signed_proposal.proposal;
@@ -136,7 +136,7 @@ where
                     let signed_vote: SignedVote = rlp::decode(&encode).map_err(|e| {
                         BftError::DecodeErr(format!("signed_vote encounters {:?}", e))
                     })?;
-                    trace!("Bft receives {:?}", &signed_vote);
+                    info!("Bft receives {:?}", &signed_vote);
                     self.check_and_save_vote(&signed_vote, true)?;
 
                     let vote = signed_vote.vote;
@@ -172,14 +172,14 @@ where
             }
 
             BftMsg::Status(status) => {
-                trace!("Bft receives status {:?}", &status);
+                info!("Bft receives status {:?}", &status);
                 self.check_and_save_status(&status, true)?;
                 self.handle_status(status)?;
             }
 
             #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
-                trace!("Bft receives verify_resp {:?}", &verify_resp);
+                info!("Bft receives verify_resp {:?}", &verify_resp);
                 self.check_and_save_verify_resp(&verify_resp, true)?;
 
                 if self.step == Step::VerifyWait {

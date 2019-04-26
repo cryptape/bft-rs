@@ -48,24 +48,24 @@ where
         for (log_type, msg) in vec_buf {
             match log_type {
                 LogType::Proposal => {
-                    info!("Load proposal!");
+                    info!("Load proposal {:?}!", &msg);
                     let _rst = self.send_bft_msg(BftMsg::Proposal(msg));
                 }
                 LogType::Vote => {
-                    info!("Load vote message!");
+                    info!("Load vote {:?}!", &msg);
                     let _rst = self.send_bft_msg(BftMsg::Vote(msg));
                 }
                 LogType::Feed => {
-                    info!("Load feed message!");
+                    info!("Load feed {:?}!", &msg);
                     let _rst = self.send_bft_msg(BftMsg::Feed(rlp::decode(&msg).unwrap()));
                 }
                 LogType::Status => {
-                    info!("Load status message!");
+                    info!("Load status {:?}!", &msg);
                     let _rst = self.send_bft_msg(BftMsg::Status(rlp::decode(&msg).unwrap()));
                 }
                 #[cfg(feature = "verify_req")]
                 LogType::VerifyResp => {
-                    info!("Load verify_resp message!");
+                    info!("Load verify_resp {:?}!", &msg);
                     let _rst = self.send_bft_msg(BftMsg::VerifyResp(rlp::decode(&msg).unwrap()));
                 }
             }
