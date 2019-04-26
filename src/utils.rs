@@ -30,7 +30,7 @@ where
         self.htime = Instant::now();
         self.feed = None;
         self.verify_results.clear();
-        self.proof = Some(proof);
+        self.proof = proof;
         self.authority_manage = AuthorityManage::new();
         self.proposals = ProposalCollector::new();
         self.votes = VoteCollector::new();

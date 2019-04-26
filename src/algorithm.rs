@@ -49,7 +49,7 @@ pub struct Bft<T: BftSupport> {
     pub(crate) feed: Option<Block>,
     pub(crate) status: Option<Status>,
     pub(crate) verify_results: HashMap<Round, bool>,
-    pub(crate) proof: Option<Proof>,
+    pub(crate) proof: Proof,
     pub(crate) proposals: ProposalCollector,
     pub(crate) votes: VoteCollector,
     pub(crate) wal_log: Wal,
@@ -316,7 +316,7 @@ where
             params: BftParams::new(local_address),
             feed: None,
             verify_results: HashMap::new(),
-            proof: Some(Proof::default()),
+            proof: Proof::default(),
             status: None,
             authority_manage: AuthorityManage::new(),
             proposals: ProposalCollector::new(),
@@ -492,9 +492,7 @@ where
 
     fn transmit_proposal(&mut self) -> BftResult<()> {
         if self.lock_status.is_none()
-            && (self.feed.is_none()
-                || self.proof.is_none()
-                || (self.proof.iter().next().unwrap().height != self.height - 1))
+            && (self.feed.is_none() || self.proof.height != self.height - 1)
         {
             // if a proposer find there is no proposal nor lock, goto step proposewait
             let coef = if self.round > PROPOSAL_TIMES_COEF {
@@ -554,7 +552,7 @@ where
                 height: self.height,
                 round: self.round,
                 block,
-                proof: self.proof.clone().unwrap(),
+                proof: self.proof.clone(),
                 lock_round: None,
                 lock_votes: Vec::new(),
                 proposer: self.params.address.clone(),
@@ -760,7 +758,10 @@ where
 
     fn is_proposer(&self) -> BftResult<bool> {
         let proposer = self.get_proposer(self.height, self.round)?;
-        info!("Bft chooses proposer {:?} at height {}, round {}", proposer, self.height, self.round);
+        info!(
+            "Bft chooses proposer {:?} at height {}, round {}",
+            proposer, self.height, self.round
+        );
 
         if self.params.address == *proposer {
             info!(
@@ -859,8 +860,8 @@ where
     }
 
     pub(crate) fn set_proof(&mut self, proof: &Proof) {
-        if self.proof.is_none() || self.proof.iter().next().unwrap().height < proof.height {
-            self.proof = Some(proof.clone());
+        if self.proof.height < proof.height {
+            self.proof = proof.clone();
         }
     }
 
