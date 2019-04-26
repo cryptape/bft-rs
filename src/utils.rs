@@ -433,7 +433,7 @@ where
         }
 
         let authorities = self.get_authorities(height)?;
-        self.check_proof_only(&proof, height, authorities)?;
+        self.check_proof_only(proof, height, authorities)?;
         self.set_proof(proof);
 
         Ok(())

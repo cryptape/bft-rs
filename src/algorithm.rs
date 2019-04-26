@@ -412,8 +412,7 @@ where
         let lock_status = self.lock_status.clone().expect("No lock when commit!");
 
         let proof = self.generate_proof(lock_status.clone());
-        info!("Bft generate {:?}", &proof);
-        self.proof = Some(proof.clone());
+        self.set_proof(&proof);
 
         let signed_proposal = self.proposals.get_proposal(self.height, self.round).ok_or(
             BftError::ShouldNotHappen(
@@ -860,9 +859,8 @@ where
     }
 
     pub(crate) fn set_proof(&mut self, proof: &Proof) {
-        if self.proof.is_none() || self.proof.iter().next().unwrap().height != self.height - 1 {
+        if self.proof.is_none() || self.proof.iter().next().unwrap().height < proof.height {
             self.proof = Some(proof.clone());
-            info!("set proof {:?}", proof);
         }
     }
 
