@@ -2,9 +2,10 @@ use crate::*;
 use crate::{
     algorithm::{Bft, INIT_HEIGHT, INIT_ROUND},
     collectors::{ProposalCollector, RoundCollector, VoteCollector, CACHE_N},
-    error::{BftError, BftResult},
+    error::{BftError, BftResult, handle_error},
     objects::*,
     random::get_index,
+    timer::TimeoutInfo,
     wal::Wal,
 };
 #[cfg(feature = "verify_req")]
@@ -45,36 +46,62 @@ where
         // TODO: should prevent saving wal
         info!("Bft starts to load wal log!");
         let vec_buf = self.wal_log.load();
-        for (log_type, msg) in vec_buf {
-            match log_type {
-                LogType::Proposal => {
-                    info!("Load proposal {:?}!", &msg);
-                    let _rst = self.send_bft_msg(BftMsg::Proposal(msg));
-                }
-                LogType::Vote => {
-                    info!("Load vote {:?}!", &msg);
-                    let _rst = self.send_bft_msg(BftMsg::Vote(msg));
-                }
-                LogType::Feed => {
-                    info!("Load feed {:?}!", &msg);
-                    let _rst = self.send_bft_msg(BftMsg::Feed(rlp::decode(&msg).unwrap()));
-                }
-                LogType::Status => {
-                    info!("Load status {:?}!", &msg);
-                    let _rst = self.send_bft_msg(BftMsg::Status(rlp::decode(&msg).unwrap()));
-                }
-                LogType::Proof => {
-                    info!("Load proof {:?}!", &msg);
-                    let _rst = self.send_bft_msg(BftMsg::Clear(rlp::decode(&msg).unwrap()));
-                }
-                #[cfg(feature = "verify_req")]
-                LogType::VerifyResp => {
-                    info!("Load verify_resp {:?}!", &msg);
-                    let _rst = self.send_bft_msg(BftMsg::VerifyResp(rlp::decode(&msg).unwrap()));
-                }
-            }
+        for (log_type, encode) in vec_buf {
+            let result = self.process_wal_log(log_type, encode);
+            handle_error(result);
         }
         info!("Bft successfully processes the whole wal log!");
+    }
+
+    fn process_wal_log(&mut self, log_type: LogType, encode: Vec<u8>) -> BftResult<()> {
+        match log_type {
+            LogType::Proposal => {
+                info!("Load proposal");
+                self.process(BftMsg::Proposal(encode), false)?;
+            }
+            LogType::Vote => {
+                info!("Load vote");
+                self.process(BftMsg::Vote(encode), false)?;
+            }
+            LogType::Feed => {
+                info!("Load feed");
+                let feed: Feed = rlp::decode(&encode).map_err(|e| {
+                    BftError::DecodeErr(format!("feed encounters {:?}", e))
+                })?;
+                self.process(BftMsg::Feed(feed), false)?;
+            }
+            LogType::Status => {
+                info!("Load status");
+                let status: Status = rlp::decode(&encode).map_err(|e| {
+                    BftError::DecodeErr(format!("status encounters {:?}", e))
+                })?;
+                self.process(BftMsg::Status(status), false)?;
+            }
+            LogType::Proof => {
+                info!("Load proof");
+                let proof: Proof = rlp::decode(&encode).map_err(|e| {
+                    BftError::DecodeErr(format!("proof encounters {:?}", e))
+                })?;
+                self.proof = proof;
+            }
+            #[cfg(feature = "verify_req")]
+            LogType::VerifyResp => {
+                info!("Load verify_resp");
+                let verify_resp: VerifyResp = rlp::decode(&encode).map_err(|e| {
+                    BftError::DecodeErr(format!("verify_resp encounters {:?}", e))
+                })?;
+                self.process(BftMsg::VerifyResp(verify_resp), false)?;
+            }
+
+            LogType::TimeOutInfo => {
+                info!("Load time_out_info");
+                let time_out_info: TimeoutInfo = rlp::decode(&encode).map_err(|e| {
+                    BftError::DecodeErr(format!("time_out_info encounters {:?}", e))
+                })?;
+                self.timeout_process(time_out_info, false)?;
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn build_signed_proposal(&self, proposal: &Proposal) -> BftResult<SignedProposal> {

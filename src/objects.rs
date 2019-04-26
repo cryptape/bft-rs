@@ -303,6 +303,41 @@ impl Default for Step {
     }
 }
 
+impl From<u8> for Step {
+    fn from(s: u8) -> Self {
+        match s {
+            0 => Step::Propose,
+            1 => Step::ProposeWait,
+            2 => Step::Prevote,
+            3 => Step::PrevoteWait,
+            #[cfg(feature = "verify_req")]
+            4 => Step::VerifyWait,
+            5 => Step::Precommit,
+            6 => Step::PrecommitWait,
+            7 => Step::Commit,
+            8 => Step::CommitWait,
+            _ => panic!("Invalid vote type!"),
+        }
+    }
+}
+
+impl Into<u8> for Step {
+    fn into(self) -> u8 {
+        match self {
+            Step::Propose => 0,
+            Step::ProposeWait => 1,
+            Step::Prevote => 2,
+            Step::PrevoteWait => 3,
+            #[cfg(feature = "verify_req")]
+            Step::VerifyWait => 4,
+            Step::Precommit => 5,
+            Step::PrecommitWait => 6,
+            Step::Commit => 7,
+            Step::CommitWait => 8,
+        }
+    }
+}
+
 /// Bft vote types.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) enum VoteType {
@@ -340,6 +375,7 @@ pub(crate) enum LogType {
     Feed,
     #[cfg(feature = "verify_req")]
     VerifyResp,
+    TimeOutInfo,
 }
 
 impl From<u8> for LogType {
@@ -352,6 +388,7 @@ impl From<u8> for LogType {
             4 => LogType::Feed,
             #[cfg(feature = "verify_req")]
             5 => LogType::VerifyResp,
+            6 => LogType::TimeOutInfo,
             _ => panic!("Invalid vote type!"),
         }
     }
@@ -367,6 +404,7 @@ impl Into<u8> for LogType {
             LogType::Feed => 4,
             #[cfg(feature = "verify_req")]
             LogType::VerifyResp => 5,
+            LogType::TimeOutInfo => 6,
         }
     }
 }
@@ -593,7 +631,7 @@ mod test {
     fn test_verify_resp_rlp() {
         let verify_resp = VerifyResp {
             is_pass: false,
-            block_hash: vec![99u8, 12u8],
+            round: 99u64,
         };
 
         let encode = rlp::encode(&verify_resp);

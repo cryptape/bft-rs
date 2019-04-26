@@ -100,25 +100,25 @@ where
 
                 let mut result = Ok(());
                 if let Ok(msg) = get_timer_msg {
-                    result = engine.timeout_process(msg);
+                    result = engine.timeout_process(msg, true);
                 }
                 if let Ok(msg) = get_msg {
-                    result = engine.process(msg);
+                    result = engine.process(msg, true);
                 }
                 handle_error(result);
             })
             .expect("Bft starts main-thread failed!");
     }
 
-    fn process(&mut self, msg: BftMsg) -> BftResult<()> {
+    pub(crate) fn process(&mut self, msg: BftMsg, need_wal: bool) -> BftResult<()> {
         match msg {
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
                     let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
                         BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                     })?;
-                    info!("Bft receives {:?}", &encode);
-                    self.check_and_save_proposal(&signed_proposal, &encode, true)?;
+                    trace!("Bft receives {:?}", &encode);
+                    self.check_and_save_proposal(&signed_proposal, &encode, need_wal)?;
 
                     let proposal = signed_proposal.proposal;
                     if self.step <= Step::ProposeWait {
@@ -136,8 +136,8 @@ where
                     let signed_vote: SignedVote = rlp::decode(&encode).map_err(|e| {
                         BftError::DecodeErr(format!("signed_vote encounters {:?}", e))
                     })?;
-                    info!("Bft receives {:?}", &encode);
-                    self.check_and_save_vote(&signed_vote, true)?;
+                    trace!("Bft receives {:?}", &encode);
+                    self.check_and_save_vote(&signed_vote, need_wal)?;
 
                     let vote = signed_vote.vote;
                     match vote.vote_type {
@@ -163,8 +163,8 @@ where
             }
 
             BftMsg::Feed(feed) => {
-                info!("Bft receives feed {:?}", &feed);
-                self.check_and_save_feed(&feed, true)?;
+                trace!("Bft receives feed {:?}", &feed);
+                self.check_and_save_feed(&feed, need_wal)?;
 
                 if self.step == Step::ProposeWait {
                     self.new_round_start(false)?;
@@ -172,15 +172,15 @@ where
             }
 
             BftMsg::Status(status) => {
-                info!("Bft receives status {:?}", &status);
-                self.check_and_save_status(&status, true)?;
+                trace!("Bft receives status {:?}", &status);
+                self.check_and_save_status(&status, need_wal)?;
                 self.handle_status(status)?;
             }
 
             #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
-                info!("Bft receives verify_resp {:?}", &verify_resp);
-                self.check_and_save_verify_resp(&verify_resp, true)?;
+                trace!("Bft receives verify_resp {:?}", &verify_resp);
+                self.check_and_save_verify_resp(&verify_resp, need_wal)?;
 
                 if self.step == Step::VerifyWait {
                     // next do precommit
@@ -198,6 +198,7 @@ where
             BftMsg::Start => self.consensus_power = true,
 
             BftMsg::Clear(proof) => {
+                trace!("Bft receives clear {:?}", &proof);
                 self.clear(proof);
             }
         }
@@ -205,7 +206,7 @@ where
         Ok(())
     }
 
-    fn timeout_process(&mut self, tminfo: TimeoutInfo) -> BftResult<()> {
+    pub(crate) fn timeout_process(&mut self, tminfo: TimeoutInfo, need_wal: bool) -> BftResult<()> {
         if tminfo.height < self.height {
             return Err(BftError::ObsoleteTimer(format!(
                 "TimeoutInfo height: {} < self.height: {}",
@@ -223,6 +224,12 @@ where
                 "TimeoutInfo step: {:?} != self.step: {:?}",
                 tminfo.step, self.step
             )));
+        }
+
+        if need_wal {
+            self.wal_log
+                .save(self.height, LogType::TimeOutInfo, &rlp::encode(&tminfo))
+                .or(Err(BftError::SaveWalErr(format!("{:?}", &tminfo))))?;
         }
 
         match tminfo.step {

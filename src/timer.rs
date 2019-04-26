@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use crossbeam::crossbeam_channel::{Receiver, Sender};
 use min_max_heap::MinMaxHeap;
+use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 
 /// Timer infomation.
 #[derive(Debug, Clone)]
@@ -18,6 +19,29 @@ pub(crate) struct TimeoutInfo {
     pub(crate) round: Round,
     /// The step of the timer.
     pub(crate) step: Step,
+}
+
+impl Encodable for TimeoutInfo {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        let step: u8 = self.step.clone().into();
+        s.begin_list(3).append(&self.height)
+            .append(&self.round).append(&step);
+    }
+}
+
+impl Decodable for TimeoutInfo {
+    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
+        match r.prototype()? {
+            Prototype::List(3) => {
+                let height: Height = r.val_at(0)?;
+                let round: Round = r.val_at(1)?;
+                let step: u8 = r.val_at(2)?;
+                let step: Step = Step::from(step);
+                Ok(TimeoutInfo { timeval: Instant::now(), height, round, step })
+            }
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
+        }
+    }
 }
 
 /// Sender and receiver of a timeout infomation channel.
@@ -74,5 +98,23 @@ impl WaitTimer {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_time_out_info_rlp() {
+        let time_out_info = TimeoutInfo {
+            timeval: Instant::now(),
+            height: 1888787u64,
+            round: 23u64,
+            step: Step::Commit,
+        };
+        let encode = rlp::encode(&time_out_info);
+        let decode: TimeoutInfo = rlp::decode(&encode).unwrap();
+        assert_eq!(time_out_info.height, decode.height);
     }
 }
