@@ -722,17 +722,26 @@ where
                 let function = self.function.clone();
                 let sender = self.msg_sender.clone();
                 let height = self.height;
-                cross_thread::scope(|s| {
-                    s.spawn(move |_| {
-                        info!("get block req!");
-                        if let Ok(block) = function.get_block(height) {
-                            let feed = Feed { height, block };
-                            info!("get block resp {:?}!", &feed);
-                            sender.send(BftMsg::Feed(feed)).unwrap();
-                        }
-                    });
-                })
-                .unwrap();
+//                cross_thread::scope(|s| {
+//                    s.spawn(move |_| {
+//                        info!("get block req!");
+//                        if let Ok(block) = function.get_block(height) {
+//                            let feed = Feed { height, block };
+//                            info!("get block resp {:?}!", &feed);
+//                            sender.send(BftMsg::Feed(feed)).unwrap();
+//                        }
+//                    });
+//                })
+//                .unwrap();
+
+                thread::spawn(move |_| {
+                    info!("get block req!");
+                    if let Ok(block) = function.get_block(height) {
+                        let feed = Feed { height, block };
+                        info!("get block resp {:?}!", &feed);
+                        sender.send(BftMsg::Feed(feed)).unwrap();
+                    }
+                }).unwrap();
             }
             info!("ready to transmit proposal!");
             self.transmit_proposal()?;
