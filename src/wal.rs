@@ -160,57 +160,57 @@ impl Wal {
         Ok(())
     }
 
-    pub(crate) fn load(&mut self) -> Vec<(LogType, Vec<u8>)> {
-        let mut vec_buf: Vec<u8> = Vec::new();
-        let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
-        let cur_height = self.current_height;
-        if self.height_fs.is_empty() || cur_height == 0 {
-            return vec_out;
-        }
-
-        for (height, mut fs) in &self.height_fs {
-            if *height < self.current_height {
-                continue;
-            }
-            let expect_str = format!("Seek wal file {:?} of height {} failed!", fs, *height);
-            fs.seek(io::SeekFrom::Start(0)).expect(&expect_str);
-            let res_fsize = fs.read_to_end(&mut vec_buf);
-            if res_fsize.is_err() {
-                return vec_out;
-            }
-            let expect_str = format!(
-                "Get size of buf of wal file {:?} of height {} failed!",
-                fs, *height
-            );
-            let fsize = res_fsize.expect(&expect_str);
-            if fsize <= 5 {
-                return vec_out;
-            }
-            let mut index = 0;
-            loop {
-                if index + 5 > fsize {
-                    break;
-                }
-                let hd: [u8; 4] = [
-                    vec_buf[index],
-                    vec_buf[index + 1],
-                    vec_buf[index + 2],
-                    vec_buf[index + 3],
-                ];
-                let tmp: u32 = unsafe { transmute::<[u8; 4], u32>(hd) };
-                let bodylen = tmp as usize;
-                let mtype = vec_buf[index + 4];
-                index += 5;
-                if index + bodylen > fsize {
-                    break;
-                }
-                vec_out.push((
-                    LogType::from(mtype),
-                    vec_buf[index..index + bodylen].to_vec(),
-                ));
-                index += bodylen;
-            }
-        }
-        vec_out
-    }
+//    pub(crate) fn load(&mut self) -> Vec<(LogType, Vec<u8>)> {
+//        let mut vec_buf: Vec<u8> = Vec::new();
+//        let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
+//        let cur_height = self.current_height;
+//        if self.height_fs.is_empty() || cur_height == 0 {
+//            return vec_out;
+//        }
+//
+//        for (height, mut fs) in &self.height_fs {
+//            if *height < self.current_height {
+//                continue;
+//            }
+//            let expect_str = format!("Seek wal file {:?} of height {} failed!", fs, *height);
+//            fs.seek(io::SeekFrom::Start(0)).expect(&expect_str);
+//            let res_fsize = fs.read_to_end(&mut vec_buf);
+//            if res_fsize.is_err() {
+//                return vec_out;
+//            }
+//            let expect_str = format!(
+//                "Get size of buf of wal file {:?} of height {} failed!",
+//                fs, *height
+//            );
+//            let fsize = res_fsize.expect(&expect_str);
+//            if fsize <= 5 {
+//                return vec_out;
+//            }
+//            let mut index = 0;
+//            loop {
+//                if index + 5 > fsize {
+//                    break;
+//                }
+//                let hd: [u8; 4] = [
+//                    vec_buf[index],
+//                    vec_buf[index + 1],
+//                    vec_buf[index + 2],
+//                    vec_buf[index + 3],
+//                ];
+//                let tmp: u32 = unsafe { transmute::<[u8; 4], u32>(hd) };
+//                let bodylen = tmp as usize;
+//                let mtype = vec_buf[index + 4];
+//                index += 5;
+//                if index + bodylen > fsize {
+//                    break;
+//                }
+//                vec_out.push((
+//                    LogType::from(mtype),
+//                    vec_buf[index..index + bodylen].to_vec(),
+//                ));
+//                index += bodylen;
+//            }
+//        }
+//        vec_out
+//    }
 }

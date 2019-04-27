@@ -89,7 +89,7 @@ where
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
             .spawn(move || {
-                engine.load_wal_log();
+//                engine.load_wal_log();
 
                 loop {
                     let mut get_timer_msg = Err(RecvError);
