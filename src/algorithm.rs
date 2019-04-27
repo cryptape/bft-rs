@@ -89,7 +89,7 @@ where
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
             .spawn(move || {
-//                engine.load_wal_log();
+                engine.load_wal_log();
 
                 loop {
                     let mut get_timer_msg = Err(RecvError);
@@ -175,7 +175,7 @@ where
             }
 
             BftMsg::Status(status) => {
-                trace!("Bft receives status {:?}", &status);
+                info!("Bft receives status {:?}", &status);
                 self.check_and_save_status(&status, need_wal)?;
                 self.handle_status(status)?;
             }
