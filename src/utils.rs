@@ -10,10 +10,9 @@ use crate::{
     wal::Wal,
 };
 #[cfg(feature = "verify_req")]
-//use crossbeam_utils::thread as cross_thread;
+use crossbeam_utils::thread as cross_thread;
 use std::collections::HashMap;
 use std::fs;
-use std::thread;
 use std::time::Instant;
 
 impl<T> Bft<T>
@@ -437,43 +436,25 @@ where
 
             let function = self.function.clone();
             let sender = self.msg_sender.clone();
-//            cross_thread::scope(|s| {
-//                s.spawn(move |_| {
-//                    let is_pass = match function.check_txs(block, proposal_hash, height, round) {
-//                        Ok(_) => true,
-//                        Err(e) => {
-//                            warn!(
-//                                "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
-//                                e, proposal
-//                            );
-//                            false
-//                        }
-//                    };
-//                    let verify_resp = VerifyResp { is_pass, round };
-//                    sender
-//                        .send(BftMsg::VerifyResp(verify_resp))
-//                        .expect("cross_thread send verify_resp failed!");
-//                });
-//            })
-//            .unwrap();
-            let proposal_hash = proposal_hash.to_owned();
-            let proposal = proposal.clone();
-            thread::spawn(move || {
-                let is_pass = match function.check_txs(block, &proposal_hash, height, round) {
-                    Ok(_) => true,
-                    Err(e) => {
-                        warn!(
-                            "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
-                            e, proposal
-                        );
-                        false
-                    }
-                };
-                let verify_resp = VerifyResp { is_pass, round };
-                sender
-                    .send(BftMsg::VerifyResp(verify_resp))
-                    .expect("cross_thread send verify_resp failed!");
-            });
+            cross_thread::scope(|s| {
+                s.spawn(move |_| {
+                    let is_pass = match function.check_txs(block, proposal_hash, height, round) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            warn!(
+                                "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
+                                e, proposal
+                            );
+                            false
+                        }
+                    };
+                    let verify_resp = VerifyResp { is_pass, round };
+                    sender
+                        .send(BftMsg::VerifyResp(verify_resp))
+                        .expect("cross_thread send verify_resp failed!");
+                });
+            })
+            .unwrap();
 
             Ok(())
         }
