@@ -456,14 +456,15 @@ where
 //                });
 //            })
 //            .unwrap();
-
+            let proposal_hash = proposal_hash.to_owned();
+            let proposal = proposal.clone();
             thread::spawn(move || {
-                let is_pass = match function.check_txs(block, proposal_hash, height, round) {
+                let is_pass = match function.check_txs(block, &proposal_hash, height, round) {
                     Ok(_) => true,
                     Err(e) => {
                         warn!(
                             "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
-                            e, proposal
+                            e, &proposal
                         );
                         false
                     }
