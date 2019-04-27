@@ -85,28 +85,30 @@ where
             })
             .expect("Bft starts time-thread failed!");
 
-        engine.load_wal_log();
-
         // start main loop module.
         let _main_thread = thread::Builder::new()
             .name("main_loop".to_string())
-            .spawn(move || loop {
-                let mut get_timer_msg = Err(RecvError);
-                let mut get_msg = Err(RecvError);
+            .spawn(move || {
+                engine.load_wal_log();
 
-                select! {
-                    recv(engine.timer_notity) -> msg => get_timer_msg = msg,
-                    recv(engine.msg_receiver) -> msg => get_msg = msg,
-                }
+                loop {
+                    let mut get_timer_msg = Err(RecvError);
+                    let mut get_msg = Err(RecvError);
 
-                let mut result = Ok(());
-                if let Ok(msg) = get_timer_msg {
-                    result = engine.timeout_process(msg, true);
+                    select! {
+                        recv(engine.timer_notity) -> msg => get_timer_msg = msg,
+                        recv(engine.msg_receiver) -> msg => get_msg = msg,
+                    }
+
+                    let mut result = Ok(());
+                    if let Ok(msg) = get_timer_msg {
+                        result = engine.timeout_process(msg, true);
+                    }
+                    if let Ok(msg) = get_msg {
+                        result = engine.process(msg, true);
+                    }
+                    handle_error(result);
                 }
-                if let Ok(msg) = get_msg {
-                    result = engine.process(msg, true);
-                }
-                handle_error(result);
             })
             .expect("Bft starts main-thread failed!");
     }
