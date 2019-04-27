@@ -9,7 +9,7 @@ use crate::{
 };
 
 use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
-use crossbeam_utils::thread as cross_thread;
+//use crossbeam_utils::thread as cross_thread;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
@@ -734,14 +734,14 @@ where
 //                })
 //                .unwrap();
 
-                thread::spawn(move |_| {
+                thread::spawn(move || {
                     info!("get block req!");
                     if let Ok(block) = function.get_block(height) {
                         let feed = Feed { height, block };
                         info!("get block resp {:?}!", &feed);
                         sender.send(BftMsg::Feed(feed)).unwrap();
                     }
-                }).unwrap();
+                });
             }
             info!("ready to transmit proposal!");
             self.transmit_proposal()?;
