@@ -464,7 +464,7 @@ where
                     Err(e) => {
                         warn!(
                             "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
-                            e, &proposal
+                            e, proposal
                         );
                         false
                     }
