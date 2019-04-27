@@ -362,6 +362,7 @@ where
             self.wal_log
                 .save(self.height + 1, LogType::Status, &rlp::encode(status))
                 .or(Err(BftError::SaveWalErr(format!("{:?}", status))))?;
+            info!("wal save {:?} and {:?}", &self.proof, status);
         }
 
         Ok(())

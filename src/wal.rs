@@ -164,6 +164,7 @@ impl Wal {
         let mut vec_buf: Vec<u8> = Vec::new();
         let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
         let cur_height = self.current_height;
+        info!("current height of wal is {}", cur_height);
         if self.height_fs.is_empty() || cur_height == 0 {
             return vec_out;
         }
@@ -211,6 +212,7 @@ impl Wal {
                 index += bodylen;
             }
         }
+        info!("wal vec_out {:?}", &vec_out);
         vec_out
     }
 }
