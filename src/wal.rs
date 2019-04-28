@@ -156,9 +156,11 @@ impl Wal {
             fs.write_all(&type_bytes[..])?;
             fs.write(msg)?;
             fs.flush()?;
+            info!("save exist height succeed");
         } else {
             warn!("Can't find wal log in height {} ", height);
         }
+
         Ok(())
     }
 
