@@ -359,8 +359,9 @@ where
             self.wal_log
                 .save(self.height + 1, LogType::Proof, &rlp::encode(&self.proof))
                 .or(Err(BftError::SaveWalErr(format!("{:?}", &self.proof))))?;
+            let status_height = status.height;
             self.wal_log
-                .save(self.height + 1, LogType::Status, &rlp::encode(status))
+                .save(status_height + 1, LogType::Status, &rlp::encode(status))
                 .or(Err(BftError::SaveWalErr(format!("{:?}", status))))?;
             info!("wal save {:?} and {:?}", &self.proof, status);
         }
