@@ -355,7 +355,7 @@ where
         if self.height > 0 && height < self.height - 1 {
             return Err(BftError::ObsoleteMsg(format!("{:?}", status)));
         }
-        if need_wal && height == self.height {
+        if need_wal {
             self.wal_log
                 .save(self.height + 1, LogType::Proof, &rlp::encode(&self.proof))
                 .or(Err(BftError::SaveWalErr(format!("{:?}", &self.proof))))?;
