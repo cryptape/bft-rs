@@ -107,6 +107,7 @@ where
                     if let Ok(msg) = get_msg {
                         result = engine.process(msg, true);
                     }
+                    info!("Bft block detect!");
                     handle_error(result);
                 }
             })
