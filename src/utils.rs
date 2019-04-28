@@ -435,8 +435,6 @@ where
             let block = block.clone();
             let proposal_hash = proposal_hash.to_owned();
             thread::spawn(move || {
-                let block = block;
-                let proposal_hash = proposal_hash;
                 let is_pass = match function.check_txs(&block, &proposal_hash, height, round) {
                     Ok(_) => true,
                     Err(e) => {
