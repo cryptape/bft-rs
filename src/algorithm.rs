@@ -450,6 +450,8 @@ where
             .map_err(|e| BftError::CommitFailed(format!("{:?} of {:?}", e, &commit)))
             .and_then(|status| self.send_bft_msg(BftMsg::Status(status)))?;
 
+        info!("Bft block by commit function");
+
         self.last_commit_round = Some(self.round);
         self.last_commit_block_hash = Some(self.function.crypt_hash(&proposal.block));
         Ok(())
