@@ -432,7 +432,7 @@ where
 
             let function = self.function.clone();
             let sender = self.msg_sender.clone();
-            let block = block.to_owned();
+            let block = block.clone();
             let proposal_hash = proposal_hash.to_owned();
             thread::spawn(move || {
                 let block = block;
@@ -442,7 +442,7 @@ where
                     Err(e) => {
                         warn!(
                             "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
-                            e, proposal
+                            e, block
                         );
                         false
                     }
