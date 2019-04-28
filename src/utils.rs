@@ -56,29 +56,29 @@ where
     fn process_wal_log(&mut self, log_type: LogType, encode: Vec<u8>) -> BftResult<()> {
         match log_type {
             LogType::Proposal => {
-                info!("Load proposal");
+                trace!("Load proposal");
                 self.process(BftMsg::Proposal(encode), false)?;
             }
             LogType::Vote => {
-                info!("Load vote");
+                trace!("Load vote");
                 self.process(BftMsg::Vote(encode), false)?;
             }
             LogType::Feed => {
-                info!("Load feed");
+                trace!("Load feed");
                 let feed: Feed = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("feed encounters {:?}", e))
                 })?;
                 self.process(BftMsg::Feed(feed), false)?;
             }
             LogType::Status => {
-                info!("Load status");
+                trace!("Load status");
                 let status: Status = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("status encounters {:?}", e))
                 })?;
                 self.process(BftMsg::Status(status), false)?;
             }
             LogType::Proof => {
-                info!("Load proof");
+                trace!("Load proof");
                 let proof: Proof = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("proof encounters {:?}", e))
                 })?;
@@ -86,7 +86,7 @@ where
             }
             #[cfg(feature = "verify_req")]
             LogType::VerifyResp => {
-                info!("Load verify_resp");
+                trace!("Load verify_resp");
                 let verify_resp: VerifyResp = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("verify_resp encounters {:?}", e))
                 })?;
@@ -94,7 +94,7 @@ where
             }
 
             LogType::TimeOutInfo => {
-                info!("Load time_out_info");
+                trace!("Load time_out_info");
                 let time_out_info: TimeoutInfo = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("time_out_info encounters {:?}", e))
                 })?;
@@ -363,7 +363,6 @@ where
             self.wal_log
                 .save(status_height + 1, LogType::Status, &rlp::encode(status))
                 .or(Err(BftError::SaveWalErr(format!("{:?}", status))))?;
-            info!("wal save {:?} and {:?}", &self.proof, status);
         }
 
         Ok(())

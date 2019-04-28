@@ -95,9 +95,6 @@ impl Wal {
     }
 
     pub(crate) fn set_height(&mut self, height: u64) -> Result<(), io::Error> {
-        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, _)| *height).collect();
-        info!("wal before set_height {:?}", fs_list);
-
         self.current_height = height;
         self.ifile.seek(io::SeekFrom::Start(0))?;
         let hstr = height.to_string();
@@ -125,9 +122,6 @@ impl Wal {
             self.height_fs = saved_height_fs;
         }
 
-        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, _)| *height).collect();
-        info!("wal after set_height {:?}", fs_list);
-
         Ok(())
     }
 
@@ -135,7 +129,6 @@ impl Wal {
         trace!("Wal save mtype: {:?}, height: {}", mtype, height);
         if !self.height_fs.contains_key(&height) {
             // 2 more higher than current height, do not process it
-            info!("save {:?} with height {} while current_height {}", mtype, height, self.current_height);
             if height > self.current_height + 1 {
                 return Ok(());
             } else if height == self.current_height + 1 {
@@ -146,7 +139,6 @@ impl Wal {
                     .write(true)
                     .open(filename)?;
                 self.height_fs.insert(height, fs);
-                info!("save new height succeed");
             }
         }
         let mlen = msg.len() as u32;
@@ -163,7 +155,6 @@ impl Wal {
             fs.write_all(&type_bytes[..])?;
             fs.write(msg)?;
             fs.flush()?;
-            info!("save exist height succeed");
         } else {
             warn!("Can't find wal log in height {} ", height);
         }
@@ -175,16 +166,11 @@ impl Wal {
         let mut vec_buf: Vec<u8> = Vec::new();
         let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
         let cur_height = self.current_height;
-        info!("current height of wal is {}", cur_height);
         if self.height_fs.is_empty() || cur_height == 0 {
             return vec_out;
         }
 
-        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, _)| *height).collect();
-        info!("wal caches {:?}", fs_list);
-
         for (height, mut fs) in &self.height_fs {
-            info!("load height {}", height);
             if *height < self.current_height {
                 continue;
             }
@@ -192,7 +178,6 @@ impl Wal {
             fs.seek(io::SeekFrom::Start(0)).expect(&expect_str);
             let res_fsize = fs.read_to_end(&mut vec_buf);
             if res_fsize.is_err() {
-                info!("wal log break 0 {:?}", res_fsize);
                 return vec_out;
             }
             let expect_str = format!(
@@ -201,7 +186,6 @@ impl Wal {
             );
             let fsize = res_fsize.expect(&expect_str);
             if fsize <= 5 {
-                info!("wal log break 1 {:?}", fsize);
                 return vec_out;
             }
             let mut index = 0;
@@ -229,7 +213,6 @@ impl Wal {
                 index += bodylen;
             }
         }
-        info!("wal vec_out {:?}", &vec_out);
         vec_out
     }
 }

@@ -48,7 +48,7 @@ pub(crate) fn handle_error<T>(result: BftResult<T>) {
             BftError::NotReady(_)
             | BftError::ObsoleteMsg(_)
             | BftError::HigherMsg(_)
-            | BftError::RecvMsgAgain(_) => info!("Bft encounters {:?}", e),
+            | BftError::RecvMsgAgain(_) => trace!("Bft encounters {:?}", e),
 
             BftError::CheckProofFailed(_)
             | BftError::CheckBlockFailed(_)
