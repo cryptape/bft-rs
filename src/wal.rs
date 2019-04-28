@@ -95,7 +95,7 @@ impl Wal {
     }
 
     pub(crate) fn set_height(&mut self, height: u64) -> Result<(), io::Error> {
-        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, fs)| height).collect();
+        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, _)| *height).collect();
         info!("wal before set_height {:?}", fs_list);
 
         self.current_height = height;
@@ -125,7 +125,7 @@ impl Wal {
             self.height_fs = saved_height_fs;
         }
 
-        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, fs)| height).collect();
+        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, _)| *height).collect();
         info!("wal after set_height {:?}", fs_list);
 
         Ok(())
@@ -180,7 +180,7 @@ impl Wal {
             return vec_out;
         }
 
-        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, fs)| height).collect();
+        let fs_list: Vec<u64> = self.height_fs.iter().map(|(height, _)| *height).collect();
         info!("wal caches {:?}", fs_list);
 
         for (height, mut fs) in &self.height_fs {
