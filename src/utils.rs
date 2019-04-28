@@ -434,7 +434,9 @@ where
             let sender = self.msg_sender.clone();
             let block = block.to_owned();
             let proposal_hash = proposal_hash.to_owned();
-            thread::spawn(move |block, proposal_hash| {
+            thread::spawn(move || {
+                let block = block;
+                let proposal_hash = proposal_hash;
                 let is_pass = match function.check_txs(&block, &proposal_hash, height, round) {
                     Ok(_) => true,
                     Err(e) => {
