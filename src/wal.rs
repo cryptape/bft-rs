@@ -128,6 +128,7 @@ impl Wal {
         trace!("Wal save mtype: {:?}, height: {}", mtype, height);
         if !self.height_fs.contains_key(&height) {
             // 2 more higher than current height, do not process it
+            info!("save {:?} with height {} while current_height {}", mtype, height, self.current_height);
             if height > self.current_height + 1 {
                 return Ok(());
             } else if height == self.current_height + 1 {
@@ -138,6 +139,7 @@ impl Wal {
                     .write(true)
                     .open(filename)?;
                 self.height_fs.insert(height, fs);
+                info!("save new height succeed");
             }
         }
         let mlen = msg.len() as u32;
@@ -170,6 +172,7 @@ impl Wal {
         }
 
         for (height, mut fs) in &self.height_fs {
+            info!("load height {}", height);
             if *height < self.current_height {
                 continue;
             }
