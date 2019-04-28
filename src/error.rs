@@ -2,20 +2,22 @@ pub type BftResult<T> = ::std::result::Result<T, BftError>;
 /// Error for Bft actuator.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BftError {
+
+    ShouldNotHappen(String),
     /// Send message error.
     SendMsgErr(String),
     /// Receive message error.
     RecvMsgErr(String),
 
-    DecodeErr(String),
+    RecvMsgAgain(String),
 
     ObsoleteMsg(String),
 
     HigherMsg(String),
 
-    SaveWalErr(String),
+    DecodeErr(String),
 
-    ShouldNotHappen(String),
+    SaveWalErr(String),
 
     InvalidSender(String),
 
@@ -25,15 +27,15 @@ pub enum BftError {
 
     CheckSigFailed(String),
 
-    SignFailed(String),
-
-    CommitFailed(String),
-
     CheckProofFailed(String),
 
     CheckLockVotesFailed(String),
 
-    RecvMsgAgain(String),
+    SignFailed(String),
+
+    CommitFailed(String),
+
+    GetBlockFailed(String),
 
     NotReady(String),
 
@@ -41,12 +43,12 @@ pub enum BftError {
 }
 
 pub(crate) fn handle_error<T>(result: BftResult<T>) {
-    if let Err(error) = result {
-        match error {
+    if let Err(e) = result {
+        match e {
             BftError::NotReady(_)
             | BftError::ObsoleteMsg(_)
             | BftError::HigherMsg(_)
-            | BftError::RecvMsgAgain(_) => info!("Bft encounters {:?}", error),
+            | BftError::RecvMsgAgain(_) => info!("Bft encounters {:?}", e),
 
             BftError::CheckProofFailed(_)
             | BftError::CheckBlockFailed(_)
@@ -54,14 +56,15 @@ pub(crate) fn handle_error<T>(result: BftResult<T>) {
             | BftError::CheckSigFailed(_)
             | BftError::CheckTxFailed(_)
             | BftError::DecodeErr(_)
-            | BftError::InvalidSender(_) => warn!("Bft encounters {:?}", error),
+            | BftError::InvalidSender(_) => warn!("Bft encounters {:?}", e),
 
             BftError::ShouldNotHappen(_)
             | BftError::SendMsgErr(_)
             | BftError::RecvMsgErr(_)
             | BftError::CommitFailed(_)
             | BftError::SaveWalErr(_)
-            | BftError::SignFailed(_) => error!("Bft encounters {:?}", error),
+            | BftError::SignFailed(_)
+            | BftError::GetBlockFailed(_) => error!("Bft encounters {:?}", e),
 
             BftError::ObsoleteTimer(_) => {}
         }

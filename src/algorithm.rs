@@ -739,28 +739,18 @@ where
                 let function = self.function.clone();
                 let sender = self.msg_sender.clone();
                 let height = self.height;
-//                cross_thread::scope(|s| {
-//                    s.spawn(move |_| {
-//                        info!("get block req!");
-//                        if let Ok(block) = function.get_block(height) {
-//                            let feed = Feed { height, block };
-//                            info!("get block resp {:?}!", &feed);
-//                            sender.send(BftMsg::Feed(feed)).unwrap();
-//                        }
-//                    });
-//                })
-//                .unwrap();
 
                 thread::spawn(move || {
-                    info!("get block req!");
-                    if let Ok(block) = function.get_block(height) {
-                        let feed = Feed { height, block };
-                        info!("get block resp {:?}!", &feed);
-                        sender.send(BftMsg::Feed(feed)).unwrap();
+                    let result = function
+                        .get_block(height)
+                        .map_err(|e| BftError::GetBlockFailed(format!("{:?}", e)))
+                        .and_then(|block| sender.send(BftMsg::Feed(Feed { height, block })).map_err(|e| BftError::SendMsgErr(format!("{:?}", e))));
+                    if let Err(e) = result{
+                        error!("Bft encounters {:?}", e);
                     }
                 });
+
             }
-            info!("ready to transmit proposal!");
             self.transmit_proposal()?;
             self.transmit_prevote()?;
         }

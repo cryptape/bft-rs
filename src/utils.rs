@@ -9,9 +9,9 @@ use crate::{
     wal::Wal,
 };
 #[cfg(feature = "verify_req")]
-use crossbeam_utils::thread as cross_thread;
 use std::collections::HashMap;
 use std::fs;
+use std::thread;
 use std::time::Instant;
 
 impl<T> Bft<T>
@@ -437,25 +437,28 @@ where
 
             let function = self.function.clone();
             let sender = self.msg_sender.clone();
-            cross_thread::scope(|s| {
-                s.spawn(move |_| {
-                    let is_pass = match function.check_txs(block, proposal_hash, height, round) {
-                        Ok(_) => true,
-                        Err(e) => {
-                            warn!(
-                                "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
-                                e, proposal
-                            );
-                            false
-                        }
-                    };
-                    let verify_resp = VerifyResp { is_pass, round };
-                    sender
-                        .send(BftMsg::VerifyResp(verify_resp))
-                        .expect("cross_thread send verify_resp failed!");
-                });
-            })
-            .unwrap();
+            let block = block.to_owned();
+            let proposal_hash = proposal_hash.to_owned();
+            thread::spawn(move |block, proposal_hash| {
+                let is_pass = match function.check_txs(&block, &proposal_hash, height, round) {
+                    Ok(_) => true,
+                    Err(e) => {
+                        warn!(
+                            "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
+                            e, proposal
+                        );
+                        false
+                    }
+                };
+                let verify_resp = VerifyResp { is_pass, round };
+                let result = sender
+                    .send(BftMsg::VerifyResp(verify_resp))
+                    .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)));
+                if let Err(e) = result{
+                    error!("Bft encounters {:?}", e);
+                }
+            });
+
 
             Ok(())
         }
@@ -711,7 +714,7 @@ where
         let info = format!("{:?}", &msg);
         self.msg_sender
             .send(msg)
-            .map_err(|error| BftError::SendMsgErr(format!("{:?} of {:?}",error, info)))
+            .map_err(|e| BftError::SendMsgErr(format!("{:?} of {:?}", e, info)))
     }
 
     #[inline]
