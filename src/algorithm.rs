@@ -1,6 +1,6 @@
 use crate::*;
 use crate::{
-    collectors::{ProposalCollector, VoteCollector, VoteSet},
+    collectors::{ProposalCollector, VoteCollector},
     error::{handle_error, BftError, BftResult},
     objects::*,
     params::BftParams,
@@ -18,8 +18,6 @@ pub(crate) const INIT_HEIGHT: u64 = 0;
 pub(crate) const INIT_ROUND: u64 = 0;
 const PROPOSAL_TIMES_COEF: u64 = 10;
 const TIMEOUT_RETRANSE_COEF: u32 = 15;
-const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;
-const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
 
 #[cfg(feature = "verify_req")]
 const VERIFY_AWAIT_COEF: u32 = 50;
@@ -61,6 +59,45 @@ impl<T> Bft<T>
 where
     T: BftSupport + 'static,
 {
+    fn new(
+        s: Sender<BftMsg>,
+        r: Receiver<BftMsg>,
+        ts: Sender<TimeoutInfo>,
+        tn: Receiver<TimeoutInfo>,
+        f: Arc<T>,
+        local_address: Hash,
+        wal_path: &str,
+    ) -> Self {
+        info!("Bft Address: {:?}, wal_path: {}", local_address, wal_path);
+        Bft {
+            msg_sender: s,
+            msg_receiver: r,
+            timer_seter: ts,
+            timer_notity: tn,
+            height: INIT_HEIGHT,
+            round: INIT_ROUND,
+            step: Step::default(),
+            block_hash: None,
+            lock_status: None,
+            height_filter: HashMap::new(),
+            round_filter: HashMap::new(),
+            last_commit_round: None,
+            last_commit_block_hash: None,
+            htime: Instant::now(),
+            params: BftParams::new(local_address),
+            feed: None,
+            verify_results: HashMap::new(),
+            proof: Proof::default(),
+            status: None,
+            authority_manage: AuthorityManage::new(),
+            proposals: ProposalCollector::new(),
+            votes: VoteCollector::new(),
+            wal_log: Wal::new(wal_path).unwrap(),
+            function: f,
+            consensus_power: false,
+        }
+    }
+
     /// A function to start a BFT state machine.
     pub fn start(
         s: Sender<BftMsg>,
@@ -73,7 +110,7 @@ where
         let (bft2timer, timer4bft) = unbounded();
         let (timer2bft, bft4timer) = unbounded();
 
-        let mut engine = Bft::initialize(s, r, bft2timer, bft4timer, f, local_address, wal_path);
+        let mut engine = Bft::new(s, r, bft2timer, bft4timer, f, local_address, wal_path);
 
         // start timer module.
         let _timer_thread = thread::Builder::new()
@@ -195,9 +232,15 @@ where
                 }
             }
 
-            BftMsg::Pause => self.consensus_power = false,
+            BftMsg::Pause => {
+                self.consensus_power = false;
+                info!("Pause Bft process");
+            }
 
-            BftMsg::Start => self.consensus_power = true,
+            BftMsg::Start => {
+                self.consensus_power = true;
+                info!("Start Bft process");
+            }
 
             BftMsg::Clear(proof) => {
                 trace!("Bft receives clear {:?}", &proof);
@@ -295,45 +338,6 @@ where
         }
 
         Ok(())
-    }
-
-    fn initialize(
-        s: Sender<BftMsg>,
-        r: Receiver<BftMsg>,
-        ts: Sender<TimeoutInfo>,
-        tn: Receiver<TimeoutInfo>,
-        f: Arc<T>,
-        local_address: Hash,
-        wal_path: &str,
-    ) -> Self {
-        info!("Bft Address: {:?}, wal_path: {}", local_address, wal_path);
-        Bft {
-            msg_sender: s,
-            msg_receiver: r,
-            timer_seter: ts,
-            timer_notity: tn,
-            height: INIT_HEIGHT,
-            round: INIT_ROUND,
-            step: Step::default(),
-            block_hash: None,
-            lock_status: None,
-            height_filter: HashMap::new(),
-            round_filter: HashMap::new(),
-            last_commit_round: None,
-            last_commit_block_hash: None,
-            htime: Instant::now(),
-            params: BftParams::new(local_address),
-            feed: None,
-            verify_results: HashMap::new(),
-            proof: Proof::default(),
-            status: None,
-            authority_manage: AuthorityManage::new(),
-            proposals: ProposalCollector::new(),
-            votes: VoteCollector::new(),
-            wal_log: Wal::new(wal_path).unwrap(),
-            function: f,
-            consensus_power: false,
-        }
     }
 
     fn handle_proposal(&self, proposal: &Proposal) -> BftResult<()> {
@@ -448,10 +452,6 @@ where
             Instant::now() - self.htime
         );
 
-        //        self.function
-        //            .commit(commit.clone())
-        //            .map_err(|e| BftError::CommitFailed(format!("{:?} of {:?}", e, &commit)))
-        //            .and_then(|status| self.send_bft_msg(BftMsg::Status(status)))?;
         let function = self.function.clone();
         let sender = self.msg_sender.clone();
         thread::spawn(move || {
@@ -725,11 +725,6 @@ where
         Ok(())
     }
 
-    #[inline]
-    fn change_to_step(&mut self, step: Step) {
-        self.step = step;
-    }
-
     fn new_round_start(&mut self, new_round: bool) -> BftResult<()> {
         if self.step != Step::ProposeWait {
             trace!(
@@ -825,38 +820,6 @@ where
         Ok(false)
     }
 
-    fn filter_height(&self, voter: &Address) -> bool {
-        let mut trans_flag = false;
-
-        if let Some(ins) = self.height_filter.get(voter) {
-            // had received retransmit message from the address
-            if (Instant::now() - *ins)
-                > self.params.timer.get_prevote() * TIMEOUT_LOW_HEIGHT_MESSAGE_COEF
-            {
-                trans_flag = true;
-            }
-        } else {
-            trans_flag = true;
-        }
-        trans_flag
-    }
-
-    fn filter_round(&self, voter: &Address) -> bool {
-        let mut trans_flag = false;
-
-        if let Some(ins) = self.round_filter.get(voter) {
-            // had received retransmit message from the address
-            if (Instant::now() - *ins)
-                > self.params.timer.get_prevote() * TIMEOUT_LOW_ROUND_MESSAGE_COEF
-            {
-                trans_flag = true;
-            }
-        } else {
-            trans_flag = true;
-        }
-        trans_flag
-    }
-
     fn set_proposal(&mut self, proposal: Proposal) {
         let block_hash = self.function.crypt_hash(&proposal.block);
 
@@ -897,76 +860,6 @@ where
             trace!("Bft handles a proposal with an earlier PoLC");
             return;
         }
-    }
-
-    pub(crate) fn set_proof(&mut self, proof: &Proof) {
-        if self.proof.height < proof.height {
-            self.proof = proof.clone();
-        }
-    }
-
-    fn set_status(&mut self, status: &Status) {
-        self.authority_manage
-            .receive_authorities_list(status.height, status.authority_list.clone());
-        trace!("Bft updates authority_manage {:?}", self.authority_manage);
-
-        if self.consensus_power
-            && !status
-                .authority_list
-                .iter()
-                .any(|node| node.address == self.params.address)
-        {
-            trace!(
-                "Bft loses consensus power in height {} and stops the bft-rs process!",
-                status.height
-            );
-            self.consensus_power = false;
-        } else if !self.consensus_power
-            && status
-                .authority_list
-                .iter()
-                .any(|node| node.address == self.params.address)
-        {
-            trace!(
-                "Bft accesses consensus power in height {} and starts the bft-rs process!",
-                status.height
-            );
-            self.consensus_power = true;
-        }
-
-        if let Some(interval) = status.interval {
-            // update the bft interval
-            self.params.timer.set_total_duration(interval);
-        }
-    }
-
-    fn set_polc(&mut self, hash: &Hash, voteset: &VoteSet) {
-        self.block_hash = Some(hash.to_owned());
-        self.lock_status = Some(LockStatus {
-            block_hash: hash.to_owned(),
-            round: self.round,
-            votes: voteset.extract_polc(hash),
-        });
-
-        trace!(
-            "Bft sets a PoLC at height {:?}, round {:?}, on proposal {:?}",
-            self.height,
-            self.round,
-            hash.to_owned()
-        );
-    }
-
-    #[inline]
-    fn set_timer(&self, duration: Duration, step: Step) {
-        trace!("Bft sets {:?} timer for {:?}", step, duration);
-        self.timer_seter
-            .send(TimeoutInfo {
-                timeval: Instant::now() + duration,
-                height: self.height,
-                round: self.round,
-                step,
-            })
-            .unwrap();
     }
 
     fn check_prevote_count(&mut self) -> bool {
@@ -1094,37 +987,5 @@ where
             }
         }
         VerifyResult::Approved
-    }
-
-    fn clean_polc(&mut self) {
-        self.block_hash = None;
-        self.lock_status = None;
-        trace!(
-            "Bft cleans PoLC at height {:?}, round {:?}",
-            self.height,
-            self.round
-        );
-    }
-
-    #[inline]
-    fn clean_save_info(&mut self) {
-        // clear prevote count needed when goto new height
-        self.block_hash = None;
-        self.lock_status = None;
-        self.votes.clear_prevote_count();
-
-        #[cfg(feature = "verify_req")]
-        self.verify_results.clear();
-    }
-
-    #[inline]
-    fn clean_feed(&mut self) {
-        self.feed = None;
-    }
-
-    #[inline]
-    fn clean_filter(&mut self) {
-        self.height_filter.clear();
-        self.round_filter.clear();
     }
 }

@@ -1,7 +1,7 @@
 use crate::*;
 use crate::{
     algorithm::{Bft, INIT_HEIGHT, INIT_ROUND},
-    collectors::{ProposalCollector, RoundCollector, VoteCollector, CACHE_N},
+    collectors::{ProposalCollector, RoundCollector, VoteCollector, VoteSet, CACHE_N},
     error::{handle_error, BftError, BftResult},
     objects::*,
     random::get_index,
@@ -12,36 +12,15 @@ use crate::{
 use std::collections::HashMap;
 use std::fs;
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;
+const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
 
 impl<T> Bft<T>
 where
     T: BftSupport + 'static,
 {
-    pub(crate) fn clear(&mut self, proof: Proof) {
-        self.height = INIT_HEIGHT;
-        self.round = INIT_ROUND;
-        self.step = Step::default();
-        self.block_hash = None;
-        self.lock_status = None;
-        self.height_filter.clear();
-        self.round_filter.clear();
-        self.last_commit_round = None;
-        self.last_commit_block_hash = None;
-        self.htime = Instant::now();
-        self.feed = None;
-        self.verify_results.clear();
-        self.proof = proof;
-        self.authority_manage = AuthorityManage::new();
-        self.proposals = ProposalCollector::new();
-        self.votes = VoteCollector::new();
-        //TODO: 将之前的 wal 文件备份
-        let wal_path = &self.wal_log.dir;
-        let _ = fs::remove_dir_all(wal_path);
-        self.wal_log = Wal::new(wal_path).unwrap();
-        self.consensus_power = false;
-    }
-
     pub(crate) fn load_wal_log(&mut self) {
         // TODO: should prevent saving wal
         info!("Bft starts to load wal log!");
@@ -130,21 +109,7 @@ where
         })
     }
 
-    pub(crate) fn get_vote_weight(&self, height: u64, address: &Address) -> u64 {
-        if height != self.height {
-            return 1u64;
-        }
-        if let Some(node) = self
-            .authority_manage
-            .authorities
-            .iter()
-            .find(|node| node.address == *address)
-        {
-            return node.vote_weight as u64;
-        }
-        1u64
-    }
-
+    #[inline]
     fn get_authorities(&self, height: u64) -> BftResult<&Vec<Node>> {
         let p = &self.authority_manage;
         let mut authorities = &p.authorities;
@@ -160,6 +125,22 @@ where
         Ok(authorities)
     }
 
+    #[inline]
+    fn get_vote_weight(&self, height: u64, address: &Address) -> u64 {
+        if height != self.height {
+            return 1u64;
+        }
+        if let Some(node) = self
+            .authority_manage
+            .authorities
+            .iter()
+            .find(|node| node.address == *address)
+        {
+            return node.vote_weight as u64;
+        }
+        1u64
+    }
+
     pub(crate) fn get_proposer(&self, height: u64, round: u64) -> BftResult<&Address> {
         let authorities = self.get_authorities(height)?;
         let nonce = height + round;
@@ -172,6 +153,77 @@ where
             .expect("The select proposer index is not in authorities, it should not happen!")
             .address;
         Ok(proposer)
+    }
+
+    #[inline]
+    pub(crate) fn set_proof(&mut self, proof: &Proof) {
+        if self.proof.height < proof.height {
+            self.proof = proof.clone();
+        }
+    }
+
+    pub(crate) fn set_status(&mut self, status: &Status) {
+        self.authority_manage
+            .receive_authorities_list(status.height, status.authority_list.clone());
+        trace!("Bft updates authority_manage {:?}", self.authority_manage);
+
+        if self.consensus_power
+            && !status
+            .authority_list
+            .iter()
+            .any(|node| node.address == self.params.address)
+        {
+            trace!(
+                "Bft loses consensus power in height {} and stops the bft-rs process!",
+                status.height
+            );
+            self.consensus_power = false;
+        } else if !self.consensus_power
+            && status
+            .authority_list
+            .iter()
+            .any(|node| node.address == self.params.address)
+        {
+            trace!(
+                "Bft accesses consensus power in height {} and starts the bft-rs process!",
+                status.height
+            );
+            self.consensus_power = true;
+        }
+
+        if let Some(interval) = status.interval {
+            // update the bft interval
+            self.params.timer.set_total_duration(interval);
+        }
+    }
+
+    pub(crate) fn set_polc(&mut self, hash: &Hash, voteset: &VoteSet) {
+        self.block_hash = Some(hash.to_owned());
+        self.lock_status = Some(LockStatus {
+            block_hash: hash.to_owned(),
+            round: self.round,
+            votes: voteset.extract_polc(hash),
+        });
+
+        trace!(
+            "Bft sets a PoLC at height {:?}, round {:?}, on proposal {:?}",
+            self.height,
+            self.round,
+            hash.to_owned()
+        );
+    }
+
+    #[inline]
+    pub(crate) fn set_timer(&self, duration: Duration, step: Step) {
+        trace!("Bft sets {:?} timer for {:?}", step, duration);
+        self.timer_seter
+            .send(TimeoutInfo {
+                timeval: Instant::now() + duration,
+                height: self.height,
+                round: self.round,
+                step,
+            })
+            .unwrap();
     }
 
     pub(crate) fn generate_proof(&mut self, lock_status: LockStatus) -> Proof {
@@ -703,12 +755,49 @@ where
         Ok(())
     }
 
+    pub(crate) fn filter_height(&self, voter: &Address) -> bool {
+        let mut trans_flag = false;
+
+        if let Some(ins) = self.height_filter.get(voter) {
+            // had received retransmit message from the address
+            if (Instant::now() - *ins)
+                > self.params.timer.get_prevote() * TIMEOUT_LOW_HEIGHT_MESSAGE_COEF
+            {
+                trans_flag = true;
+            }
+        } else {
+            trans_flag = true;
+        }
+        trans_flag
+    }
+
+    pub(crate) fn filter_round(&self, voter: &Address) -> bool {
+        let mut trans_flag = false;
+
+        if let Some(ins) = self.round_filter.get(voter) {
+            // had received retransmit message from the address
+            if (Instant::now() - *ins)
+                > self.params.timer.get_prevote() * TIMEOUT_LOW_ROUND_MESSAGE_COEF
+            {
+                trans_flag = true;
+            }
+        } else {
+            trans_flag = true;
+        }
+        trans_flag
+    }
+
     #[inline]
     pub(crate) fn send_bft_msg(&self, msg: BftMsg) -> BftResult<()> {
         let info = format!("{:?}", &msg);
         self.msg_sender
             .send(msg)
             .map_err(|e| BftError::SendMsgErr(format!("{:?} of {:?}", e, info)))
+    }
+
+    #[inline]
+    pub(crate) fn change_to_step(&mut self, step: Step) {
+        self.step = step;
     }
 
     #[inline]
@@ -722,8 +811,65 @@ where
         let weight_sum = get_total_weight(&self.authority_manage.authorities);
         count * 3 > weight_sum * 2
     }
+
+    pub(crate) fn clean_polc(&mut self) {
+        self.block_hash = None;
+        self.lock_status = None;
+        trace!(
+            "Bft cleans PoLC at height {:?}, round {:?}",
+            self.height,
+            self.round
+        );
+    }
+
+    #[inline]
+    pub(crate) fn clean_save_info(&mut self) {
+        // clear prevote count needed when goto new height
+        self.block_hash = None;
+        self.lock_status = None;
+        self.votes.clear_prevote_count();
+
+        #[cfg(feature = "verify_req")]
+            self.verify_results.clear();
+    }
+
+    #[inline]
+    pub(crate) fn clean_feed(&mut self) {
+        self.feed = None;
+    }
+
+    #[inline]
+    pub(crate) fn clean_filter(&mut self) {
+        self.height_filter.clear();
+        self.round_filter.clear();
+    }
+
+    pub(crate) fn clear(&mut self, proof: Proof) {
+        self.height = INIT_HEIGHT;
+        self.round = INIT_ROUND;
+        self.step = Step::default();
+        self.block_hash = None;
+        self.lock_status = None;
+        self.height_filter.clear();
+        self.round_filter.clear();
+        self.last_commit_round = None;
+        self.last_commit_block_hash = None;
+        self.htime = Instant::now();
+        self.feed = None;
+        self.verify_results.clear();
+        self.proof = proof;
+        self.authority_manage = AuthorityManage::new();
+        self.proposals = ProposalCollector::new();
+        self.votes = VoteCollector::new();
+        //TODO: 将之前的 wal 文件备份
+        let wal_path = &self.wal_log.dir;
+        let _ = fs::remove_dir_all(wal_path);
+        self.wal_log = Wal::new(wal_path).unwrap();
+        self.consensus_power = false;
+    }
 }
 
+#[inline]
 fn get_total_weight(authorities: &[Node]) -> u64 {
     let weight: Vec<u64> = authorities
         .iter()
@@ -732,6 +878,7 @@ fn get_total_weight(authorities: &[Node]) -> u64 {
     weight.iter().sum()
 }
 
+#[inline]
 fn get_votes_weight(authorities: &[Node], vote_addresses: &[Address]) -> u64 {
     let votes_weight: Vec<u64> = authorities
         .iter()
