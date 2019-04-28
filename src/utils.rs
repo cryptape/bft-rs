@@ -2,7 +2,7 @@ use crate::*;
 use crate::{
     algorithm::{Bft, INIT_HEIGHT, INIT_ROUND},
     collectors::{ProposalCollector, RoundCollector, VoteCollector, CACHE_N},
-    error::{BftError, BftResult, handle_error},
+    error::{handle_error, BftError, BftResult},
     objects::*,
     random::get_index,
     timer::TimeoutInfo,
@@ -65,31 +65,27 @@ where
             }
             LogType::Feed => {
                 trace!("Load feed");
-                let feed: Feed = rlp::decode(&encode).map_err(|e| {
-                    BftError::DecodeErr(format!("feed encounters {:?}", e))
-                })?;
+                let feed: Feed = rlp::decode(&encode)
+                    .map_err(|e| BftError::DecodeErr(format!("feed encounters {:?}", e)))?;
                 self.process(BftMsg::Feed(feed), false)?;
             }
             LogType::Status => {
                 trace!("Load status");
-                let status: Status = rlp::decode(&encode).map_err(|e| {
-                    BftError::DecodeErr(format!("status encounters {:?}", e))
-                })?;
+                let status: Status = rlp::decode(&encode)
+                    .map_err(|e| BftError::DecodeErr(format!("status encounters {:?}", e)))?;
                 self.process(BftMsg::Status(status), false)?;
             }
             LogType::Proof => {
                 trace!("Load proof");
-                let proof: Proof = rlp::decode(&encode).map_err(|e| {
-                    BftError::DecodeErr(format!("proof encounters {:?}", e))
-                })?;
+                let proof: Proof = rlp::decode(&encode)
+                    .map_err(|e| BftError::DecodeErr(format!("proof encounters {:?}", e)))?;
                 self.proof = proof;
             }
             #[cfg(feature = "verify_req")]
             LogType::VerifyResp => {
                 trace!("Load verify_resp");
-                let verify_resp: VerifyResp = rlp::decode(&encode).map_err(|e| {
-                    BftError::DecodeErr(format!("verify_resp encounters {:?}", e))
-                })?;
+                let verify_resp: VerifyResp = rlp::decode(&encode)
+                    .map_err(|e| BftError::DecodeErr(format!("verify_resp encounters {:?}", e)))?;
                 self.process(BftMsg::VerifyResp(verify_resp), false)?;
             }
 
@@ -453,11 +449,10 @@ where
                 let result = sender
                     .send(BftMsg::VerifyResp(verify_resp))
                     .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)));
-                if let Err(e) = result{
+                if let Err(e) = result {
                     error!("Bft encounters {:?}", e);
                 }
             });
-
 
             Ok(())
         }

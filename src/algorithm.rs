@@ -361,7 +361,11 @@ where
     fn handle_vote(&mut self, vote: Vote) -> BftResult<()> {
         trace!(
             "Bft handles a {:?} vote of height {:?}, round {:?}, to {:?}, from {:?}",
-            vote.vote_type, vote.height, vote.round, vote.block_hash, vote.voter
+            vote.vote_type,
+            vote.height,
+            vote.round,
+            vote.block_hash,
+            vote.voter
         );
 
         if vote.height == self.height - 1 {
@@ -445,18 +449,22 @@ where
             Instant::now() - self.htime
         );
 
-//        self.function
-//            .commit(commit.clone())
-//            .map_err(|e| BftError::CommitFailed(format!("{:?} of {:?}", e, &commit)))
-//            .and_then(|status| self.send_bft_msg(BftMsg::Status(status)))?;
+        //        self.function
+        //            .commit(commit.clone())
+        //            .map_err(|e| BftError::CommitFailed(format!("{:?} of {:?}", e, &commit)))
+        //            .and_then(|status| self.send_bft_msg(BftMsg::Status(status)))?;
         let function = self.function.clone();
         let sender = self.msg_sender.clone();
         thread::spawn(move || {
             let result = function
                 .commit(commit)
                 .map_err(|e| BftError::CommitFailed(format!("{:?}", e)))
-                .and_then(|status| sender.send(BftMsg::Status(status)).map_err(|e| BftError::SendMsgErr(format!("{:?}", e))));
-            if let Err(e) = result{
+                .and_then(|status| {
+                    sender
+                        .send(BftMsg::Status(status))
+                        .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
+                });
+            if let Err(e) = result {
                 error!("Bft encounters {:?}", e);
             }
         });
@@ -584,7 +592,8 @@ where
         };
         trace!(
             "Bft transmits proposal at height {:?}, round {:?}",
-            self.height, self.round
+            self.height,
+            self.round
         );
         self.function.transmit(msg.clone());
         self.send_bft_msg(msg)?;
@@ -602,7 +611,8 @@ where
 
         trace!(
             "Bft transmits prevote at height {:?}, round {:?}",
-            self.height, self.round
+            self.height,
+            self.round
         );
 
         let vote = Vote {
@@ -639,7 +649,8 @@ where
 
         trace!(
             "Bft transmits precommit at height {:?}, round {:?}",
-            self.height, self.round
+            self.height,
+            self.round
         );
 
         let vote = Vote {
@@ -724,7 +735,8 @@ where
         if self.step != Step::ProposeWait {
             trace!(
                 "Bft starts height {:?}, round {:?}",
-                self.height, self.round
+                self.height,
+                self.round
             );
         }
         self.change_to_step(Step::ProposeWait);
@@ -740,12 +752,15 @@ where
                     let result = function
                         .get_block(height)
                         .map_err(|e| BftError::GetBlockFailed(format!("{:?}", e)))
-                        .and_then(|block| sender.send(BftMsg::Feed(Feed { height, block })).map_err(|e| BftError::SendMsgErr(format!("{:?}", e))));
-                    if let Err(e) = result{
+                        .and_then(|block| {
+                            sender
+                                .send(BftMsg::Feed(Feed { height, block }))
+                                .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
+                        });
+                    if let Err(e) = result {
                         error!("Bft encounters {:?}", e);
                     }
                 });
-
             }
             self.transmit_proposal()?;
             self.transmit_prevote()?;
@@ -783,13 +798,16 @@ where
         let proposer = self.get_proposer(self.height, self.round)?;
         trace!(
             "Bft chooses proposer {:?} at height {}, round {}",
-            proposer, self.height, self.round
+            proposer,
+            self.height,
+            self.round
         );
 
         if self.params.address == *proposer {
             trace!(
                 "Bft becomes proposer at height {}, round {}",
-                self.height, self.round
+                self.height,
+                self.round
             );
             return Ok(true);
         }
@@ -968,7 +986,8 @@ where
         }
         trace!(
             "Bft collects over 2/3 prevotes at height {:?}, round {:?}",
-            self.height, self.round
+            self.height,
+            self.round
         );
 
         if let Some(prevote_set) =
@@ -990,7 +1009,8 @@ where
                             // receive +2/3 prevote to nil, clean lock info
                             trace!(
                                 "Bft collects over 2/3 prevotes to nil at height {:?}, round {:?}",
-                                self.height, self.round
+                                self.height,
+                                self.round
                             );
                             self.clean_polc();
                             self.block_hash = None;
@@ -1031,7 +1051,8 @@ where
 
             trace!(
                 "Bft collects over 2/3 precommits at height {:?}, round {:?}",
-                self.height, self.round
+                self.height,
+                self.round
             );
 
             for (hash, count) in &precommit_set.votes_by_proposal {
@@ -1081,7 +1102,8 @@ where
         self.lock_status = None;
         trace!(
             "Bft cleans PoLC at height {:?}, round {:?}",
-            self.height, self.round
+            self.height,
+            self.round
         );
     }
 

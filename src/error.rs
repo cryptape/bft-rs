@@ -2,7 +2,6 @@ pub type BftResult<T> = ::std::result::Result<T, BftError>;
 /// Error for Bft actuator.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BftError {
-
     ShouldNotHappen(String),
     /// Send message error.
     SendMsgErr(String),

@@ -24,8 +24,10 @@ pub(crate) struct TimeoutInfo {
 impl Encodable for TimeoutInfo {
     fn rlp_append(&self, s: &mut RlpStream) {
         let step: u8 = self.step.clone().into();
-        s.begin_list(3).append(&self.height)
-            .append(&self.round).append(&step);
+        s.begin_list(3)
+            .append(&self.height)
+            .append(&self.round)
+            .append(&step);
     }
 }
 
@@ -37,7 +39,12 @@ impl Decodable for TimeoutInfo {
                 let round: Round = r.val_at(1)?;
                 let step: u8 = r.val_at(2)?;
                 let step: Step = Step::from(step);
-                Ok(TimeoutInfo { timeval: Instant::now(), height, round, step })
+                Ok(TimeoutInfo {
+                    timeval: Instant::now(),
+                    height,
+                    round,
+                    step,
+                })
             }
             _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
