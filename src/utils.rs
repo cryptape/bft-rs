@@ -710,7 +710,7 @@ where
         let info = format!("{:?}", &msg);
         self.msg_sender
             .send(msg)
-            .map_err(|_| BftError::SendMsgErr(info))
+            .map_err(|error| BftError::SendMsgErr(format!("{:?} of {:?}",error, info)))
     }
 
     #[inline]

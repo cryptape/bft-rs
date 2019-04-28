@@ -445,10 +445,22 @@ where
             Instant::now() - self.htime
         );
 
-        self.function
-            .commit(commit.clone())
-            .map_err(|e| BftError::CommitFailed(format!("{:?} of {:?}", e, &commit)))
-            .and_then(|status| self.send_bft_msg(BftMsg::Status(status)))?;
+//        self.function
+//            .commit(commit.clone())
+//            .map_err(|e| BftError::CommitFailed(format!("{:?} of {:?}", e, &commit)))
+//            .and_then(|status| self.send_bft_msg(BftMsg::Status(status)))?;
+        let function = self.function.clone();
+        let sender = self.msg_sender.clone();
+        thread::spawn(move || {
+            info!("commit!");
+            let result = function
+                .commit(commit)
+                .map_err(|e| BftError::CommitFailed(format!("{:?}", e)))
+                .and_then(|status| sender.send(BftMsg::Status(status)).map_err(|e| BftError::SendMsgErr(format!("{:?}", e))));
+            if let Err(e) = result{
+                error!("Bft encounters {:?}", e);
+            }
+        });
 
         info!("Bft block by commit function");
 
