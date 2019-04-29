@@ -166,7 +166,7 @@ where
     pub(crate) fn set_status(&mut self, status: &Status) {
         self.authority_manage
             .receive_authorities_list(status.height, status.authority_list.clone());
-        info!("Bft updates authority_manage {:?}", self.authority_manage);
+        trace!("Bft updates authority_manage {:?}", self.authority_manage);
 
         if self.consensus_power
             && !status
@@ -206,7 +206,7 @@ where
             votes: voteset.extract_polc(hash),
         });
 
-        info!(
+        trace!(
             "Bft sets a PoLC at height {:?}, round {:?}, on proposal {:?}",
             self.height,
             self.round,
@@ -216,7 +216,7 @@ where
 
     #[inline]
     pub(crate) fn set_timer(&self, duration: Duration, step: Step) {
-        info!("Bft sets {:?} timer for {:?}", step, duration);
+        trace!("Bft sets {:?} timer for {:?}", step, duration);
         self.timer_seter
             .send(TimeoutInfo {
                 timeval: Instant::now() + duration,
@@ -306,7 +306,7 @@ where
         encode: &Encode,
         need_wal: bool,
     ) -> BftResult<()> {
-        info!("Bft receives {:?}", signed_proposal);
+        trace!("Bft receives {:?}", signed_proposal);
         let proposal = &signed_proposal.proposal;
         let height = proposal.height;
         let round = proposal.round;
@@ -363,7 +363,7 @@ where
         signed_vote: &SignedVote,
         need_wal: bool,
     ) -> BftResult<()> {
-        info!("Bft receives {:?}", signed_vote);
+        trace!("Bft receives {:?}", signed_vote);
         let vote = &signed_vote.vote;
         let height = vote.height;
         let round = vote.round;
@@ -824,7 +824,7 @@ where
     pub(crate) fn clean_polc(&mut self) {
         self.block_hash = None;
         self.lock_status = None;
-        info!(
+        trace!(
             "Bft cleans PoLC at height {:?}, round {:?}",
             self.height, self.round
         );

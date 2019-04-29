@@ -361,7 +361,7 @@ where
     }
 
     fn handle_vote(&mut self, vote: Vote) -> BftResult<()> {
-        info!(
+        trace!(
             "Bft handles a {:?} vote of height {:?}, round {:?}, to {:?}, from {:?}",
             vote.vote_type, vote.height, vote.round, vote.block_hash, vote.voter
         );
@@ -504,7 +504,7 @@ where
             self.new_round_start(true)?;
             self.flush_cache()?;
 
-            info!(
+            trace!(
                 "Bft receives rich status, goto new height {:?}",
                 status.height + 1
             );
@@ -536,7 +536,7 @@ where
 
         let msg = if self.lock_status.is_some() {
             // if is locked, boradcast the lock proposal
-            info!("Bft is ready to transmit locked Proposal");
+            trace!("Bft is ready to transmit locked Proposal");
             let lock_status = self.lock_status.clone().unwrap();
             let lock_round = lock_status.round;
             let lock_votes = lock_status.votes;
@@ -569,7 +569,7 @@ where
                 .expect("Have checked before, should not happen!");
             let block_hash = self.function.crypt_hash(&block);
             self.block_hash = Some(block_hash.clone());
-            info!("Bft is ready to transmit new Proposal");
+            trace!("Bft is ready to transmit new Proposal");
 
             let proposal = Proposal {
                 height: self.height,
@@ -584,7 +584,7 @@ where
             let signed_proposal = self.build_signed_proposal(&proposal)?;
             BftMsg::Proposal(rlp::encode(&signed_proposal))
         };
-        info!(
+        trace!(
             "Bft transmits proposal at height {:?}, round {:?}",
             self.height, self.round
         );
@@ -602,7 +602,7 @@ where
             Vec::new()
         };
 
-        info!(
+        trace!(
             "Bft transmits prevote at height {:?}, round {:?}",
             self.height, self.round
         );
@@ -617,7 +617,7 @@ where
         let signed_vote = self.build_signed_vote(&vote)?;
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
 
-        info!("Bft prevotes to {:?}", block_hash);
+        trace!("Bft prevotes to {:?}", block_hash);
         self.function.transmit(msg.clone());
         self.send_bft_msg(msg)?;
 
@@ -639,7 +639,7 @@ where
             Vec::new()
         };
 
-        info!(
+        trace!(
             "Bft transmits precommit at height {:?}, round {:?}",
             self.height, self.round
         );
@@ -654,7 +654,7 @@ where
         let signed_vote = self.build_signed_vote(&vote)?;
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
 
-        info!("Bft precommits to {:?}", block_hash);
+        trace!("Bft precommits to {:?}", block_hash);
         self.function.transmit(msg.clone());
         self.send_bft_msg(msg)?;
 
@@ -666,13 +666,13 @@ where
     }
 
     fn retransmit_lower_votes(&self, round: u64) -> BftResult<()> {
-        info!(
+        trace!(
             "Bft finds some nodes are at low height, retransmit votes of height {:?}, round {:?}",
             self.height - 1,
             round
         );
 
-        info!(
+        trace!(
             "Bft retransmits votes to proposal {:?}",
             self.last_commit_block_hash.clone().unwrap()
         );
@@ -711,7 +711,7 @@ where
         };
         let signed_precommit = self.build_signed_vote(&precommit)?;
 
-        info!("Bft finds some nodes fall behind, and sends nil vote to help them pursue");
+        trace!("Bft finds some nodes fall behind, and sends nil vote to help them pursue");
         self.function
             .transmit(BftMsg::Vote(rlp::encode(&signed_precommit)));
         Ok(())
@@ -781,7 +781,7 @@ where
 
     fn is_proposer(&self) -> BftResult<bool> {
         let proposer = self.get_proposer(self.height, self.round)?;
-        info!(
+        trace!(
             "Bft chooses proposer {:?} at height {}, round {}",
             proposer, self.height, self.round
         );
@@ -816,7 +816,7 @@ where
                 || self.lock_status.clone().unwrap().round <= proposal.lock_round.unwrap())
         {
             // receive a proposal with a later PoLC
-            info!(
+            trace!(
                     "Bft handles a proposal with the PoLC that proposal is {:?}, lock round is {:?}, lock votes are {:?}",
                     block_hash,
                     proposal.lock_round,
@@ -839,13 +839,13 @@ where
             && proposal.round == self.round
         {
             // receive a proposal without PoLC
-            info!(
+            trace!(
                 "Bft handles a proposal without PoLC, the proposal is {:?}",
                 block_hash
             );
             self.block_hash = Some(block_hash);
         } else {
-            info!("Bft handles a proposal with an earlier PoLC");
+            trace!("Bft handles a proposal with an earlier PoLC");
             return;
         }
     }
@@ -853,7 +853,7 @@ where
     fn check_prevote_count(&mut self) -> bool {
         let mut flag = false;
         for (round, prevote_count) in self.votes.prevote_count.iter() {
-            info!("Bft have received {} prevotes in round {}", prevote_count, round);
+            trace!("Bft have received {} prevotes in round {}", prevote_count, round);
             if self.cal_above_threshold(*prevote_count) && *round >= self.round {
                 flag = true;
                 if self.round < *round {
@@ -865,7 +865,7 @@ where
         if !flag {
             return false;
         }
-        info!(
+        trace!(
             "Bft collects over 2/3 prevotes at height {:?}, round {:?}",
             self.height, self.round
         );
@@ -887,7 +887,7 @@ where
                     {
                         if hash.is_empty() {
                             // receive +2/3 prevote to nil, clean lock info
-                            info!(
+                            trace!(
                                 "Bft collects over 2/3 prevotes to nil at height {:?}, round {:?}",
                                 self.height, self.round
                             );
@@ -919,7 +919,7 @@ where
             self.votes
                 .get_voteset(self.height, self.round, &VoteType::Precommit)
         {
-            info!("Bft have received {} precommits in round {}", precommit_set.count, self.round);
+            trace!("Bft have received {} precommits in round {}", precommit_set.count, self.round);
             let tv = if self.cal_all_vote(precommit_set.count) {
                 Duration::new(0, 0)
             } else {
@@ -929,7 +929,7 @@ where
                 return PrecommitRes::Below;
             }
 
-            info!(
+            trace!(
                 "Bft collects over 2/3 precommits at height {:?}, round {:?}",
                 self.height, self.round
             );
@@ -937,7 +937,7 @@ where
             for (hash, count) in &precommit_set.votes_by_proposal {
                 if self.cal_above_threshold(*count) {
                     if hash.is_empty() {
-                        info!(
+                        trace!(
                             "Bft reaches nil consensus, goto next round {:?}",
                             self.round + 1
                         );
