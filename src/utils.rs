@@ -35,41 +35,41 @@ where
     fn process_wal_log(&mut self, log_type: LogType, encode: Vec<u8>) -> BftResult<()> {
         match log_type {
             LogType::Proposal => {
-                trace!("Load proposal");
+                info!("Load proposal");
                 self.process(BftMsg::Proposal(encode), false)?;
             }
             LogType::Vote => {
-                trace!("Load vote");
+                info!("Load vote");
                 self.process(BftMsg::Vote(encode), false)?;
             }
             LogType::Feed => {
-                trace!("Load feed");
+                info!("Load feed");
                 let feed: Feed = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("feed encounters {:?}", e)))?;
                 self.process(BftMsg::Feed(feed), false)?;
             }
             LogType::Status => {
-                trace!("Load status");
+                info!("Load status");
                 let status: Status = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("status encounters {:?}", e)))?;
                 self.process(BftMsg::Status(status), false)?;
             }
             LogType::Proof => {
-                trace!("Load proof");
+                info!("Load proof");
                 let proof: Proof = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("proof encounters {:?}", e)))?;
                 self.proof = proof;
             }
             #[cfg(feature = "verify_req")]
             LogType::VerifyResp => {
-                trace!("Load verify_resp");
+                info!("Load verify_resp");
                 let verify_resp: VerifyResp = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("verify_resp encounters {:?}", e)))?;
                 self.process(BftMsg::VerifyResp(verify_resp), false)?;
             }
 
             LogType::TimeOutInfo => {
-                trace!("Load time_out_info");
+                info!("Load time_out_info");
                 let time_out_info: TimeoutInfo = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("time_out_info encounters {:?}", e))
                 })?;
@@ -165,26 +165,26 @@ where
     pub(crate) fn set_status(&mut self, status: &Status) {
         self.authority_manage
             .receive_authorities_list(status.height, status.authority_list.clone());
-        trace!("Bft updates authority_manage {:?}", self.authority_manage);
+        info!("Bft updates authority_manage {:?}", self.authority_manage);
 
         if self.consensus_power
             && !status
-            .authority_list
-            .iter()
-            .any(|node| node.address == self.params.address)
+                .authority_list
+                .iter()
+                .any(|node| node.address == self.params.address)
         {
-            trace!(
+            info!(
                 "Bft loses consensus power in height {} and stops the bft-rs process!",
                 status.height
             );
             self.consensus_power = false;
         } else if !self.consensus_power
             && status
-            .authority_list
-            .iter()
-            .any(|node| node.address == self.params.address)
+                .authority_list
+                .iter()
+                .any(|node| node.address == self.params.address)
         {
-            trace!(
+            info!(
                 "Bft accesses consensus power in height {} and starts the bft-rs process!",
                 status.height
             );
@@ -205,7 +205,7 @@ where
             votes: voteset.extract_polc(hash),
         });
 
-        trace!(
+        info!(
             "Bft sets a PoLC at height {:?}, round {:?}, on proposal {:?}",
             self.height,
             self.round,
@@ -215,7 +215,7 @@ where
 
     #[inline]
     pub(crate) fn set_timer(&self, duration: Duration, step: Step) {
-        trace!("Bft sets {:?} timer for {:?}", step, duration);
+        info!("Bft sets {:?} timer for {:?}", step, duration);
         self.timer_seter
             .send(TimeoutInfo {
                 timeval: Instant::now() + duration,
@@ -815,10 +815,9 @@ where
     pub(crate) fn clean_polc(&mut self) {
         self.block_hash = None;
         self.lock_status = None;
-        trace!(
+        info!(
             "Bft cleans PoLC at height {:?}, round {:?}",
-            self.height,
-            self.round
+            self.height, self.round
         );
     }
 
@@ -830,7 +829,7 @@ where
         self.votes.clear_prevote_count();
 
         #[cfg(feature = "verify_req")]
-            self.verify_results.clear();
+        self.verify_results.clear();
     }
 
     #[inline]
