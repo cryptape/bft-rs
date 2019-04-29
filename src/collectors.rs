@@ -265,9 +265,13 @@ impl ProposalCollector {
             .get_mut(&height)
             .and_then(|prc| prc.get_proposal(round))
     }
+
+    pub(crate) fn remove(&mut self, current_height: Height) {
+        self.proposals.remove(&current_height);
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ProposalRoundCollector {
     pub round_proposals: LruCache<Round, SignedProposal>,
 }

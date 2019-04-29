@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
+use crate::collectors::ProposalRoundCollector;
 
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;
 const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
@@ -244,26 +245,32 @@ where
     pub(crate) fn flush_cache(&mut self) -> BftResult<()> {
         let proposals = &mut self.proposals.proposals;
         let round_proposals = proposals.get_mut(&self.height);
+        let mut proposal_collector = ProposalRoundCollector::new();
+
         let votes = &mut self.votes.votes;
         let round_votes = votes.get_mut(&self.height);
-        let mut round_collector = RoundCollector::new();
+        let mut vote_collector = RoundCollector::new();
+
+        if round_proposals.is_some() {
+            proposal_collector = round_proposals.unwrap().clone();
+            self.proposals.remove(self.height);
+        }
+
         if round_votes.is_some() {
-            round_collector = round_votes.unwrap().clone();
+            vote_collector = round_votes.unwrap().clone();
             self.votes.remove(self.height);
         }
 
-        if let Some(round_proposals) = round_proposals {
-            for (_, signed_proposal) in round_proposals.round_proposals.iter() {
-                let encode = rlp::encode(signed_proposal);
-                let msg = BftMsg::Proposal(encode);
-                let info = format!("{:?}", &msg);
-                self.msg_sender
-                    .send(msg)
-                    .map_err(|_| BftError::SendMsgErr(info))?;
-            }
+        for (_, signed_proposal) in proposal_collector.round_proposals.iter() {
+            let encode = rlp::encode(signed_proposal);
+            let msg = BftMsg::Proposal(encode);
+            let info = format!("{:?}", &msg);
+            self.msg_sender
+                .send(msg)
+                .map_err(|_| BftError::SendMsgErr(info))?;
         };
 
-        for (_, step_votes) in round_collector.round_votes.iter() {
+        for (_, step_votes) in vote_collector.round_votes.iter() {
             for (_, vote_set) in step_votes.step_votes.iter() {
                 for (_, signed_vote) in vote_set.votes_by_sender.iter() {
                     let encode = rlp::encode(signed_vote);
