@@ -299,6 +299,7 @@ where
         encode: &Encode,
         need_wal: bool,
     ) -> BftResult<()> {
+        info!("Bft receives {:?}", signed_proposal);
         let proposal = &signed_proposal.proposal;
         let height = proposal.height;
         let round = proposal.round;
@@ -355,6 +356,7 @@ where
         signed_vote: &SignedVote,
         need_wal: bool,
     ) -> BftResult<()> {
+        info!("Bft receives {:?}", signed_vote);
         let vote = &signed_vote.vote;
         let height = vote.height;
         let round = vote.round;
