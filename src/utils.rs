@@ -206,7 +206,7 @@ where
             votes: voteset.extract_polc(hash),
         });
 
-        trace!(
+        debug!(
             "Bft sets a PoLC at height {:?}, round {:?}, on proposal {:?}",
             self.height,
             self.round,
@@ -216,7 +216,7 @@ where
 
     #[inline]
     pub(crate) fn set_timer(&self, duration: Duration, step: Step) {
-        trace!("Bft sets {:?} timer for {:?}", step, duration);
+        debug!("Bft sets {:?} timer for {:?}", step, duration);
         self.timer_seter
             .send(TimeoutInfo {
                 timeval: Instant::now() + duration,
@@ -306,7 +306,7 @@ where
         encode: &Encode,
         need_wal: bool,
     ) -> BftResult<()> {
-        trace!("Bft receives {:?}", signed_proposal);
+        debug!("Bft receives {:?}", signed_proposal);
         let proposal = &signed_proposal.proposal;
         let height = proposal.height;
         let round = proposal.round;
@@ -363,7 +363,7 @@ where
         signed_vote: &SignedVote,
         need_wal: bool,
     ) -> BftResult<()> {
-        trace!("Bft receives {:?}", signed_vote);
+        debug!("Bft receives {:?}", signed_vote);
         let vote = &signed_vote.vote;
         let height = vote.height;
         let round = vote.round;
@@ -824,7 +824,7 @@ where
     pub(crate) fn clean_polc(&mut self) {
         self.block_hash = None;
         self.lock_status = None;
-        trace!(
+        debug!(
             "Bft cleans PoLC at height {:?}, round {:?}",
             self.height, self.round
         );
