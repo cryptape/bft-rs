@@ -1,6 +1,9 @@
+#[cfg(feature = "random_proposer")]
 use rand_core::{RngCore, SeedableRng};
+#[cfg(feature = "random_proposer")]
 use rand_pcg::Pcg64Mcg as Pcg;
 
+#[cfg(feature = "random_proposer")]
 pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
     let sum: u64 = weight.iter().sum();
     let x = u64::max_value() / sum;
@@ -14,6 +17,21 @@ pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
     for (index, w) in weight.iter().enumerate() {
         acc += *w;
         if res < acc * x {
+            return index;
+        }
+    }
+    0
+}
+
+#[cfg(not(feature = "random_proposer"))]
+pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
+    let sum: u64 = weight.iter().sum();
+    let x = seed % sum;
+
+    let mut acc = 0u64;
+    for (index, w) in weight.iter().enumerate() {
+        acc += *w;
+        if x < acc {
             return index;
         }
     }
