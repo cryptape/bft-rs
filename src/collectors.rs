@@ -218,10 +218,10 @@ impl VoteSet {
     }
 
     /// A function to abstract the PoLC of the round.
-    pub(crate) fn extract_polc(&self, block_hash: &Hash) -> Vec<SignedVote> {
+    pub(crate) fn extract_polc(&self, block_hash: &[u8]) -> Vec<SignedVote> {
         // abstract the votes for the polc proposal into a vec
         let mut polc = Vec::new();
-        for (_, signed_vote) in &self.votes_by_sender {
+        for signed_vote in self.votes_by_sender.values() {
             let hash = &signed_vote.vote.block_hash;
             if hash.to_vec() == block_hash.to_vec() {
                 polc.push(signed_vote.to_owned());

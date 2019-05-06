@@ -25,7 +25,7 @@ pub(crate) struct TimeoutInfo {
 
 impl Encodable for TimeoutInfo {
     fn rlp_append(&self, s: &mut RlpStream) {
-        let step: u8 = self.step.clone().into();
+        let step: u8 = self.step.into();
         s.begin_list(4)
             .append(&self.duration)
             .append(&self.height)
@@ -106,12 +106,14 @@ impl WaitTimer {
                 while !timer_heap.is_empty() && now >= timer_heap.peek_min().cloned().unwrap() {
                     let timestamp = timer_heap.pop_min().unwrap();
                     if let Some(time_out) = timeout_info.remove(&timestamp) {
-                        if let Err(e) = self.timer_notify
-                            .send(time_out) {
+                        if let Err(e) = self.timer_notify.send(time_out) {
                             error!("Bft send time notification failed with {:?}", e);
                         }
                     } else {
-                        error!("Bft timer get time_out_info with repeat timestamp {:?}", timestamp);
+                        error!(
+                            "Bft timer get time_out_info with repeat timestamp {:?}",
+                            timestamp
+                        );
                     }
                 }
             }

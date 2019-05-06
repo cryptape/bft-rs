@@ -113,12 +113,14 @@ where
     #[inline]
     fn get_authorities(&self, height: u64) -> BftResult<&Vec<Node>> {
         let p = &self.authority_manage;
-        let mut authorities = &p.authorities;
-        if height == p.authority_h_old {
+        let authorities = if height == p.authority_h_old {
             trace!("Bft sets the authority manage with old authorities!");
-            authorities = &p.authorities_old;
-        }
-        if authorities.len() == 0 {
+            &p.authorities_old
+        } else {
+            &p.authorities
+        };
+
+        if authorities.is_empty() {
             return Err(BftError::ShouldNotHappen(
                 "the authority_list is empty".to_string(),
             ));
@@ -127,7 +129,7 @@ where
     }
 
     #[inline]
-    fn get_vote_weight(&self, height: u64, address: &Address) -> u64 {
+    fn get_vote_weight(&self, height: u64, address: &[u8]) -> u64 {
         if height != self.height {
             return 1u64;
         }
@@ -135,9 +137,9 @@ where
             .authority_manage
             .authorities
             .iter()
-            .find(|node| node.address == *address)
+            .find(|node| node.address == address.to_vec())
         {
-            return node.vote_weight as u64;
+            return u64::from(node.vote_weight);
         }
         1u64
     }
@@ -147,7 +149,7 @@ where
         let nonce = height + round;
         let weight: Vec<u64> = authorities
             .iter()
-            .map(|node| node.proposal_weight as u64)
+            .map(|node| u64::from(node.proposal_weight))
             .collect();
         let proposer: &Address = &authorities
             .get(get_index(nonce, &weight))
@@ -198,7 +200,7 @@ where
         }
     }
 
-    pub(crate) fn set_polc(&mut self, hash: &Hash, voteset: &VoteSet) {
+    pub(crate) fn set_polc(&mut self, hash: &[u8], voteset: &VoteSet) {
         self.block_hash = Some(hash.to_owned());
         self.lock_status = Some(LockStatus {
             block_hash: hash.to_owned(),
@@ -304,7 +306,7 @@ where
     pub(crate) fn check_and_save_proposal(
         &mut self,
         signed_proposal: &SignedProposal,
-        encode: &Encode,
+        encode: &[u8],
         need_wal: bool,
     ) -> BftResult<()> {
         debug!("Bft receives {:?}", signed_proposal);
@@ -338,7 +340,12 @@ where
             if need_wal {
                 self.wal_log
                     .save(height, LogType::Proposal, &rlp::encode(signed_proposal))
-                    .or(Err(BftError::SaveWalErr(format!("{:?}", signed_proposal))))?
+                    .or_else(|e| {
+                        Err(BftError::SaveWalErr(format!(
+                            "{:?} of {:?}",
+                            e, signed_proposal
+                        )))
+                    })?
             }
         }
 
@@ -391,7 +398,12 @@ where
             if need_wal {
                 self.wal_log
                     .save(height, LogType::Vote, &rlp::encode(signed_vote))
-                    .or(Err(BftError::SaveWalErr(format!("{:?}", signed_vote))))?;
+                    .or_else(|e| {
+                        Err(BftError::SaveWalErr(format!(
+                            "{:?} of {:?}",
+                            e, signed_vote
+                        )))
+                    })?;
             }
         }
 
@@ -416,11 +428,16 @@ where
         if need_wal {
             self.wal_log
                 .save(self.height + 1, LogType::Proof, &rlp::encode(&self.proof))
-                .or(Err(BftError::SaveWalErr(format!("{:?}", &self.proof))))?;
+                .or_else(|e| {
+                    Err(BftError::SaveWalErr(format!(
+                        "{:?} of {:?}",
+                        e, &self.proof
+                    )))
+                })?;
             let status_height = status.height;
             self.wal_log
                 .save(status_height + 1, LogType::Status, &rlp::encode(status))
-                .or(Err(BftError::SaveWalErr(format!("{:?}", status))))?;
+                .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, status))))?;
         }
 
         Ok(())
@@ -455,7 +472,7 @@ where
         if need_wal {
             self.wal_log
                 .save(height, LogType::Feed, &rlp::encode(feed))
-                .or(Err(BftError::SaveWalErr(format!("{:?}", feed))))?;
+                .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, feed))))?;
         }
 
         self.feed = Some(feed.block.clone());
@@ -571,7 +588,7 @@ where
         let mut map = HashMap::new();
         for (voter, sig) in proof.precommit_votes.clone() {
             // check repeat
-            if let Some(_) = map.insert(voter.clone(), 1) {
+            if map.insert(voter.clone(), 1).is_some() {
                 return Err(BftError::CheckProofFailed(format!(
                     "vote repeat of {:?} in {:?}",
                     &voter, proof
@@ -613,7 +630,7 @@ where
     pub(crate) fn check_lock_votes(
         &mut self,
         proposal: &Proposal,
-        block_hash: &Hash,
+        block_hash: &[u8],
     ) -> BftResult<()> {
         let height = proposal.height;
         if height < self.height - 1 || height > self.height {
@@ -627,7 +644,7 @@ where
         if let Some(lock_round) = proposal.lock_round {
             for signed_vote in &proposal.lock_votes {
                 let voter = self.check_vote(height, lock_round, block_hash, signed_vote)?;
-                if let Some(_) = map.insert(voter, 1) {
+                if map.insert(voter, 1).is_some() {
                     return Err(BftError::CheckLockVotesFailed(format!(
                         "vote repeat of {:?} in {:?} with lock_votes {:?}",
                         signed_vote, proposal, &proposal.lock_votes
@@ -658,7 +675,7 @@ where
         &mut self,
         height: Height,
         round: Round,
-        block_hash: &Hash,
+        block_hash: &[u8],
         signed_vote: &SignedVote,
     ) -> BftResult<Address> {
         if height < self.height - 1 {
@@ -765,7 +782,7 @@ where
         Ok(())
     }
 
-    pub(crate) fn filter_height(&self, voter: &Address) -> bool {
+    pub(crate) fn filter_height(&self, voter: &[u8]) -> bool {
         let mut trans_flag = false;
 
         if let Some(ins) = self.height_filter.get(voter) {
@@ -781,7 +798,7 @@ where
         trans_flag
     }
 
-    pub(crate) fn filter_round(&self, voter: &Address) -> bool {
+    pub(crate) fn filter_round(&self, voter: &[u8]) -> bool {
         let mut trans_flag = false;
 
         if let Some(ins) = self.round_filter.get(voter) {
@@ -882,7 +899,7 @@ where
 fn get_total_weight(authorities: &[Node]) -> u64 {
     let weight: Vec<u64> = authorities
         .iter()
-        .map(|node| node.vote_weight as u64)
+        .map(|node| u64::from(node.vote_weight))
         .collect();
     weight.iter().sum()
 }
@@ -892,7 +909,7 @@ fn get_votes_weight(authorities: &[Node], vote_addresses: &[Address]) -> u64 {
     let votes_weight: Vec<u64> = authorities
         .iter()
         .filter(|node| vote_addresses.contains(&node.address))
-        .map(|node| node.vote_weight as u64)
+        .map(|node| u64::from(node.vote_weight))
         .collect();
     votes_weight.iter().sum()
 }

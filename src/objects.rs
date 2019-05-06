@@ -252,12 +252,11 @@ pub(crate) struct AuthorityManage {
 
 impl AuthorityManage {
     pub(crate) fn new() -> Self {
-        let authority_manage = AuthorityManage {
+        AuthorityManage {
             authorities: Vec::new(),
             authorities_old: Vec::new(),
             authority_h_old: 0,
-        };
-        authority_manage
+        }
     }
 
     pub(crate) fn receive_authorities_list(&mut self, height: u64, mut authorities: Vec<Node>) {

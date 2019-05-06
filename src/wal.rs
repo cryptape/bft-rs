@@ -153,7 +153,7 @@ impl Wal {
             fs.seek(io::SeekFrom::End(0))?;
             fs.write_all(&len_bytes[..])?;
             fs.write_all(&type_bytes[..])?;
-            fs.write(msg)?;
+            fs.write_all(msg)?;
             fs.flush()?;
         } else {
             warn!("Can't find wal log in height {} ", height);

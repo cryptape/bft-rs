@@ -363,12 +363,11 @@ impl Decodable for Node {
 
 impl Node {
     pub fn new(address: Address, proposal_weight: u32, vote_weight: u32) -> Self {
-        let node = Node {
+        Node {
             address,
             proposal_weight,
             vote_weight,
-        };
-        node
+        }
     }
 
     pub fn set_address(address: Address) -> Self {
@@ -542,7 +541,7 @@ pub fn check_proof(
 
     let weight: Vec<u64> = authorities
         .iter()
-        .map(|node| node.vote_weight as u64)
+        .map(|node| u64::from(node.vote_weight))
         .collect();
     let vote_addresses: Vec<Address> = proof
         .precommit_votes
@@ -552,7 +551,7 @@ pub fn check_proof(
     let votes_weight: Vec<u64> = authorities
         .iter()
         .filter(|node| vote_addresses.contains(&node.address))
-        .map(|node| node.vote_weight as u64)
+        .map(|node| u64::from(node.vote_weight))
         .collect();
     let weight_sum: u64 = weight.iter().sum();
     let vote_sum: u64 = votes_weight.iter().sum();

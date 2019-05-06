@@ -273,7 +273,7 @@ where
         if need_wal {
             self.wal_log
                 .save(self.height, LogType::TimeOutInfo, &rlp::encode(&tminfo))
-                .or(Err(BftError::SaveWalErr(format!("{:?}", &tminfo))))?;
+                .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, &tminfo))))?;
         }
 
         match tminfo.step {
@@ -426,11 +426,14 @@ where
         let proof = self.generate_proof(lock_status.clone());
         self.set_proof(&proof);
 
-        let signed_proposal = self.proposals.get_proposal(self.height, self.round).ok_or(
-            BftError::ShouldNotHappen(
-                "can not fetch proposal from cache when handle commit".to_string(),
-            ),
-        )?;
+        let signed_proposal = self
+            .proposals
+            .get_proposal(self.height, self.round)
+            .ok_or_else(|| {
+                BftError::ShouldNotHappen(
+                    "can not fetch proposal from cache when handle commit".to_string(),
+                )
+            })?;
         let proposal = signed_proposal.proposal;
 
         let commit = Commit {
@@ -483,10 +486,11 @@ where
                 if status.height == self.height {
                     let cost_time = Instant::now() - self.htime;
                     let interval = self.params.timer.get_total_duration();
-                    let mut tv = Duration::new(0, 0);
-                    if cost_time < interval {
-                        tv = interval - cost_time;
-                    }
+                    let tv = if cost_time < interval {
+                        interval - cost_time
+                    } else {
+                        Duration::new(0, 0)
+                    };
                     self.change_to_step(Step::CommitWait);
                     self.set_timer(tv, Step::CommitWait);
                     return Ok(());
