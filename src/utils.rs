@@ -219,10 +219,12 @@ where
     #[inline]
     pub(crate) fn set_timer(&self, duration: Duration, step: Step) {
         debug!("Bft sets {:?} timer for {:?}", step, duration);
+        let timestamp = Instant::now() + duration;
+        let since = timestamp - self.htime;
         self.timer_seter
             .send(TimeoutInfo {
-                timestamp: Instant::now() + duration,
-                duration: duration.as_nanos() as u64,
+                timestamp,
+                duration: since.as_nanos() as u64,
                 height: self.height,
                 round: self.round,
                 step,
