@@ -1,3 +1,4 @@
+use crate::collectors::ProposalRoundCollector;
 use crate::*;
 use crate::{
     algorithm::{Bft, INIT_HEIGHT, INIT_ROUND},
@@ -13,7 +14,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
-use crate::collectors::ProposalRoundCollector;
 
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;
 const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
@@ -219,7 +219,8 @@ where
         debug!("Bft sets {:?} timer for {:?}", step, duration);
         self.timer_seter
             .send(TimeoutInfo {
-                timeval: Instant::now() + duration,
+                timestamp: Instant::now() + duration,
+                duration: duration.as_nanos() as u64,
                 height: self.height,
                 round: self.round,
                 step,
@@ -268,7 +269,7 @@ where
             self.msg_sender
                 .send(msg)
                 .map_err(|_| BftError::SendMsgErr(info))?;
-        };
+        }
 
         for (_, step_votes) in vote_collector.round_votes.iter() {
             for (_, vote_set) in step_votes.step_votes.iter() {

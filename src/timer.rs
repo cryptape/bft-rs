@@ -11,8 +11,10 @@ use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 /// Timer infomation.
 #[derive(Debug, Clone)]
 pub(crate) struct TimeoutInfo {
-    /// A timeval of a timer.
-    pub(crate) timeval: Instant,
+    /// A timestamp of a timer.
+    pub(crate) timestamp: Instant,
+
+    pub(crate) duration: u64,
     /// The height of the timer.
     pub(crate) height: Height,
     /// The round of the timer.
@@ -24,7 +26,8 @@ pub(crate) struct TimeoutInfo {
 impl Encodable for TimeoutInfo {
     fn rlp_append(&self, s: &mut RlpStream) {
         let step: u8 = self.step.clone().into();
-        s.begin_list(3)
+        s.begin_list(4)
+            .append(&self.duration)
             .append(&self.height)
             .append(&self.round)
             .append(&step);
@@ -34,13 +37,15 @@ impl Encodable for TimeoutInfo {
 impl Decodable for TimeoutInfo {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
-            Prototype::List(3) => {
-                let height: Height = r.val_at(0)?;
-                let round: Round = r.val_at(1)?;
-                let step: u8 = r.val_at(2)?;
+            Prototype::List(4) => {
+                let duration: u64 = r.val_at(0)?;
+                let height: Height = r.val_at(1)?;
+                let round: Round = r.val_at(2)?;
+                let step: u8 = r.val_at(3)?;
                 let step: Step = Step::from(step);
                 Ok(TimeoutInfo {
-                    timeval: Instant::now(),
+                    timestamp: Instant::now() + Duration::from_nanos(duration),
+                    duration,
                     height,
                     round,
                     step,
@@ -90,8 +95,8 @@ impl WaitTimer {
             // put the TimeoutInfo into a hashmap, K: timeval  V: TimeoutInfo
             if set_time.is_ok() {
                 let time_out = set_time.unwrap();
-                timer_heap.push(time_out.timeval);
-                timeout_info.insert(time_out.timeval, time_out);
+                timer_heap.push(time_out.timestamp);
+                timeout_info.insert(time_out.timestamp, time_out);
             }
 
             if !timer_heap.is_empty() {
@@ -99,9 +104,15 @@ impl WaitTimer {
 
                 // if some timers are set as the same time, send timeout messages and pop them
                 while !timer_heap.is_empty() && now >= timer_heap.peek_min().cloned().unwrap() {
-                    self.timer_notify
-                        .send(timeout_info.remove(&timer_heap.pop_min().unwrap()).unwrap())
-                        .unwrap();
+                    let timestamp = timer_heap.pop_min().unwrap();
+                    if let Some(time_out) = timeout_info.remove(&timestamp) {
+                        if let Err(e) = self.timer_notify
+                            .send(time_out) {
+                            error!("Bft send time notification failed with {:?}", e);
+                        }
+                    } else {
+                        error!("Bft timer get time_out_info with repeat timestamp {:?}", timestamp);
+                    }
                 }
             }
         }
@@ -115,7 +126,8 @@ mod test {
     #[test]
     fn test_time_out_info_rlp() {
         let time_out_info = TimeoutInfo {
-            timeval: Instant::now(),
+            timestamp: Instant::now(),
+            duration: 10000000u64,
             height: 1888787u64,
             round: 23u64,
             step: Step::Commit,

@@ -853,7 +853,10 @@ where
     fn check_prevote_count(&mut self) -> bool {
         let mut flag = false;
         for (round, prevote_count) in self.votes.prevote_count.iter() {
-            debug!("Bft have received {} prevotes in round {}", prevote_count, round);
+            debug!(
+                "Bft have received {} prevotes in round {}",
+                prevote_count, round
+            );
             if self.cal_above_threshold(*prevote_count) && *round >= self.round {
                 flag = true;
                 if self.round < *round {
@@ -919,7 +922,10 @@ where
             self.votes
                 .get_voteset(self.height, self.round, &VoteType::Precommit)
         {
-            debug!("Bft have received {} precommits in round {}", precommit_set.count, self.round);
+            debug!(
+                "Bft have received {} precommits in round {}",
+                precommit_set.count, self.round
+            );
             let tv = if self.cal_all_vote(precommit_set.count) {
                 Duration::new(0, 0)
             } else {
