@@ -164,7 +164,7 @@ where
                         self.handle_proposal(&proposal)?;
                         self.set_proposal(proposal);
                         if self.step == Step::ProposeWait {
-                            self.transmit_prevote()?;
+                            self.transmit_prevote(false)?;
                         }
                     }
                 }
@@ -226,7 +226,7 @@ where
                     if self.check_verify() == VerifyResult::Undetermined {
                         self.change_to_step(Step::VerifyWait);
                     } else {
-                        self.transmit_precommit()?;
+                        self.transmit_precommit(false)?;
                     }
                 }
             }
@@ -270,7 +270,7 @@ where
             )));
         }
 
-        if need_wal {
+        if need_wal && tminfo.step != Step::Prevote && tminfo.step != Step::Precommit {
             self.wal_log
                 .save(self.height, LogType::TimeOutInfo, &rlp::encode(&tminfo))
                 .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, &tminfo))))?;
@@ -279,13 +279,13 @@ where
         match tminfo.step {
             Step::ProposeWait => {
                 self.change_to_step(Step::Prevote);
-                self.transmit_prevote()?;
+                self.transmit_prevote(false)?;
                 if self.check_prevote_count() {
                     self.change_to_step(Step::PrevoteWait);
                 }
             }
             Step::Prevote => {
-                self.transmit_prevote()?;
+                self.transmit_prevote(true)?;
             }
             Step::PrevoteWait => {
                 // if there is no lock, clear the proposal
@@ -304,11 +304,11 @@ where
                     }
                 }
 
-                self.transmit_precommit()?;
+                self.transmit_precommit(false)?;
             }
             Step::Precommit => {
-                self.transmit_prevote()?;
-                self.transmit_precommit()?;
+                self.transmit_prevote(true)?;
+                self.transmit_precommit(true)?;
             }
             Step::PrecommitWait => {
                 // receive +2/3 precommits however no proposal reach +2/3
@@ -324,7 +324,7 @@ where
 
                 // next do precommit
                 self.change_to_step(Step::Precommit);
-                self.transmit_precommit()?;
+                self.transmit_precommit(false)?;
             }
 
             Step::CommitWait => {
@@ -597,7 +597,7 @@ where
         Ok(())
     }
 
-    fn transmit_prevote(&mut self) -> BftResult<()> {
+    fn transmit_prevote(&mut self, resend: bool) -> BftResult<()> {
         let block_hash = if let Some(lock_status) = self.lock_status.clone() {
             lock_status.block_hash
         } else if let Some(block_hash) = self.block_hash.clone() {
@@ -623,7 +623,9 @@ where
 
         debug!("Bft prevotes to {:?}", block_hash);
         self.function.transmit(msg.clone());
-        self.send_bft_msg(msg)?;
+        if !resend {
+            self.send_bft_msg(msg)?;
+        }
 
         self.change_to_step(Step::Prevote);
 
@@ -635,7 +637,7 @@ where
         Ok(())
     }
 
-    fn transmit_precommit(&mut self) -> BftResult<()> {
+    fn transmit_precommit(&mut self, resend: bool) -> BftResult<()> {
         let block_hash = if let Some(lock_status) = self.lock_status.clone() {
             lock_status.block_hash
         } else {
@@ -660,7 +662,9 @@ where
 
         debug!("Bft precommits to {:?}", block_hash);
         self.function.transmit(msg.clone());
-        self.send_bft_msg(msg)?;
+        if !resend {
+            self.send_bft_msg(msg)?;
+        }
 
         self.set_timer(
             self.params.timer.get_precommit() * TIMEOUT_RETRANSE_COEF,
@@ -752,7 +756,7 @@ where
                 });
             }
             self.transmit_proposal()?;
-            self.transmit_prevote()?;
+            self.transmit_prevote(false)?;
         }
 
         Ok(())
