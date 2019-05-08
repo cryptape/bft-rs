@@ -1,7 +1,8 @@
+use crate::error::{handle_err, BftError};
 use crate::objects::Step;
 use crate::{Height, Round};
 
-use std::collections::HashMap;
+use std::cmp::{Ord, Ordering, PartialOrd};
 use std::time::{Duration, Instant};
 
 use crossbeam::crossbeam_channel::{Receiver, Sender};
@@ -9,7 +10,7 @@ use min_max_heap::MinMaxHeap;
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 
 /// Timer infomation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct TimeoutInfo {
     /// A timestamp of a timer.
     pub(crate) timestamp: Instant,
@@ -21,6 +22,18 @@ pub(crate) struct TimeoutInfo {
     pub(crate) round: Round,
     /// The step of the timer.
     pub(crate) step: Step,
+}
+
+impl PartialOrd for TimeoutInfo {
+    fn partial_cmp(&self, other: &TimeoutInfo) -> Option<Ordering> {
+        self.timestamp.partial_cmp(&other.timestamp)
+    }
+}
+
+impl Ord for TimeoutInfo {
+    fn cmp(&self, other: &TimeoutInfo) -> Ordering {
+        self.timestamp.cmp(&other.timestamp)
+    }
 }
 
 impl Encodable for TimeoutInfo {
@@ -73,15 +86,15 @@ impl WaitTimer {
 
     /// A function to start a timer.
     pub(crate) fn start(&self) {
-        let mut timer_heap = MinMaxHeap::new();
-        let mut timeout_info = HashMap::new();
+        let mut timer_heap = MinMaxHeap::<TimeoutInfo>::new();
 
         loop {
             // take the peek of the min-heap-timer sub now as the sleep time otherwise set timeout as 100
             let timeout = if !timer_heap.is_empty() {
+                let peek_min_time = timer_heap.peek_min().unwrap().timestamp;
                 let now = Instant::now();
-                if *timer_heap.peek_min().unwrap() > now {
-                    *timer_heap.peek_min().unwrap() - now
+                if peek_min_time > now {
+                    peek_min_time - now
                 } else {
                     Duration::new(0, 0)
                 }
@@ -95,26 +108,20 @@ impl WaitTimer {
             // put the TimeoutInfo into a hashmap, K: timeval  V: TimeoutInfo
             if set_time.is_ok() {
                 let time_out = set_time.unwrap();
-                timer_heap.push(time_out.timestamp);
-                timeout_info.insert(time_out.timestamp, time_out);
+                timer_heap.push(time_out);
             }
 
             if !timer_heap.is_empty() {
                 let now = Instant::now();
 
                 // if some timers are set as the same time, send timeout messages and pop them
-                while !timer_heap.is_empty() && now >= timer_heap.peek_min().cloned().unwrap() {
-                    let timestamp = timer_heap.pop_min().unwrap();
-                    if let Some(time_out) = timeout_info.remove(&timestamp) {
-                        if let Err(e) = self.timer_notify.send(time_out) {
-                            error!("Bft send time notification failed with {:?}", e);
-                        }
-                    } else {
-                        error!(
-                            "Bft timer get time_out_info with repeat timestamp {:?}",
-                            timestamp
-                        );
-                    }
+                while !timer_heap.is_empty()
+                    && now >= timer_heap.peek_min().cloned().unwrap().timestamp
+                {
+                    let time_info = timer_heap.pop_min().unwrap();
+                    handle_err(self.timer_notify.send(time_info).map_err(|e| {
+                        BftError::SendMsgErr(format!("send time notification failed with {:?}", e))
+                    }));
                 }
             }
         }
