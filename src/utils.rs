@@ -576,9 +576,8 @@ where
         }
         if height != proof.height + 1 {
             return Err(BftError::CheckProofFailed(format!(
-                "height {} can not check for {:?}",
-                height, proof
-            )));
+                "the height {} is mismatching with proof.height {}",
+                                                          height, proof.height)));
         }
 
         let vote_addresses: Vec<Address> = proof
@@ -589,7 +588,7 @@ where
 
         if get_votes_weight(authorities, &vote_addresses) * 3 <= get_total_weight(authorities) * 2 {
             return Err(BftError::CheckProofFailed(format!(
-                "not reach 2/3+ weight for {:?}",
+                "the proof doesn't collect 2/3+ weight \n {:?} ",
                 proof
             )));
         }
@@ -603,7 +602,7 @@ where
             // check repeat
             if map.insert(voter.clone(), 1).is_some() {
                 return Err(BftError::CheckProofFailed(format!(
-                    "vote repeat of {:?} in {:?}",
+                    "the proof contains repeat votes from the same voter {:?} \n {:?}",
                     &voter, proof
                 )));
             }
@@ -909,7 +908,7 @@ where
 }
 
 #[inline]
-fn get_total_weight(authorities: &[Node]) -> u64 {
+pub fn get_total_weight(authorities: &[Node]) -> u64 {
     let weight: Vec<u64> = authorities
         .iter()
         .map(|node| u64::from(node.vote_weight))
@@ -918,7 +917,7 @@ fn get_total_weight(authorities: &[Node]) -> u64 {
 }
 
 #[inline]
-fn get_votes_weight(authorities: &[Node], vote_addresses: &[Address]) -> u64 {
+pub fn get_votes_weight(authorities: &[Node], vote_addresses: &[Address]) -> u64 {
     let votes_weight: Vec<u64> = authorities
         .iter()
         .filter(|node| vote_addresses.contains(&node.address))

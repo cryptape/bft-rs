@@ -19,11 +19,12 @@ use crate::{
     algorithm::Bft,
     error::{BftError, BftResult},
     objects::{Vote, VoteType},
+    utils::{get_total_weight, get_votes_weight},
 };
 
 use crossbeam::crossbeam_channel::{unbounded, Sender};
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::hash::{Hash as Hashable, Hasher};
 use std::sync::Arc;
@@ -539,28 +540,23 @@ pub fn check_proof(
         return false;
     }
 
-    let weight: Vec<u64> = authorities
-        .iter()
-        .map(|node| u64::from(node.vote_weight))
-        .collect();
     let vote_addresses: Vec<Address> = proof
         .precommit_votes
         .iter()
         .map(|(sender, _)| sender.clone())
         .collect();
-    let votes_weight: Vec<u64> = authorities
-        .iter()
-        .filter(|node| vote_addresses.contains(&node.address))
-        .map(|node| u64::from(node.vote_weight))
-        .collect();
-    let weight_sum: u64 = weight.iter().sum();
-    let vote_sum: u64 = votes_weight.iter().sum();
-    if vote_sum * 3 <= weight_sum * 2 {
+
+    if get_votes_weight(authorities, &vote_addresses) * 3 <= get_total_weight(authorities) * 2 {
         return false;
     }
 
+    let authority_addresses: Vec<Address> = authorities
+        .iter()
+        .map(|node| node.address.clone())
+        .collect();
+    let mut set = HashSet::new();
     proof.precommit_votes.iter().all(|(voter, sig)| {
-        if authorities.iter().any(|node| node.address == *voter) {
+        if set.insert(voter.clone()) && authorities.iter().any(|node| node.address == *voter) {
             let vote = Vote {
                 vote_type: VoteType::Precommit,
                 height: proof.height,
