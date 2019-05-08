@@ -41,7 +41,7 @@ pub enum BftError {
     ObsoleteTimer(String),
 }
 
-pub(crate) fn handle_error<T>(result: BftResult<T>) {
+pub(crate) fn handle_err<T>(result: BftResult<T>) {
     if let Err(e) = result {
         match e {
             BftError::NotReady(_)

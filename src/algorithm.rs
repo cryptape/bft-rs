@@ -1,7 +1,7 @@
 use crate::*;
 use crate::{
     collectors::{ProposalCollector, VoteCollector},
-    error::{handle_error, BftError, BftResult},
+    error::{handle_err, BftError, BftResult},
     objects::*,
     params::BftParams,
     timer::{TimeoutInfo, WaitTimer},
@@ -136,14 +136,12 @@ where
                         recv(engine.msg_receiver) -> msg => get_msg = msg,
                     }
 
-                    let mut result = Ok(());
                     if let Ok(msg) = get_timer_msg {
-                        result = engine.timeout_process(msg, true);
+                        handle_err(engine.timeout_process(msg, true));
                     }
                     if let Ok(msg) = get_msg {
-                        result = engine.process(msg, true);
+                        handle_err(engine.process(msg, true));
                     }
-                    handle_error(result);
                 }
             })
             .expect("Bft starts main-thread failed!");
@@ -271,18 +269,17 @@ where
         }
 
         if need_wal && tminfo.step != Step::Prevote && tminfo.step != Step::Precommit {
-            self.wal_log
-                .save(self.height, LogType::TimeOutInfo, &rlp::encode(&tminfo))
-                .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, &tminfo))))?;
+            handle_err(
+                self.wal_log
+                    .save(self.height, LogType::TimeOutInfo, &rlp::encode(&tminfo))
+                    .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, &tminfo)))),
+            );
         }
 
         match tminfo.step {
             Step::ProposeWait => {
                 self.change_to_step(Step::Prevote);
                 self.transmit_prevote(false)?;
-                if self.check_prevote_count() {
-                    self.change_to_step(Step::PrevoteWait);
-                }
             }
             Step::Prevote => {
                 self.transmit_prevote(true)?;
@@ -292,7 +289,6 @@ where
                 if self.lock_status.is_none() {
                     self.block_hash = None;
                 }
-                // next do precommit
                 self.change_to_step(Step::Precommit);
 
                 #[cfg(feature = "verify_req")]
@@ -307,22 +303,17 @@ where
                 self.transmit_precommit(false)?;
             }
             Step::Precommit => {
-                self.transmit_prevote(true)?;
+                handle_err(self.transmit_prevote(true));
                 self.transmit_precommit(true)?;
             }
             Step::PrecommitWait => {
-                // receive +2/3 precommits however no proposal reach +2/3
-                // then goto next round directly
                 self.goto_next_round();
                 self.new_round_start(true)?;
             }
 
             #[cfg(feature = "verify_req")]
             Step::VerifyWait => {
-                // clean fsave info
                 self.clean_polc();
-
-                // next do precommit
                 self.change_to_step(Step::Precommit);
                 self.transmit_precommit(false)?;
             }
@@ -330,8 +321,8 @@ where
             Step::CommitWait => {
                 self.set_status(&self.status.clone().unwrap());
                 self.goto_new_height(self.height + 1);
+                handle_err(self.flush_cache());
                 self.new_round_start(true)?;
-                self.flush_cache()?;
             }
             _ => error!("Invalid Timeout Info!"),
         }
@@ -505,8 +496,8 @@ where
 
             self.set_status(&status);
             self.goto_new_height(status.height + 1);
+            handle_err(self.flush_cache());
             self.new_round_start(true)?;
-            self.flush_cache()?;
 
             debug!(
                 "Bft receives rich status, goto new height {:?}",
@@ -766,7 +757,11 @@ where
     fn goto_new_height(&mut self, new_height: u64) {
         self.clean_save_info();
         self.clean_filter();
-        let _ = self.wal_log.set_height(new_height);
+        handle_err(
+            self.wal_log
+                .set_height(new_height)
+                .map_err(|e| BftError::SaveWalErr(format!("{:?} of set_height", e))),
+        );
 
         self.height = new_height;
         self.round = 0;

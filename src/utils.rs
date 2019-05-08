@@ -3,7 +3,7 @@ use crate::*;
 use crate::{
     algorithm::{Bft, INIT_HEIGHT, INIT_ROUND},
     collectors::{ProposalCollector, RoundCollector, VoteCollector, VoteSet, CACHE_N},
-    error::{handle_error, BftError, BftResult},
+    error::{handle_err, BftError, BftResult},
     objects::*,
     random::get_index,
     timer::TimeoutInfo,
@@ -27,8 +27,7 @@ where
         info!("Bft starts to load wal log!");
         let vec_buf = self.wal_log.load();
         for (log_type, encode) in vec_buf {
-            let result = self.process_wal_log(log_type, encode);
-            handle_error(result);
+            handle_err(self.process_wal_log(log_type, encode));
         }
         info!("Bft successfully processes the whole wal log!");
     }
@@ -340,14 +339,16 @@ where
         if height < self.height + CACHE_N - 1 && round < self.round + CACHE_N {
             self.proposals.add(&signed_proposal)?;
             if need_wal {
-                self.wal_log
-                    .save(height, LogType::Proposal, &rlp::encode(signed_proposal))
-                    .or_else(|e| {
-                        Err(BftError::SaveWalErr(format!(
-                            "{:?} of {:?}",
-                            e, signed_proposal
-                        )))
-                    })?
+                handle_err(
+                    self.wal_log
+                        .save(height, LogType::Proposal, &rlp::encode(signed_proposal))
+                        .or_else(|e| {
+                            Err(BftError::SaveWalErr(format!(
+                                "{:?} of {:?}",
+                                e, signed_proposal
+                            )))
+                        }),
+                );
             }
         }
 
@@ -398,14 +399,16 @@ where
             let vote_weight = self.get_vote_weight(vote.height, &vote.voter);
             self.votes.add(&signed_vote, vote_weight, self.height)?;
             if need_wal {
-                self.wal_log
-                    .save(height, LogType::Vote, &rlp::encode(signed_vote))
-                    .or_else(|e| {
-                        Err(BftError::SaveWalErr(format!(
-                            "{:?} of {:?}",
-                            e, signed_vote
-                        )))
-                    })?;
+                handle_err(
+                    self.wal_log
+                        .save(height, LogType::Vote, &rlp::encode(signed_vote))
+                        .or_else(|e| {
+                            Err(BftError::SaveWalErr(format!(
+                                "{:?} of {:?}",
+                                e, signed_vote
+                            )))
+                        }),
+                );
             }
         }
 
@@ -428,18 +431,22 @@ where
             return Err(BftError::ObsoleteMsg(format!("{:?}", status)));
         }
         if need_wal {
-            self.wal_log
-                .save(self.height + 1, LogType::Proof, &rlp::encode(&self.proof))
-                .or_else(|e| {
-                    Err(BftError::SaveWalErr(format!(
-                        "{:?} of {:?}",
-                        e, &self.proof
-                    )))
-                })?;
+            handle_err(
+                self.wal_log
+                    .save(self.height + 1, LogType::Proof, &rlp::encode(&self.proof))
+                    .or_else(|e| {
+                        Err(BftError::SaveWalErr(format!(
+                            "{:?} of {:?}",
+                            e, &self.proof
+                        )))
+                    }),
+            );
             let status_height = status.height;
-            self.wal_log
-                .save(status_height + 1, LogType::Status, &rlp::encode(status))
-                .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, status))))?;
+            handle_err(
+                self.wal_log
+                    .save(status_height + 1, LogType::Status, &rlp::encode(status))
+                    .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, status)))),
+            );
         }
 
         Ok(())
@@ -452,9 +459,11 @@ where
         need_wal: bool,
     ) -> BftResult<()> {
         if need_wal {
-            self.wal_log
-                .save(self.height, LogType::VerifyResp, &rlp::encode(verify_resp))
-                .or(Err(BftError::SaveWalErr(format!("{:?}", verify_resp))))?;
+            handle_err(
+                self.wal_log
+                    .save(self.height, LogType::VerifyResp, &rlp::encode(verify_resp))
+                    .or(Err(BftError::SaveWalErr(format!("{:?}", verify_resp)))),
+            );
         }
         self.save_verify_res(verify_resp.round, verify_resp.is_pass)?;
 
@@ -472,9 +481,11 @@ where
         }
 
         if need_wal {
-            self.wal_log
-                .save(height, LogType::Feed, &rlp::encode(feed))
-                .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, feed))))?;
+            handle_err(
+                self.wal_log
+                    .save(height, LogType::Feed, &rlp::encode(feed))
+                    .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, feed)))),
+            );
         }
 
         self.feed = Some(feed.block.clone());
