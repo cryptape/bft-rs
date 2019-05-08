@@ -444,17 +444,16 @@ where
         let function = self.function.clone();
         let sender = self.msg_sender.clone();
         thread::spawn(move || {
-            let result = function
-                .commit(commit)
-                .map_err(|e| BftError::CommitFailed(format!("{:?}", e)))
-                .and_then(|status| {
-                    sender
-                        .send(BftMsg::Status(status))
-                        .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
-                });
-            if let Err(e) = result {
-                error!("Bft encounters {:?}", e);
-            }
+            handle_err(
+                function
+                    .commit(commit)
+                    .map_err(|e| BftError::CommitFailed(format!("{:?}", e)))
+                    .and_then(|status| {
+                        sender
+                            .send(BftMsg::Status(status))
+                            .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
+                    }),
+            );
         });
 
         self.last_commit_round = Some(self.round);
@@ -733,17 +732,16 @@ where
                 let height = self.height;
 
                 thread::spawn(move || {
-                    let result = function
-                        .get_block(height)
-                        .map_err(|e| BftError::GetBlockFailed(format!("{:?}", e)))
-                        .and_then(|block| {
-                            sender
-                                .send(BftMsg::Feed(Feed { height, block }))
-                                .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
-                        });
-                    if let Err(e) = result {
-                        error!("Bft encounters {:?}", e);
-                    }
+                    handle_err(
+                        function
+                            .get_block(height)
+                            .map_err(|e| BftError::GetBlockFailed(format!("{:?}", e)))
+                            .and_then(|block| {
+                                sender
+                                    .send(BftMsg::Feed(Feed { height, block }))
+                                    .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
+                            }),
+                    );
                 });
             }
             self.transmit_proposal()?;

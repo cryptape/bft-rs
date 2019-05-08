@@ -538,12 +538,11 @@ where
                     }
                 };
                 let verify_resp = VerifyResp { is_pass, round };
-                let result = sender
-                    .send(BftMsg::VerifyResp(verify_resp))
-                    .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)));
-                if let Err(e) = result {
-                    error!("Bft encounters {:?}", e);
-                }
+                handle_err(
+                    sender
+                        .send(BftMsg::VerifyResp(verify_resp))
+                        .map_err(|e| BftError::SendMsgErr(format!("{:?}", e))),
+                );
             });
 
             Ok(())
@@ -707,10 +706,6 @@ where
         }
 
         if vote.block_hash != block_hash.to_vec() {
-            warn!(
-                "The lock votes of proposal {:?} contains vote for other proposal hash {:?}!",
-                block_hash, vote.block_hash
-            );
             return Err(BftError::CheckLockVotesFailed(format!(
                 "vote {:?} not for rightful block_hash {:?}",
                 vote, block_hash
@@ -738,7 +733,6 @@ where
                 ))
             })?;
         if &address != voter {
-            warn!("The address recovers from the signature is {:?} which is mismatching with the sender {:?}!", &address, &voter);
             return Err(BftError::CheckLockVotesFailed(format!(
                 "recover {:?} of {:?}",
                 &address, signed_vote
