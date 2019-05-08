@@ -219,8 +219,6 @@ where
                 self.check_and_save_verify_resp(&verify_resp, need_wal)?;
 
                 if self.step == Step::VerifyWait {
-                    // next do precommit
-                    self.change_to_step(Step::Precommit);
                     if self.check_verify() == VerifyResult::Undetermined {
                         self.change_to_step(Step::VerifyWait);
                     } else {
@@ -289,7 +287,6 @@ where
                 if self.lock_status.is_none() {
                     self.block_hash = None;
                 }
-                self.change_to_step(Step::Precommit);
 
                 #[cfg(feature = "verify_req")]
                 {
@@ -314,7 +311,6 @@ where
             #[cfg(feature = "verify_req")]
             Step::VerifyWait => {
                 self.clean_polc();
-                self.change_to_step(Step::Precommit);
                 self.transmit_precommit(false)?;
             }
 
@@ -614,10 +610,9 @@ where
         debug!("Bft prevotes to {:?}", block_hash);
         self.function.transmit(msg.clone());
         if !resend {
-            self.send_bft_msg(msg)?;
+            self.change_to_step(Step::Prevote);
+            handle_err(self.send_bft_msg(msg));
         }
-
-        self.change_to_step(Step::Prevote);
 
         self.set_timer(
             self.params.timer.get_prevote() * TIMEOUT_RETRANSE_COEF,
@@ -653,7 +648,8 @@ where
         debug!("Bft precommits to {:?}", block_hash);
         self.function.transmit(msg.clone());
         if !resend {
-            self.send_bft_msg(msg)?;
+            self.change_to_step(Step::Precommit);
+            handle_err(self.send_bft_msg(msg));
         }
 
         self.set_timer(
