@@ -550,10 +550,6 @@ pub fn check_proof(
         return false;
     }
 
-    let authority_addresses: Vec<Address> = authorities
-        .iter()
-        .map(|node| node.address.clone())
-        .collect();
     let mut set = HashSet::new();
     proof.precommit_votes.iter().all(|(voter, sig)| {
         if set.insert(voter.clone()) && authorities.iter().any(|node| node.address == *voter) {

@@ -577,7 +577,8 @@ where
         if height != proof.height + 1 {
             return Err(BftError::CheckProofFailed(format!(
                 "the height {} is mismatching with proof.height {}",
-                                                          height, proof.height)));
+                height, proof.height
+            )));
         }
 
         let vote_addresses: Vec<Address> = proof
