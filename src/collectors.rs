@@ -32,51 +32,44 @@ impl VoteCollector {
         signed_vote: &SignedVote,
         vote_weight: u64,
         current_height: Height,
-    ) -> bool {
+    ) -> BftResult<()> {
         let vote = &signed_vote.vote;
         let height = vote.height;
         let round = vote.round;
         let vote_type = &vote.vote_type;
 
         if *vote_type == VoteType::Prevote {
+            let counter = self.prevote_count.entry(round).or_insert(0);
             if self.votes.contains_key(&height) {
-                if self
-                    .votes
+                self.votes
                     .get_mut(&height)
                     .unwrap()
-                    .add(signed_vote, vote_weight)
-                    && height == current_height
-                {
+                    .add(signed_vote, vote_weight)?;
+                if height == current_height {
                     // update prevote count hashmap
-                    let counter = self.prevote_count.entry(round).or_insert(0);
                     *counter += vote_weight;
-                    true
-                } else {
-                    // if add prevote fail, do not update prevote hashmap
-                    false
                 }
             } else {
                 let mut round_votes = RoundCollector::new();
-                round_votes.add(signed_vote, vote_weight);
+                round_votes.add(signed_vote, vote_weight)?;
                 self.votes.insert(height, round_votes);
                 // update prevote count hashmap
                 if height == current_height {
-                    let counter = self.prevote_count.entry(round).or_insert(0);
                     *counter += vote_weight;
                 }
-                true
             }
+            debug!("Bft set prevote_count by {} of round {}", counter, round);
         } else if self.votes.contains_key(&height) {
             self.votes
                 .get_mut(&height)
                 .unwrap()
-                .add(signed_vote, vote_weight)
+                .add(signed_vote, vote_weight)?
         } else {
             let mut round_votes = RoundCollector::new();
-            round_votes.add(signed_vote, vote_weight);
+            round_votes.add(signed_vote, vote_weight)?;
             self.votes.insert(height, round_votes);
-            true
         }
+        Ok(())
     }
 
     pub(crate) fn remove(&mut self, current_height: Height) {
@@ -119,7 +112,7 @@ impl RoundCollector {
     }
 
     /// A function try to add a vote to a round collector.
-    pub(crate) fn add(&mut self, signed_vote: &SignedVote, vote_weight: u64) -> bool {
+    pub(crate) fn add(&mut self, signed_vote: &SignedVote, vote_weight: u64) -> BftResult<()> {
         let round = signed_vote.vote.round;
 
         if self.round_votes.contains_key(&round) {
@@ -129,9 +122,9 @@ impl RoundCollector {
                 .add(signed_vote, vote_weight)
         } else {
             let mut step_votes = StepCollector::new();
-            step_votes.add(signed_vote, vote_weight);
+            step_votes.add(signed_vote, vote_weight)?;
             self.round_votes.insert(round, step_votes);
-            true
+            Ok(())
         }
     }
 
@@ -160,7 +153,7 @@ impl StepCollector {
     }
 
     /// A function to add a vote to the step collector.
-    pub(crate) fn add(&mut self, signed_vote: &SignedVote, vote_weight: u64) -> bool {
+    pub(crate) fn add(&mut self, signed_vote: &SignedVote, vote_weight: u64) -> BftResult<()> {
         let vote = &signed_vote.vote;
         let vote_type = &vote.vote_type;
         self.step_votes
@@ -198,23 +191,24 @@ impl VoteSet {
     }
 
     /// A function to add a vote to the vote set.
-    pub(crate) fn add(&mut self, signed_vote: &SignedVote, vote_weight: u64) -> bool {
+    pub(crate) fn add(&mut self, signed_vote: &SignedVote, vote_weight: u64) -> BftResult<()> {
         let vote = &signed_vote.vote;
-        let mut is_add = false;
-        self.votes_by_sender
-            .entry(vote.voter.clone())
-            .or_insert_with(|| {
-                is_add = true;
-                signed_vote.to_owned()
-            });
-        if is_add {
-            self.count += vote_weight;
-            *self
-                .votes_by_proposal
-                .entry(vote.block_hash.clone())
-                .or_insert(0) += vote_weight;
+        if self.votes_by_sender.contains_key(&vote.voter) {
+            return Err(BftError::RecvMsgAgain(format!("{:?}", signed_vote)));
         }
-        is_add
+        self.votes_by_sender
+            .insert(vote.voter.clone(), signed_vote.to_owned());
+        self.count += vote_weight;
+        *self
+            .votes_by_proposal
+            .entry(vote.block_hash.clone())
+            .or_insert(0) += vote_weight;
+
+        debug!(
+            "Bft set voteset with count: {}, votes_by_proposal: {:?}",
+            self.count, self.votes_by_proposal
+        );
+        Ok(())
     }
 
     /// A function to abstract the PoLC of the round.
