@@ -10,7 +10,7 @@ use crate::{
     wal::Wal,
 };
 #[cfg(feature = "verify_req")]
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -598,10 +598,10 @@ where
             .iter()
             .map(|node| node.address.clone())
             .collect();
-        let mut map = HashMap::new();
+        let mut set = HashSet::new();
         for (voter, sig) in proof.precommit_votes.clone() {
             // check repeat
-            if map.insert(voter.clone(), 1).is_some() {
+            if !set.insert(voter.clone()) {
                 return Err(BftError::CheckProofFailed(format!(
                     "the proof contains repeat votes from the same voter {:?} \n {:?}",
                     &voter, proof
