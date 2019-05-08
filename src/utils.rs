@@ -397,8 +397,8 @@ where
         // prevent too many high proposals flush out current proposal
         if height < self.height + CACHE_N && round < self.round + CACHE_N {
             let vote_weight = self.get_vote_weight(vote.height, &vote.voter);
-            self.votes.add(&signed_vote, vote_weight, self.height)?;
-            if need_wal {
+            let result = self.votes.add(&signed_vote, vote_weight, self.height);
+            if need_wal && result.is_ok() {
                 handle_err(
                     self.wal_log
                         .save(height, LogType::Vote, &rlp::encode(signed_vote))
@@ -410,6 +410,7 @@ where
                         }),
                 );
             }
+            handle_err(result);
         }
 
         if height > self.height || round >= self.round + CACHE_N {
