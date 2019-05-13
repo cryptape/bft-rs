@@ -11,4 +11,7 @@
 /tests/test_log/
 
 # These are vscode debug setting
-/.vscode/
+/.vscode
+
+# These are intellij setting
+/.idea/
