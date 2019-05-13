@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 
 pub(crate) const INIT_HEIGHT: u64 = 0;
 pub(crate) const INIT_ROUND: u64 = 0;
-const PROPOSAL_TIMES_COEF: u64 = 10;
+const PROPOSAL_TIMES_COEF: u64 = 4;
 const TIMEOUT_RETRANSE_COEF: u32 = 15;
 
 #[cfg(feature = "verify_req")]
