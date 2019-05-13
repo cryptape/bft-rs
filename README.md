@@ -59,7 +59,7 @@ A complete BFT model consists of 4 essential parts:
 **NOTICE**: The bft-rs only provides a basic BFT state machine and does not support the advanced functions such as signature verification, proof generation, compact block, etc. These functions are in consensus module rather than bft-rs library.
 
 ## Feature
-The bft-rs provides `verify_req` feature to verify transcation after received a proposal. BFT state machine will check the verify result of the proposal before `Precommit` step. If it has not received the result of the proposal yet, it will wait for an extra 1/2 of the consensus duration.
+The bft-rs provides `async_check_txs` feature to verify transcation after received a proposal. BFT state machine will check the verify result of the proposal before `Precommit` step. If it has not received the result of the proposal yet, it will wait for an extra 1/2 of the consensus duration.
 
 ## Interface
 
@@ -73,7 +73,7 @@ enum BftMsg {
     Status(Status),
     Commit(Commit),
 
-    #[cfg(feature = "verify_req")]
+    #[cfg(feature = "async_check_txs")]
     VerifyResp(VerifyResp),
     Pause,
     Start,
@@ -91,11 +91,11 @@ First, add bft-rs and crossbeam to your `Cargo.toml`:
 bft-rs = { git = "https://github.com/cryptape/bft-rs.git", branch = "develop" }
 ```
 
-If you want to use `verify_req` feature, needs to add following codes:
+If you want to use `async_check_txs` feature, needs to add following codes:
 
 ```rust
 [features]
-verify_req = ["bft-rs/verify_req"]
+async_check_txs = ["bft-rs/async_check_txs"]
 ```
 
 Second, add BFT and channel to your crate as following:
@@ -121,7 +121,7 @@ actuator.send_start(BftMsg::Start).expect("");
 
 actuator.send_status(BftMsg::Status(status)).expect("");
 
-// only in feature verify_req
+// only in feature async_check_txs
 actuator.send_verify(BftMsg::VerifyResq(result)).expect("");
 ```
 
