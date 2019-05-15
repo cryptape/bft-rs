@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use crate::objects::LogType;
+use log::{trace, warn};
 use std::collections::BTreeMap;
 use std::fs::{read_dir, DirBuilder, File, OpenOptions};
 use std::io::{self, Read, Seek, Write};

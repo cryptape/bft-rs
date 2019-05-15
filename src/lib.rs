@@ -4,16 +4,10 @@
 
 //#![deny(missing_docs)]
 
-#[macro_use]
-pub extern crate crossbeam;
-#[macro_use]
-extern crate log;
-extern crate lru_cache;
-extern crate min_max_heap;
-extern crate rand;
-extern crate rand_core;
-extern crate rand_pcg;
-extern crate rlp;
+//#[macro_use]
+//pub extern crate crossbeam;
+//#[macro_use]
+//extern crate log;
 
 use crate::{
     algorithm::Bft,
@@ -23,6 +17,7 @@ use crate::{
 };
 
 use crossbeam::crossbeam_channel::{unbounded, Sender};
+use log::{debug, error, info, trace};
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter, Result as FmtResult};

@@ -1,3 +1,5 @@
+use log::{error, trace, warn};
+
 pub type BftResult<T> = ::std::result::Result<T, BftError>;
 /// Error for Bft actuator.
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -8,7 +8,8 @@ use crate::{
     wal::Wal,
 };
 
-use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender};
+use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender, select};
+use log::{debug, error, info, trace};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
