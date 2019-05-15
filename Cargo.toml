@@ -17,7 +17,7 @@ crossbeam-utils = "0.6.5"
 lru-cache = "0.1"
 log = "0.4.3"
 min-max-heap = "1.2.0"
-rand = "0.5.5"
+rand = "0.6.5"
 rand_core = "0.3.1"
 rand_pcg = "0.1.2"
 rlp = "0.3.0"
@@ -28,6 +28,9 @@ time = "0.1.36"
 
 [dev-dependencies]
 env_logger = "0.6.0"
+digest-hash = "0.3.0"
+sha2 = "0.8.0"
+
 
 [features]
 default = []
