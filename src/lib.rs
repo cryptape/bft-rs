@@ -92,6 +92,7 @@ pub enum BftMsg {
     Pause,
     Start,
     Clear(Proof),
+    Kill,
 }
 
 #[cfg(feature = "verify_req")]

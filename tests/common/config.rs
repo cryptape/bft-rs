@@ -1,5 +1,5 @@
-use std::time::Duration;
 use super::utils::RandomMode;
+use std::time::Duration;
 use std::u64::MAX as MAX_U64;
 use std::u8::MAX as MAX_U8;
 

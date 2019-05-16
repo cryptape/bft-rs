@@ -13,11 +13,11 @@ use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub struct Env {
     pub honest_nodes: HashMap<Vec<u8>, Box<BftActuator>>,
-    pub msg_recv: Receiver<BftMsg>,
+    pub msg_recv: Receiver<(BftMsg, Address)>,
     pub commit_recv: Receiver<(Commit, Address)>,
     pub authority_list: Vec<Node>,
     pub interval: Option<u64>,
@@ -94,7 +94,6 @@ impl Env {
         self.honest_nodes
             .iter()
             .for_each(|(_, actuator)| actuator.send(BftMsg::Status(status.clone())).unwrap());
-        thread::sleep(Duration::from_secs(20));
 
         loop {
             let mut get_msg = Err(RecvError);
@@ -107,15 +106,17 @@ impl Env {
                 recv(test4timer) -> msg => get_timer = msg,
             }
 
-            if let Ok(msg) = get_msg {
+            if let Ok((msg, from)) = get_msg {
                 self.honest_nodes.iter().for_each(|(address, _)| {
-                    let delay = message_delay();
-                    let event = Event {
-                        process_time: Instant::now() + delay,
-                        to: address.clone(),
-                        content: Content::Msg(msg.clone()),
-                    };
-                    test2timer.send(event).unwrap();
+                    if address != &from {
+                        let delay = message_delay();
+                        let event = Event {
+                            process_time: Instant::now() + delay,
+                            to: address.clone(),
+                            content: Content::Msg(msg.clone()),
+                        };
+                        test2timer.send(event).unwrap();
+                    }
                 });
             }
             if let Ok((commit, sender)) = get_commit {

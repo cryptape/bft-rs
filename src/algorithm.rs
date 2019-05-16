@@ -242,6 +242,10 @@ where
                 debug!("Bft receives clear {:?}", &proof);
                 self.clear(proof);
             }
+
+            BftMsg::Kill => {
+                std::process::exit(0);
+            }
         }
 
         Ok(())

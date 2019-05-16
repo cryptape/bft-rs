@@ -7,7 +7,7 @@ use std::thread;
 
 pub struct HonestNode {
     pub address: Vec<u8>,
-    pub msg_send: Sender<BftMsg>,
+    pub msg_send: Sender<(BftMsg, Address)>,
     pub commit_send: Sender<(Commit, Address)>,
 }
 
@@ -38,7 +38,7 @@ impl BftSupport for HonestNode {
     }
 
     fn transmit(&self, msg: BftMsg) {
-        self.msg_send.send(msg).unwrap();
+        self.msg_send.send((msg, self.address.clone())).unwrap();
     }
 
     fn commit(&self, commit: Commit) -> Result<Status, TestError> {
