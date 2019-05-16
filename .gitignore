@@ -15,3 +15,7 @@
 
 # These are intellij setting
 /.idea/
+
+# These are logs
+/wal*/
+/log/
