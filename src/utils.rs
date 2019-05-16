@@ -36,7 +36,21 @@ where
         match log_type {
             LogType::Proposal => {
                 info!("Load proposal");
-                self.process(BftMsg::Proposal(encode), false)?;
+                let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
+                    BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
+                })?;
+                let proposal = signed_proposal.proposal;
+                let block_hash = proposal.block_hash;
+                let block = self
+                    .blocks
+                    .get_block(proposal.height, &block_hash)
+                    .ok_or_else(|| {
+                        BftError::ShouldNotHappen(
+                            "can not fetch block from cache when load signed_proposal".to_string(),
+                        )
+                    })?;
+                let proposal_block_encode = combine_proposal_block(&encode, block);
+                self.process(BftMsg::Proposal(proposal_block_encode), false)?;
             }
             LogType::Vote => {
                 info!("Load vote");
@@ -75,8 +89,34 @@ where
                 })?;
                 self.timeout_process(time_out_info, false)?;
             }
+
+            LogType::Block => {
+                info!("Load block");
+                let (height, block) = decode_block(&encode);
+                let block_hash = self.function.crypt_hash(block);
+                self.blocks.add(height, &block_hash, block);
+            }
         }
         Ok(())
+    }
+
+    pub(crate) fn build_signed_proposal_encode(
+        &mut self,
+        proposal: &Proposal,
+    ) -> BftResult<Vec<u8>> {
+        let block_hash = &proposal.block_hash;
+        let signed_proposal = self.build_signed_proposal(&proposal)?;
+        let signed_proposal_encode = rlp::encode(&signed_proposal);
+        let block = self
+            .blocks
+            .get_block(proposal.height, block_hash)
+            .ok_or_else(|| {
+                BftError::ShouldNotHappen(
+                    "can not fetch block from cache when send signed_proposal".to_string(),
+                )
+            })?;
+        let encode = combine_proposal_block(&signed_proposal_encode, block);
+        Ok(encode)
     }
 
     pub(crate) fn build_signed_proposal(&self, proposal: &Proposal) -> BftResult<SignedProposal> {
@@ -307,16 +347,25 @@ where
     pub(crate) fn check_and_save_proposal(
         &mut self,
         signed_proposal: &SignedProposal,
+        block: &[u8],
         encode: &[u8],
         need_wal: bool,
     ) -> BftResult<()> {
         debug!("Bft receives {:?}", signed_proposal);
         let proposal = &signed_proposal.proposal;
+        let block_hash = &proposal.block_hash;
         let height = proposal.height;
         let round = proposal.round;
 
         if height < self.height - 1 {
             return Err(BftError::ObsoleteMsg(format!("{:?}", signed_proposal)));
+        }
+
+        if block_hash != &self.function.crypt_hash(block) {
+            return Err(BftError::MismatchingBlock(format!(
+                "the hash of block is mismatching with block_hash {:?} in proposal",
+                block_hash
+            )));
         }
 
         let address = self
@@ -333,12 +382,26 @@ where
             )));
         }
 
-        // TODO: filter higher proposals to prevent flooding
         // prevent too many higher proposals flush out current proposal
         // because self.height - 1 is allowed, so judge height < self.height + CACHE_N - 1
         if height < self.height + CACHE_N - 1 && round < self.round + CACHE_N {
             self.proposals.add(&signed_proposal)?;
+            let save = self.blocks.add(height, block_hash, block);
+
             if need_wal {
+                if save {
+                    let encode = encode_block(height, block);
+                    handle_err(
+                        self.wal_log
+                            .save(height, LogType::Block, &encode)
+                            .or_else(|e| {
+                                Err(BftError::SaveWalErr(format!(
+                                    "{:?} of proposal block with height {}, round {}",
+                                    e, height, round
+                                )))
+                            }),
+                    );
+                }
                 handle_err(
                     self.wal_log
                         .save(height, LogType::Proposal, &rlp::encode(signed_proposal))
@@ -357,13 +420,13 @@ where
         }
 
         self.check_proposer(proposal)?;
-        self.check_lock_votes(proposal, &self.function.crypt_hash(&proposal.block))?;
+        self.check_lock_votes(proposal, block_hash)?;
 
         if height == self.height - 1 {
             return Ok(());
         }
 
-        self.check_block_txs(proposal, &self.function.crypt_hash(encode))?;
+        self.check_block_txs(proposal, block, &self.function.crypt_hash(encode))?;
         self.check_proof(height, &proposal.proof)?;
 
         Ok(())
@@ -474,48 +537,59 @@ where
     pub(crate) fn check_and_save_feed(&mut self, feed: &Feed, need_wal: bool) -> BftResult<()> {
         let height = feed.height;
         if height < self.height {
-            return Err(BftError::ObsoleteMsg(format!("{:?}", feed)));
+            return Err(BftError::ObsoleteMsg(format!(
+                "feed with height {}",
+                height
+            )));
         }
 
         if height > self.height {
-            return Err(BftError::HigherMsg(format!("{:?}", feed)));
+            return Err(BftError::HigherMsg(format!("feed with height {}", height)));
         }
 
         if need_wal {
             handle_err(
                 self.wal_log
                     .save(height, LogType::Feed, &rlp::encode(feed))
-                    .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, feed)))),
+                    .or_else(|e| {
+                        Err(BftError::SaveWalErr(format!(
+                            "{:?} of feed with height {}",
+                            e, height
+                        )))
+                    }),
             );
         }
 
-        self.feed = Some(feed.block.clone());
+        let block_hash = self.function.crypt_hash(&feed.block);
+        self.blocks.add(height, &block_hash, &feed.block);
+        self.feed = Some(block_hash);
         Ok(())
     }
 
     pub(crate) fn check_block_txs(
         &mut self,
         proposal: &Proposal,
+        block: &[u8],
         proposal_hash: &[u8],
     ) -> BftResult<()> {
         let height = proposal.height;
         let round = proposal.round;
-        let block = &proposal.block;
+        let block_hash = &proposal.block_hash;
 
         #[cfg(not(feature = "verify_req"))]
         {
             self.function
-                .check_block(block, height)
+                .check_block(block, block_hash, height)
                 .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
             self.function
-                .check_txs(block, proposal_hash, height, round)
+                .check_txs(block, block_hash, proposal_hash, height, round)
                 .map_err(|e| BftError::CheckTxFailed(format!("{:?} of {:?}", e, proposal)))?;
             Ok(())
         }
 
         #[cfg(feature = "verify_req")]
         {
-            if let Err(e) = self.function.check_block(block, height) {
+            if let Err(e) = self.function.check_block(block, block_hash, height) {
                 self.save_verify_res(round, false)?;
                 return Err(BftError::CheckBlockFailed(format!(
                     "{:?} of {:?}",
@@ -526,18 +600,20 @@ where
             let function = self.function.clone();
             let sender = self.msg_sender.clone();
             let block = block.clone();
+            let block_hash = block_hash.clone();
             let proposal_hash = proposal_hash.to_owned();
             thread::spawn(move || {
-                let is_pass = match function.check_txs(&block, &proposal_hash, height, round) {
-                    Ok(_) => true,
-                    Err(e) => {
-                        warn!(
-                            "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
-                            e, block
-                        );
-                        false
-                    }
-                };
+                let is_pass =
+                    match function.check_txs(&block, &block_hash, &proposal_hash, height, round) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            warn!(
+                                "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
+                                e, block
+                            );
+                            false
+                        }
+                    };
                 let verify_resp = VerifyResp { is_pass, round };
                 handle_err(
                     sender
@@ -920,4 +996,39 @@ pub fn get_votes_weight(authorities: &[Node], vote_addresses: &[Address]) -> u64
         .map(|node| u64::from(node.vote_weight))
         .collect();
     votes_weight.iter().sum()
+}
+
+pub fn combine_proposal_block(proposal: &[u8], block: &[u8]) -> Vec<u8> {
+    let proposal_len = proposal.len() as u64;
+    let len_mark = proposal_len.to_be_bytes();
+    let mut encode = Vec::with_capacity(8 + proposal.len() + block.len());
+    encode.extend_from_slice(&len_mark);
+    encode.extend_from_slice(proposal);
+    encode.extend_from_slice(block);
+    encode
+}
+
+pub fn extract_proposal_block(encode: &[u8]) -> (&[u8], &[u8]) {
+    let mut len: [u8; 8] = [0; 8];
+    len.copy_from_slice(&encode[0..8]);
+    let proposal_len = u64::from_be_bytes(len) as usize;
+    let (combine, block) = encode.split_at(proposal_len + 8);
+    let (_, proposal) = combine.split_at(8);
+    (proposal, block)
+}
+
+pub fn encode_block(height: u64, block: &[u8]) -> Vec<u8> {
+    let height_mark = height.to_be_bytes();
+    let mut encode = Vec::with_capacity(8 + block.len());
+    encode.extend_from_slice(&height_mark);
+    encode.extend_from_slice(block);
+    encode
+}
+
+pub fn decode_block(encode: &[u8]) -> (u64, &[u8]) {
+    let (h, block) = encode.split_at(8);
+    let mut height_mark: [u8; 8] = [0; 8];
+    height_mark.copy_from_slice(h);
+    let height = u64::from_be_bytes(height_mark);
+    (height, block)
 }

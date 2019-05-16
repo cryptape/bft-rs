@@ -1,15 +1,16 @@
 use crate::*;
 use crate::{
-    collectors::{ProposalCollector, VoteCollector},
+    collectors::{BlockCollector, ProposalCollector, VoteCollector},
     error::{handle_err, BftError, BftResult},
     objects::*,
     params::BftParams,
     timer::{TimeoutInfo, WaitTimer},
+    utils::extract_proposal_block,
     wal::Wal,
 };
 
-use crossbeam::crossbeam_channel::{unbounded, Receiver, RecvError, Sender, select};
-use log::{debug, error, info, trace};
+use crossbeam::crossbeam_channel::{select, unbounded, Receiver, RecvError, Sender};
+use log::{debug, error, info};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
@@ -44,13 +45,15 @@ pub struct Bft<T: BftSupport> {
     pub(crate) params: BftParams,
     pub(crate) htime: Instant,
     // caches
-    pub(crate) feed: Option<Block>,
+    pub(crate) feed: Option<Hash>, // TODO: reduce memory size
     pub(crate) status: Option<Status>,
     pub(crate) verify_results: HashMap<Round, bool>,
     pub(crate) proof: Proof,
-    pub(crate) proposals: ProposalCollector,
+    pub(crate) blocks: BlockCollector,
+    pub(crate) proposals: ProposalCollector, // TODO: reduce memory size
     pub(crate) votes: VoteCollector,
-    pub(crate) wal_log: Wal,
+    pub(crate) wal_log: Wal, // TODO: async save
+
     // user define
     pub(crate) function: Arc<T>,
     pub(crate) consensus_power: bool,
@@ -91,6 +94,7 @@ where
             proof: Proof::default(),
             status: None,
             authority_manage: AuthorityManage::new(),
+            blocks: BlockCollector::new(),
             proposals: ProposalCollector::new(),
             votes: VoteCollector::new(),
             wal_log: Wal::new(wal_path).unwrap(),
@@ -152,11 +156,13 @@ where
         match msg {
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
-                    let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
-                        BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
-                    })?;
-                    trace!("Bft receives {:?}", &encode);
-                    self.check_and_save_proposal(&signed_proposal, &encode, need_wal)?;
+                    let (proposal_encode, block) = extract_proposal_block(&encode);
+                    let signed_proposal: SignedProposal =
+                        rlp::decode(&proposal_encode).map_err(|e| {
+                            BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
+                        })?;
+
+                    self.check_and_save_proposal(&signed_proposal, block, &encode, need_wal)?;
 
                     let proposal = signed_proposal.proposal;
                     if self.step <= Step::ProposeWait {
@@ -423,10 +429,16 @@ where
                 )
             })?;
         let proposal = signed_proposal.proposal;
+        let block = self
+            .blocks
+            .get_block(self.height, &proposal.block_hash)
+            .ok_or_else(|| {
+                BftError::ShouldNotHappen("can not fetch block from cache when commit".to_string())
+            })?;
 
         let commit = Commit {
             height: self.height,
-            block: proposal.block.clone(),
+            block: block.clone(),
             proof,
             address: proposal.proposer.clone(),
         };
@@ -454,7 +466,7 @@ where
         });
 
         self.last_commit_round = Some(self.round);
-        self.last_commit_block_hash = Some(self.function.crypt_hash(&proposal.block));
+        self.last_commit_block_hash = Some(proposal.block_hash);
         Ok(())
     }
 
@@ -537,43 +549,41 @@ where
                 .get_proposal(self.height, lock_round)
                 .expect("Can not get lock_proposal, it should not happen!");
             let lock_proposal = lock_signed_proposal.proposal;
-
-            let block = lock_proposal.block;
+            let block_hash = lock_proposal.block_hash;
 
             let proposal = Proposal {
                 height: self.height,
                 round: self.round,
-                block,
+                block_hash,
                 proof: lock_proposal.proof,
                 lock_round: Some(lock_round),
                 lock_votes,
                 proposer: self.params.address.clone(),
             };
 
-            let signed_proposal = self.build_signed_proposal(&proposal)?;
-            BftMsg::Proposal(rlp::encode(&signed_proposal))
+            let encode = self.build_signed_proposal_encode(&proposal)?;
+            BftMsg::Proposal(encode)
         } else {
             // if is not locked, transmit the cached proposal
-            let block = self
+            let block_hash = self
                 .feed
                 .clone()
                 .expect("Have checked before, should not happen!");
-            let block_hash = self.function.crypt_hash(&block);
             self.block_hash = Some(block_hash.clone());
             debug!("Bft is ready to transmit new Proposal");
 
             let proposal = Proposal {
                 height: self.height,
                 round: self.round,
-                block,
+                block_hash,
                 proof: self.proof.clone(),
                 lock_round: None,
                 lock_votes: Vec::new(),
                 proposer: self.params.address.clone(),
             };
 
-            let signed_proposal = self.build_signed_proposal(&proposal)?;
-            BftMsg::Proposal(rlp::encode(&signed_proposal))
+            let encode = self.build_signed_proposal_encode(&proposal)?;
+            BftMsg::Proposal(encode)
         };
         debug!(
             "Bft transmits proposal at height {:?}, round {:?}",
@@ -807,7 +817,7 @@ where
     }
 
     fn set_proposal(&mut self, proposal: Proposal) {
-        let block_hash = self.function.crypt_hash(&proposal.block);
+        let block_hash = proposal.block_hash;
 
         if proposal.lock_round.is_some()
             && (self.lock_status.is_none()
