@@ -308,7 +308,17 @@ where
         }
 
         for (_, signed_proposal) in proposal_collector.round_proposals.iter() {
-            let encode = rlp::encode(signed_proposal);
+            let block_hash = signed_proposal.proposal.block_hash.clone();
+            let block = self
+                .blocks
+                .get_block(self.height, &block_hash)
+                .ok_or_else(|| {
+                    BftError::ShouldNotHappen(
+                        "can not fetch block from cache when load signed_proposal".to_string(),
+                    )
+                })?;
+            let proposal_encode = rlp::encode(signed_proposal);
+            let encode = combine_proposal_block(&proposal_encode, block);
             let msg = BftMsg::Proposal(encode);
             let info = format!("{:?}", &msg);
             self.msg_sender
@@ -1010,13 +1020,20 @@ pub fn combine_proposal_block(proposal: &[u8], block: &[u8]) -> Vec<u8> {
     encode
 }
 
-pub fn extract_proposal_block(encode: &[u8]) -> (&[u8], &[u8]) {
+pub fn extract_proposal_block(encode: &[u8]) -> BftResult<(&[u8], &[u8])> {
+    let encode_len = encode.len();
+    if encode_len < 8 {
+        return Err(BftError::DecodeErr(format!("extract_proposal_block failed, encode.len {} is less than 8", encode_len)));
+    }
     let mut len: [u8; 8] = [0; 8];
     len.copy_from_slice(&encode[0..8]);
     let proposal_len = u64::from_be_bytes(len) as usize;
+    if encode_len < proposal_len + 8 {
+        return Err(BftError::DecodeErr(format!("extract_proposal_block failed, encode.len {} is less than proposal_len + 8", encode_len)));
+    }
     let (combine, block) = encode.split_at(proposal_len + 8);
     let (_, proposal) = combine.split_at(8);
-    (proposal, block)
+    Ok((proposal, block))
 }
 
 pub fn encode_block(height: u64, block: &[u8]) -> Vec<u8> {
