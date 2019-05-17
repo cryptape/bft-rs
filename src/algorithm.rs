@@ -45,12 +45,12 @@ pub struct Bft<T: BftSupport> {
     pub(crate) params: BftParams,
     pub(crate) htime: Instant,
     // caches
-    pub(crate) feed: Option<Hash>, // TODO: reduce memory size
+    pub(crate) feed: Option<Hash>,
     pub(crate) status: Option<Status>,
     pub(crate) verify_results: HashMap<Round, bool>,
     pub(crate) proof: Proof,
     pub(crate) blocks: BlockCollector,
-    pub(crate) proposals: ProposalCollector, // TODO: reduce memory size
+    pub(crate) proposals: ProposalCollector,
     pub(crate) votes: VoteCollector,
     pub(crate) wal_log: Wal, // TODO: async save
 
@@ -156,12 +156,13 @@ where
         match msg {
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
+                    info!("{:?} receives proposal", self.params.address);
                     let (proposal_encode, block) = extract_proposal_block(&encode)?;
                     let signed_proposal: SignedProposal =
                         rlp::decode(&proposal_encode).map_err(|e| {
                             BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                         })?;
-
+                    info!("{:?} complete decode proposal", self.params.address);
                     self.check_and_save_proposal(&signed_proposal, block, &encode, need_wal)?;
 
                     let proposal = signed_proposal.proposal;
@@ -564,8 +565,9 @@ where
                 lock_votes,
                 proposer: self.params.address.clone(),
             };
-
+            info!("{:?} start to build locked proposal", self.params.address);
             let encode = self.build_signed_proposal_encode(&proposal)?;
+            info!("{:?} finish building locked proposal", self.params.address);
             BftMsg::Proposal(encode)
         } else {
             // if is not locked, transmit the cached proposal
@@ -585,8 +587,9 @@ where
                 lock_votes: Vec::new(),
                 proposer: self.params.address.clone(),
             };
-
+            info!("{:?} start to build new proposal", self.params.address);
             let encode = self.build_signed_proposal_encode(&proposal)?;
+            info!("{:?} finish building new proposal", self.params.address);
             BftMsg::Proposal(encode)
         };
         debug!(

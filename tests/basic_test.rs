@@ -10,7 +10,7 @@ use log::LevelFilter;
 fn test_basic() {
     clean_wal();
     clean_log_file("log/test_basic.log");
-    set_log_file("log/test_basic.log", LevelFilter::Debug);
-    let mut env = Env::new(4, 0);
+    set_log_file("log/test_basic.log", LevelFilter::Info);
+    let mut env = Env::new(1, 0);
     env.run(100);
 }

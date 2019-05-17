@@ -5,7 +5,7 @@ use std::u8::MAX as MAX_U8;
 
 pub const LIVENESS_TICK: Duration = Duration::from_secs(60);
 
-pub const BLOCK_SIZE: RandomMode = RandomMode::Normal(102_400.0, 45_000.0);
+pub const BLOCK_SIZE: RandomMode = RandomMode::Normal(10_240_000.0, 1_000.0);
 pub const MAX_BLOCK_SIZE: usize = 2_048_000;
 pub const MIN_BLOCK_SIZE: usize = 100;
 
@@ -24,4 +24,4 @@ pub const MIN_DELAY: u64 = 10; // ms
 pub const CHECK_TXS_DELAY: RandomMode = RandomMode::Normal(300.0, 20.0); // ms
 pub const COMMIT_DELAY: RandomMode = RandomMode::Normal(200.0, 20.0); // ms
 pub const SYNC_DELAY: RandomMode = RandomMode::Normal(200.0, 5.0); // ms
-pub const MESSAGE_DELAY: RandomMode = RandomMode::Normal(400.0, 100.0); // ms
+pub const MESSAGE_DELAY: RandomMode = RandomMode::Normal(10.0, 0.0); // ms
