@@ -13,7 +13,7 @@ pub struct HonestNode {
 
 impl BftSupport for HonestNode {
     type Error = TestError;
-    fn check_block(&self, block: &[u8], _height: u64) -> Result<(), TestError> {
+    fn check_block(&self, block: &[u8], _block_hash: &[u8], _height: u64) -> Result<(), TestError> {
         if check_block_result(block) {
             Ok(())
         } else {
@@ -24,6 +24,7 @@ impl BftSupport for HonestNode {
     fn check_txs(
         &self,
         _block: &[u8],
+        _block_hash: &[u8],
         _signed_proposal_hash: &[u8],
         _height: u64,
         _round: u64,

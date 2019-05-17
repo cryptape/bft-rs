@@ -930,6 +930,28 @@ where
     }
 
     fn check_precommit_count(&mut self) -> PrecommitRes {
+        let mut flag = false;
+        for (round, precommit_count) in self.votes.precommit_count.iter() {
+            debug!(
+                "Bft have received {} precommit_count in round {}",
+                precommit_count, round
+            );
+            if self.cal_above_threshold(*precommit_count) && *round >= self.round {
+                flag = true;
+                if self.round < *round {
+                    self.round_filter.clear();
+                    self.round = *round;
+                }
+            }
+        }
+        if !flag {
+            return PrecommitRes::Below;
+        }
+        debug!(
+            "Bft collects over 2/3 precommits at height {:?}, round {:?}",
+            self.height, self.round
+        );
+
         if let Some(precommit_set) =
             self.votes
                 .get_voteset(self.height, self.round, &VoteType::Precommit)

@@ -16,6 +16,7 @@ pub(crate) struct VoteCollector {
     pub(crate) votes: LruCache<Height, RoundCollector>,
     /// A HashMap to record prevote count of each round.
     pub(crate) prevote_count: HashMap<Round, u64>,
+    pub(crate) precommit_count: HashMap<Round, u64>,
 }
 
 impl VoteCollector {
@@ -24,6 +25,7 @@ impl VoteCollector {
         VoteCollector {
             votes: LruCache::new(CACHE_N as usize),
             prevote_count: HashMap::new(),
+            precommit_count: HashMap::new(),
         }
     }
 
@@ -60,22 +62,34 @@ impl VoteCollector {
                 }
             }
             debug!("Bft set prevote_count by {} of round {}", counter, round);
-        } else if self.votes.contains_key(&height) {
-            self.votes
-                .get_mut(&height)
-                .unwrap()
-                .add(signed_vote, vote_weight)?
         } else {
-            let mut round_votes = RoundCollector::new();
-            round_votes.add(signed_vote, vote_weight)?;
-            self.votes.insert(height, round_votes);
+            let counter = self.precommit_count.entry(round).or_insert(0);
+            if self.votes.contains_key(&height) {
+                self.votes
+                    .get_mut(&height)
+                    .unwrap()
+                    .add(signed_vote, vote_weight)?;
+                if height == current_height {
+                    // update prevote count hashmap
+                    *counter += vote_weight;
+                }
+            } else {
+                let mut round_votes = RoundCollector::new();
+                round_votes.add(signed_vote, vote_weight)?;
+                self.votes.insert(height, round_votes);
+                // update prevote count hashmap
+                if height == current_height {
+                    *counter += vote_weight;
+                }
+            }
+            debug!("Bft set precommit_count by {} of round {}", counter, round);
         }
         Ok(())
     }
 
     pub(crate) fn remove(&mut self, current_height: Height) {
         self.votes.remove(&current_height);
-        self.clear_prevote_count();
+        self.clear_vote_count();
     }
 
     /// A function to get the vote set of the height, the round, and the vote type.
@@ -91,8 +105,9 @@ impl VoteCollector {
     }
 
     /// A function to clean prevote count HashMap at the begining of a height.
-    pub(crate) fn clear_prevote_count(&mut self) {
+    pub(crate) fn clear_vote_count(&mut self) {
         self.prevote_count.clear();
+        self.precommit_count.clear();
     }
 }
 

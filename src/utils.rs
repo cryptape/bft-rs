@@ -949,7 +949,7 @@ where
         // clear prevote count needed when goto new height
         self.block_hash = None;
         self.lock_status = None;
-        self.votes.clear_prevote_count();
+        self.votes.clear_vote_count();
 
         #[cfg(feature = "verify_req")]
         self.verify_results.clear();
@@ -1023,13 +1023,19 @@ pub fn combine_proposal_block(proposal: &[u8], block: &[u8]) -> Vec<u8> {
 pub fn extract_proposal_block(encode: &[u8]) -> BftResult<(&[u8], &[u8])> {
     let encode_len = encode.len();
     if encode_len < 8 {
-        return Err(BftError::DecodeErr(format!("extract_proposal_block failed, encode.len {} is less than 8", encode_len)));
+        return Err(BftError::DecodeErr(format!(
+            "extract_proposal_block failed, encode.len {} is less than 8",
+            encode_len
+        )));
     }
     let mut len: [u8; 8] = [0; 8];
     len.copy_from_slice(&encode[0..8]);
     let proposal_len = u64::from_be_bytes(len) as usize;
     if encode_len < proposal_len + 8 {
-        return Err(BftError::DecodeErr(format!("extract_proposal_block failed, encode.len {} is less than proposal_len + 8", encode_len)));
+        return Err(BftError::DecodeErr(format!(
+            "extract_proposal_block failed, encode.len {} is less than proposal_len + 8",
+            encode_len
+        )));
     }
     let (combine, block) = encode.split_at(proposal_len + 8);
     let (_, proposal) = combine.split_at(8);
