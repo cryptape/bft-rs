@@ -484,7 +484,7 @@ pub trait BftSupport: Sync + Send {
     /// A user-defined function for block validation.
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate block format, block headers here.
-    fn check_block(&self, block: &[u8], height: u64) -> Result<(), Self::Error>;
+    fn check_block(&self, block: &[u8], block_hash: &[u8], height: u64) -> Result<(), Self::Error>;
     /// A user-defined function for transactions validation.
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate transactions here.
@@ -492,6 +492,7 @@ pub trait BftSupport: Sync + Send {
     fn check_txs(
         &self,
         block: &[u8],
+        block_hash: &[u8],
         signed_proposal_hash: &[u8],
         height: u64,
         round: u64,

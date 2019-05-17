@@ -24,8 +24,8 @@ pub(crate) struct Proposal {
     pub(crate) height: Height,
     /// The round of proposal.
     pub(crate) round: Round,
-    /// The proposal content.
-    pub(crate) block: Block,
+    /// The block hash.
+    pub(crate) block_hash: Hash,
     ///
     pub(crate) proof: Proof,
     /// A lock round of the proposal.
@@ -51,7 +51,7 @@ impl Encodable for Proposal {
         s.begin_list(7)
             .append(&self.height)
             .append(&self.round)
-            .append(&self.block)
+            .append(&self.block_hash)
             .append(&self.proof)
             .append(&self.lock_round)
             .append_list(&self.lock_votes)
@@ -65,7 +65,7 @@ impl Decodable for Proposal {
             Prototype::List(7) => {
                 let height: Height = r.val_at(0)?;
                 let round: Round = r.val_at(1)?;
-                let block: Block = r.val_at(2)?;
+                let block_hash: Block = r.val_at(2)?;
                 let proof: Proof = r.val_at(3)?;
                 let lock_round: Option<Round> = r.val_at(4)?;
                 let lock_votes: Vec<SignedVote> = r.list_at(5)?;
@@ -73,7 +73,7 @@ impl Decodable for Proposal {
                 Ok(Proposal {
                     height,
                     round,
-                    block,
+                    block_hash,
                     proof,
                     lock_round,
                     lock_votes,
@@ -375,6 +375,7 @@ pub(crate) enum LogType {
     #[cfg(feature = "verify_req")]
     VerifyResp,
     TimeOutInfo,
+    Block,
 }
 
 impl From<u8> for LogType {
@@ -388,6 +389,7 @@ impl From<u8> for LogType {
             #[cfg(feature = "verify_req")]
             5 => LogType::VerifyResp,
             6 => LogType::TimeOutInfo,
+            7 => LogType::Block,
             _ => panic!("Invalid vote type!"),
         }
     }
@@ -404,6 +406,7 @@ impl Into<u8> for LogType {
             #[cfg(feature = "verify_req")]
             LogType::VerifyResp => 5,
             LogType::TimeOutInfo => 6,
+            LogType::Block => 7,
         }
     }
 }
@@ -499,7 +502,7 @@ mod test {
         let proposal = Proposal {
             height: 787655u64,
             round: 2u64,
-            block: vec![76u8, 9u8, 12u8],
+            block_hash: vec![76u8, 9u8, 12u8],
             proof: Proof {
                 height: 1888787u64,
                 round: 23u64,

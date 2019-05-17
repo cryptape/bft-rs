@@ -22,6 +22,8 @@ pub enum BftError {
 
     InvalidSender(String),
 
+    MismatchingBlock(String),
+
     CheckBlockFailed(String),
 
     CheckTxFailed(String),
@@ -57,7 +59,8 @@ pub(crate) fn handle_err<T>(result: BftResult<T>) {
             | BftError::CheckSigFailed(_)
             | BftError::CheckTxFailed(_)
             | BftError::DecodeErr(_)
-            | BftError::InvalidSender(_) => warn!("Bft encounters {:?}", e),
+            | BftError::InvalidSender(_)
+            | BftError::MismatchingBlock(_) => warn!("Bft encounters {:?}", e),
 
             BftError::ShouldNotHappen(_)
             | BftError::SendMsgErr(_)

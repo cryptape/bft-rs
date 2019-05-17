@@ -1,5 +1,5 @@
 use crate::objects::{SignedProposal, SignedVote, VoteType};
-use crate::{Address, Hash, Height, Round};
+use crate::{Address, Block, Hash, Height, Round};
 
 use log::debug;
 use std::collections::HashMap;
@@ -288,5 +288,59 @@ impl ProposalRoundCollector {
 
     pub(crate) fn get_proposal(&mut self, round: Round) -> Option<SignedProposal> {
         self.round_proposals.get_mut(&round).cloned()
+    }
+}
+
+pub(crate) struct BlockCollector {
+    pub blocks: LruCache<Height, BlockSet>,
+}
+
+impl BlockCollector {
+    pub(crate) fn new() -> Self {
+        BlockCollector {
+            blocks: LruCache::new(CACHE_N as usize),
+        }
+    }
+
+    pub(crate) fn add(&mut self, height: Height, block_hash: &[u8], block: &[u8]) -> bool {
+        if self.blocks.contains_key(&height) {
+            self.blocks.get_mut(&height).unwrap().add(block_hash, block)
+        } else {
+            let mut block_set = BlockSet::new();
+            block_set.add(block_hash, block);
+            self.blocks.insert(height, block_set);
+            true
+        }
+    }
+
+    pub(crate) fn get_block(&mut self, height: Height, hash: &[u8]) -> Option<&Block> {
+        self.blocks
+            .get_mut(&height)
+            .and_then(|bs| bs.get_block(hash))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct BlockSet {
+    pub block_set: HashMap<Hash, Block>,
+}
+
+impl BlockSet {
+    pub(crate) fn new() -> Self {
+        BlockSet {
+            block_set: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn add(&mut self, hash: &[u8], block: &[u8]) -> bool {
+        if self.block_set.contains_key(hash) {
+            return false;
+        }
+        self.block_set.insert(hash.to_vec(), block.to_vec());
+        true
+    }
+
+    pub(crate) fn get_block(&self, hash: &[u8]) -> Option<&Block> {
+        self.block_set.get(hash)
     }
 }
