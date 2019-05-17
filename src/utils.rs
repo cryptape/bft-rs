@@ -15,6 +15,8 @@ use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use log::warn;
+
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;
 const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
 
@@ -387,10 +389,12 @@ where
         if height < self.height + CACHE_N - 1 && round < self.round + CACHE_N {
             self.proposals.add(&signed_proposal)?;
             let save = self.blocks.add(height, block_hash, block);
+            info!("save block {}", save);
 
             if need_wal {
                 if save {
                     let encode = encode_block(height, block);
+                    info!("block encode {:?}", encode);
                     handle_err(
                         self.wal_log
                             .save(height, LogType::Block, &encode)
@@ -599,7 +603,7 @@ where
 
             let function = self.function.clone();
             let sender = self.msg_sender.clone();
-            let block = block.clone();
+            let block = block.to_vec();
             let block_hash = block_hash.clone();
             let proposal_hash = proposal_hash.to_owned();
             thread::spawn(move || {
