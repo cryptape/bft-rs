@@ -373,13 +373,6 @@ where
             return Err(BftError::ObsoleteMsg(format!("{:?}", signed_proposal)));
         }
 
-        if block_hash != &self.function.crypt_hash(block) {
-            return Err(BftError::MismatchingBlock(format!(
-                "the hash of block is mismatching with block_hash {:?} in proposal",
-                block_hash
-            )));
-        }
-
         let address = self
             .function
             .check_sig(
@@ -572,7 +565,7 @@ where
             );
         }
 
-        let block_hash = self.function.crypt_hash(&feed.block);
+        let block_hash = feed.block_hash.clone();
         self.blocks.add(height, &block_hash, &feed.block);
         self.feed = Some(block_hash);
         Ok(())
