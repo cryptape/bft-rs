@@ -221,6 +221,8 @@ pub struct Feed {
     pub height: Height,
     /// the content of the block
     pub block: Block,
+
+    pub block_hash: Hash,
 }
 
 impl Debug for Feed {
@@ -234,23 +236,32 @@ impl Default for Feed {
         Feed {
             height: 0u64,
             block: vec![],
+            block_hash: vec![],
         }
     }
 }
 
 impl Encodable for Feed {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(2).append(&self.height).append(&self.block);
+        s.begin_list(3)
+            .append(&self.height)
+            .append(&self.block)
+            .append(&self.block_hash);
     }
 }
 
 impl Decodable for Feed {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
-            Prototype::List(2) => {
+            Prototype::List(3) => {
                 let height: Height = r.val_at(0)?;
                 let block: Block = r.val_at(1)?;
-                Ok(Feed { height, block })
+                let block_hash: Hash = r.val_at(2)?;
+                Ok(Feed {
+                    height,
+                    block,
+                    block_hash,
+                })
             }
             _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
@@ -506,7 +517,7 @@ pub trait BftSupport: Sync + Send {
     fn commit(&self, commit: Commit) -> Result<Status, Self::Error>;
     /// A user-defined function for feeding the bft consensus.
     /// The new block provided will feed for bft consensus of giving [`height`]
-    fn get_block(&self, height: u64) -> Result<Vec<u8>, Self::Error>;
+    fn get_block(&self, height: u64) -> Result<(Vec<u8>, Vec<u8>), Self::Error>;
     /// A user-defined function for signing a [`hash`].
     fn sign(&self, hash: &[u8]) -> Result<Signature, Self::Error>;
     /// A user-defined function for checking a [`signature`].

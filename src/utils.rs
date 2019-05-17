@@ -373,13 +373,6 @@ where
             return Err(BftError::ObsoleteMsg(format!("{:?}", signed_proposal)));
         }
 
-        if block_hash != &self.function.crypt_hash(block) {
-            return Err(BftError::MismatchingBlock(format!(
-                "the hash of block is mismatching with block_hash {:?} in proposal",
-                block_hash
-            )));
-        }
-
         let address = self
             .function
             .check_sig(
@@ -572,7 +565,7 @@ where
             );
         }
 
-        let block_hash = self.function.crypt_hash(&feed.block);
+        let block_hash = feed.block_hash.clone();
         self.blocks.add(height, &block_hash, &feed.block);
         self.feed = Some(block_hash);
         Ok(())
@@ -1023,13 +1016,19 @@ pub fn combine_proposal_block(proposal: &[u8], block: &[u8]) -> Vec<u8> {
 pub fn extract_proposal_block(encode: &[u8]) -> BftResult<(&[u8], &[u8])> {
     let encode_len = encode.len();
     if encode_len < 8 {
-        return Err(BftError::DecodeErr(format!("extract_proposal_block failed, encode.len {} is less than 8", encode_len)));
+        return Err(BftError::DecodeErr(format!(
+            "extract_proposal_block failed, encode.len {} is less than 8",
+            encode_len
+        )));
     }
     let mut len: [u8; 8] = [0; 8];
     len.copy_from_slice(&encode[0..8]);
     let proposal_len = u64::from_be_bytes(len) as usize;
     if encode_len < proposal_len + 8 {
-        return Err(BftError::DecodeErr(format!("extract_proposal_block failed, encode.len {} is less than proposal_len + 8", encode_len)));
+        return Err(BftError::DecodeErr(format!(
+            "extract_proposal_block failed, encode.len {} is less than proposal_len + 8",
+            encode_len
+        )));
     }
     let (combine, block) = encode.split_at(proposal_len + 8);
     let (_, proposal) = combine.split_at(8);

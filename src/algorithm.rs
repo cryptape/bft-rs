@@ -743,9 +743,13 @@ where
                         function
                             .get_block(height)
                             .map_err(|e| BftError::GetBlockFailed(format!("{:?}", e)))
-                            .and_then(|block| {
+                            .and_then(|(block, block_hash)| {
                                 sender
-                                    .send(BftMsg::Feed(Feed { height, block }))
+                                    .send(BftMsg::Feed(Feed {
+                                        height,
+                                        block,
+                                        block_hash,
+                                    }))
                                     .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
                             }),
                     );
