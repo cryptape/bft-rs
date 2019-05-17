@@ -389,12 +389,10 @@ where
         if height < self.height + CACHE_N - 1 && round < self.round + CACHE_N {
             self.proposals.add(&signed_proposal)?;
             let save = self.blocks.add(height, block_hash, block);
-            info!("save block {}", save);
 
             if need_wal {
                 if save {
                     let encode = encode_block(height, block);
-                    info!("block encode {:?}", encode);
                     handle_err(
                         self.wal_log
                             .save(height, LogType::Block, &encode)
