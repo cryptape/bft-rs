@@ -4,6 +4,7 @@ use self::bft_rs::{Address, BftMsg, BftSupport, Commit, Signature as BftSig, Sta
 use super::utils::*;
 use crossbeam::crossbeam_channel::Sender;
 use std::thread;
+use crate::common::config::MIN_BLOCK_SIZE;
 
 pub struct HonestNode {
     pub address: Vec<u8>,
@@ -48,8 +49,10 @@ impl BftSupport for HonestNode {
         Err(TestError::CommitProposed)
     }
 
-    fn get_block(&self, _height: u64) -> Result<Vec<u8>, TestError> {
-        Ok(generate_block(false))
+    fn get_block(&self, _height: u64) -> Result<(Vec<u8>, Vec<u8>), TestError> {
+        let block = generate_block(false);
+        let block_hash = hash(&block[0..MIN_BLOCK_SIZE]);
+        Ok((block, block_hash))
     }
 
     fn sign(&self, hash: &[u8]) -> Result<BftSig, TestError> {

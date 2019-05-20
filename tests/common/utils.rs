@@ -29,9 +29,10 @@ pub fn generate_block(byzantine: bool) -> Vec<u8> {
         vec.set_len(size);
     }
     let mark = if byzantine { 1u8 } else { 0u8 };
-    let rand_num = get_random_integer(RANDOM_U8) as u8;
     vec.insert(0, mark);
-    vec.insert(1, rand_num);
+    for i in 1..MIN_BLOCK_SIZE {
+        vec.insert(i, get_random_integer(RANDOM_U8) as u8);
+    }
     vec
 }
 

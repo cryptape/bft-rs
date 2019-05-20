@@ -550,6 +550,7 @@ mod test {
         let feed = Feed {
             height: 8797888u64,
             block: vec![89u8, 12u8, 32u8],
+            block_hash: vec![89u8, 12u8, 32u8],
         };
         let encode = rlp::encode(&feed);
         let decode: Feed = rlp::decode(&encode).unwrap();
