@@ -9,20 +9,20 @@ use digest_hash::{BigEndian, Hash};
 use log::info;
 use log::LevelFilter;
 use log4rs::append::file::FileAppender;
-use log4rs::config::{Appender, Config, Root};
+use log4rs::config::{Appender, Config as LogConfig, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use sha2::{Digest, Sha256};
 
-pub fn generate_block(byzantine: bool) -> Vec<u8> {
-    let random_size = get_random_integer(BLOCK_SIZE) as usize;
-    let size = if random_size < MAX_BLOCK_SIZE {
-        if random_size < MIN_BLOCK_SIZE {
-            MIN_BLOCK_SIZE
+pub fn generate_block(byzantine: bool, config: &Config) -> Vec<u8> {
+    let random_size = get_random_integer(config.block_size) as usize;
+    let size = if random_size < config.max_block_size {
+        if random_size < config.min_block_size {
+            config.min_block_size
         } else {
             random_size
         }
     } else {
-        MAX_BLOCK_SIZE
+        config.max_block_size
     };
     let mut vec = Vec::with_capacity(size);
     unsafe {
@@ -30,7 +30,7 @@ pub fn generate_block(byzantine: bool) -> Vec<u8> {
     }
     let mark = if byzantine { 1u8 } else { 0u8 };
     vec.insert(0, mark);
-    for i in 1..MIN_BLOCK_SIZE {
+    for i in 1..config.min_block_size {
         vec.insert(i, get_random_integer(RANDOM_U8) as u8);
     }
     vec
@@ -40,57 +40,57 @@ pub fn check_block_result(block: &[u8]) -> bool {
     !block.is_empty() && block[0] == 0u8
 }
 
-pub fn check_txs_result() -> bool {
-    get_dice_result(CHECK_TXS_FAILED_RATE)
+pub fn check_txs_result(config: &Config) -> bool {
+    get_dice_result(config.check_txs_failed_rate)
 }
 
-pub fn check_txs_delay() -> Duration {
-    let rand_num = get_random_integer(CHECK_TXS_DELAY);
-    let delay = if rand_num < MIN_DELAY {
-        MIN_DELAY
+pub fn check_txs_delay(config: &Config) -> Duration {
+    let rand_num = get_random_integer(config.check_txs_delay);
+    let delay = if rand_num < config.min_delay {
+        config.min_delay
     } else {
         rand_num
     };
     Duration::from_millis(delay)
 }
 
-pub fn sync_delay(height_diff: u64) -> Duration {
+pub fn sync_delay(height_diff: u64, config: &Config) -> Duration {
     if height_diff < 2 {
         return Duration::from_millis(0u64);
     }
-    let rand_num = get_random_integer(SYNC_DELAY);
-    let delay = if rand_num < MIN_DELAY {
-        MIN_DELAY
+    let rand_num = get_random_integer(config.sync_delay);
+    let delay = if rand_num < config.min_delay {
+        config.min_delay
     } else {
         rand_num
     };
     Duration::from_millis(delay * height_diff)
 }
 
-pub fn commit_delay() -> Duration {
-    let rand_num = get_random_integer(COMMIT_DELAY);
-    let delay = if rand_num < MIN_DELAY {
-        MIN_DELAY
+pub fn commit_delay(config: &Config) -> Duration {
+    let rand_num = get_random_integer(config.commit_delay);
+    let delay = if rand_num < config.min_delay {
+        config.min_delay
     } else {
         rand_num
     };
     Duration::from_millis(delay)
 }
 
-pub fn is_message_lost() -> bool {
-    get_dice_result(MESSAGE_LOST_RATE)
+pub fn is_message_lost(config: &Config) -> bool {
+    get_dice_result(config.message_lost_rate)
 }
 
-pub fn message_delay() -> Duration {
-    let rand_num = get_random_integer(MESSAGE_DELAY);
-    let cost_time = if rand_num < MAX_DELAY {
-        if rand_num < MIN_DELAY {
-            MIN_DELAY
+pub fn message_delay(config: &Config) -> Duration {
+    let rand_num = get_random_integer(config.message_delay);
+    let cost_time = if rand_num < config.max_delay {
+        if rand_num < config.min_delay {
+            config.min_delay
         } else {
             rand_num
         }
     } else {
-        MAX_DELAY
+        config.max_delay
     };
     Duration::from_millis(cost_time)
 }
@@ -137,7 +137,7 @@ pub fn set_log_file(path: &str, level: LevelFilter) {
         .encoder(Box::new(PatternEncoder::new("{d} {l} - {m}\n")))
         .build(path)
         .unwrap();
-    let config = Config::builder()
+    let config = LogConfig::builder()
         .appender(Appender::builder().build("logfile", Box::new(logfile)))
         .build(Root::builder().appender("logfile").build(level))
         .unwrap();
@@ -150,6 +150,7 @@ fn get_dice_result(likelihood: f64) -> bool {
     rate > likelihood
 }
 
+#[derive(Clone, Copy)]
 pub enum RandomMode {
     Normal(f64, f64),
     Uniform(u64, u64),

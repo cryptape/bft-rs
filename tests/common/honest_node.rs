@@ -2,11 +2,12 @@ extern crate bft_rs;
 
 use self::bft_rs::{Address, BftMsg, BftSupport, Commit, Signature as BftSig, Status};
 use super::utils::*;
+use super::config::Config;
 use crossbeam::crossbeam_channel::Sender;
 use std::thread;
-use crate::common::config::MIN_BLOCK_SIZE;
 
 pub struct HonestNode {
+    pub config: Config,
     pub address: Vec<u8>,
     pub msg_send: Sender<(BftMsg, Address)>,
     pub commit_send: Sender<(Commit, Address)>,
@@ -30,9 +31,9 @@ impl BftSupport for HonestNode {
         _height: u64,
         _round: u64,
     ) -> Result<(), TestError> {
-        let delay = check_txs_delay();
+        let delay = check_txs_delay(&self.config);
         thread::sleep(delay);
-        if check_txs_result() {
+        if check_txs_result(&self.config) {
             Ok(())
         } else {
             Err(TestError::CheckTxsFailed)
@@ -50,8 +51,8 @@ impl BftSupport for HonestNode {
     }
 
     fn get_block(&self, _height: u64) -> Result<(Vec<u8>, Vec<u8>), TestError> {
-        let block = generate_block(false);
-        let block_hash = hash(&block[0..MIN_BLOCK_SIZE]);
+        let block = generate_block(false, &self.config);
+        let block_hash = hash(&block[0..self.config.min_block_size]);
         Ok((block, block_hash))
     }
 

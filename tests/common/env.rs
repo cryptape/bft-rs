@@ -2,7 +2,7 @@ extern crate bft_rs;
 
 use self::bft_rs::timer::{GetInstant, WaitTimer};
 use self::bft_rs::Address;
-use super::config::{LIVENESS_TICK, WAL_ROOT};
+use super::config::{LIVENESS_TICK, WAL_ROOT, Config};
 use super::honest_node::HonestNode;
 use super::utils::*;
 use bft_rs::{BftActuator, BftMsg, Commit, Node, Status};
@@ -16,6 +16,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 pub struct Env {
+    pub config: Config,
     pub honest_nodes: HashMap<Vec<u8>, Box<BftActuator>>,
     pub msg_recv: Receiver<(BftMsg, Address)>,
     pub msg_send: Sender<(BftMsg, Address)>,
@@ -33,7 +34,7 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn new(honest_num: usize, _byzantine_num: usize) -> Env {
+    pub fn new(config: Config, honest_num: usize, _byzantine_num: usize) -> Env {
         let mut honest_nodes = HashMap::new();
         let mut nodes_height = HashMap::new();
         let mut authority_list = vec![];
@@ -51,6 +52,7 @@ impl Env {
             authority_list.push(node);
 
             let honest_support = HonestNode {
+                config,
                 address: address.clone(),
                 msg_send: msg_send.clone(),
                 commit_send: commit_send.clone(),
@@ -80,6 +82,7 @@ impl Env {
             .unwrap();
 
         Env {
+            config,
             honest_nodes,
             msg_recv,
             msg_send,
@@ -117,7 +120,7 @@ impl Env {
             if let Ok((msg, from)) = get_msg {
                 self.honest_nodes.iter().for_each(|(address, _)| {
                     if address != &from {
-                        let delay = message_delay();
+                        let delay = message_delay(&self.config);
                         let event = Event {
                             process_time: Instant::now() + delay,
                             to: address.clone(),
@@ -137,7 +140,7 @@ impl Env {
                     );
                     self.check_consistency(&commit);
 
-                    let delay = sync_delay(sh - ch);
+                    let delay = sync_delay(sh - ch, &self.config);
                     let event = Event {
                         process_time: Instant::now() + delay,
                         to: sender,
@@ -148,7 +151,7 @@ impl Env {
                     info!("node {:?} reach old consensus in height {}", sender, ch);
                     self.check_consistency(&commit);
 
-                    let delay = commit_delay();
+                    let delay = commit_delay(&self.config);
                     let status = self.old_status.clone().unwrap();
                     let event = Event {
                         process_time: Instant::now() + delay,
@@ -160,7 +163,7 @@ impl Env {
                     info!("node {:?} reach consensus in height {}", sender, ch);
                     self.check_consistency(&commit);
 
-                    let delay = commit_delay();
+                    let delay = commit_delay(&self.config);
                     let event = Event {
                         process_time: Instant::now() + delay,
                         to: sender,
@@ -176,7 +179,7 @@ impl Env {
                         sender, ch
                     );
                     self.commits.insert(ch, hash(&commit.block));
-                    let delay = commit_delay();
+                    let delay = commit_delay(&self.config);
                     let status = self.create_status(ch);
                     let event = Event {
                         process_time: Instant::now() + delay,
@@ -243,6 +246,7 @@ impl Env {
 
     pub fn generate_node(&self, address: Address, i: usize) -> BftActuator {
         let honest_support = HonestNode {
+            config: self.config.clone(),
             address: address.clone(),
             msg_send: self.msg_send.clone(),
             commit_send: self.commit_send.clone(),
@@ -280,7 +284,7 @@ impl Env {
         let status = self.status.clone();
         self.nodes_height.iter().for_each(|(address, height)| {
             if *height < cur_h - 2 {
-                let delay = sync_delay(cur_h - height);
+                let delay = sync_delay(cur_h - height, &self.config);
                 let event = Event {
                     process_time: Instant::now() + delay,
                     to: address.clone(),

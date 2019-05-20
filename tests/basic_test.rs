@@ -1,11 +1,9 @@
 pub mod common;
 
-use common::env::Env;
-use common::utils::clean_wal;
-
-use crate::common::utils::{clean_log_file, set_log_file};
+use crate::common::utils::{clean_log_file, clean_wal, set_log_file};
 use log::LevelFilter;
-use crate::common::env::Content;
+use crate::common::env::{Content, Env};
+use crate::common::config::NORMAL_CONFIG;
 use std::time::Duration;
 
 #[test]
@@ -14,7 +12,7 @@ fn test_basic() {
     clean_wal();
     clean_log_file(path);
     set_log_file(path, LevelFilter::Info);
-    let mut env = Env::new(4, 0);
+    let mut env = Env::new(NORMAL_CONFIG, 4, 0);
     env.run(10);
 }
 
@@ -24,7 +22,7 @@ fn test_restart_nodes() {
     clean_wal();
     clean_log_file(path);
     set_log_file(path, LevelFilter::Info);
-    let mut env = Env::new(4, 0);
+    let mut env = Env::new(NORMAL_CONFIG, 4, 0);
     // stop node 0, 1 start node 1
     env.set_node(0, Content::Stop, Duration::from_millis(2_000));
     env.set_node(1, Content::Stop, Duration::from_millis(8_000));
