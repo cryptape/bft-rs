@@ -19,6 +19,8 @@ pub struct Env {
     pub honest_nodes: HashMap<Vec<u8>, Box<BftActuator>>,
     pub msg_recv: Receiver<(BftMsg, Address)>,
     pub commit_recv: Receiver<(Commit, Address)>,
+    pub test4timer: Receiver<Event>,
+    pub test2timer: Sender<Event>,
     pub authority_list: Vec<Node>,
     pub interval: Option<u64>,
     pub status: Status,
@@ -65,10 +67,22 @@ impl Env {
             authority_list: authority_list.clone(),
         };
 
+        let (test2timer, timer4test) = unbounded();
+        let (timer2test, test4timer) = unbounded();
+        let _timer_thread = thread::Builder::new()
+            .name("test_timer".to_string())
+            .spawn(move || {
+                let timer = WaitTimer::new(timer2test, timer4test);
+                timer.start();
+            })
+            .unwrap();
+
         Env {
             honest_nodes,
             msg_recv,
             commit_recv,
+            test4timer,
+            test2timer,
             authority_list,
             interval,
             status,
@@ -80,16 +94,6 @@ impl Env {
     }
 
     pub fn run(&mut self, stop_height: u64) {
-        let (test2timer, timer4test) = unbounded();
-        let (timer2test, test4timer) = unbounded();
-        let _timer_thread = thread::Builder::new()
-            .name("test_timer".to_string())
-            .spawn(move || {
-                let timer = WaitTimer::new(timer2test, timer4test);
-                timer.start();
-            })
-            .unwrap();
-
         let status = self.status.clone();
         self.honest_nodes
             .iter()
@@ -103,7 +107,7 @@ impl Env {
             select! {
                 recv(self.msg_recv) -> msg => get_msg = msg,
                 recv(self.commit_recv) -> msg => get_commit = msg,
-                recv(test4timer) -> msg => get_timer = msg,
+                recv(self.test4timer) -> msg => get_timer = msg,
             }
 
             if let Ok((msg, from)) = get_msg {
@@ -115,7 +119,7 @@ impl Env {
                             to: address.clone(),
                             content: Content::Msg(msg.clone()),
                         };
-                        test2timer.send(event).unwrap();
+                        self.test2timer.send(event).unwrap();
                     }
                 });
             }
@@ -135,7 +139,7 @@ impl Env {
                         to: sender,
                         content: Content::Status(self.status.clone()),
                     };
-                    test2timer.send(event).unwrap();
+                    self.test2timer.send(event).unwrap();
                 } else if sh > 0 && ch == sh - 1 {
                     info!("reach old consensus in height {} of node {:?}", ch, sender);
                     self.check_consistency(&commit);
@@ -147,7 +151,7 @@ impl Env {
                         to: sender,
                         content: Content::Status(status),
                     };
-                    test2timer.send(event.clone()).unwrap();
+                    self.test2timer.send(event.clone()).unwrap();
                 } else if ch == sh {
                     info!("reach consensus in height {} of node {:?}", ch, sender);
                     self.check_consistency(&commit);
@@ -158,7 +162,7 @@ impl Env {
                         to: sender,
                         content: Content::Status(self.status.clone()),
                     };
-                    test2timer.send(event).unwrap();
+                    self.test2timer.send(event).unwrap();
                 } else if ch == sh + 1 {
                     if ch == stop_height {
                         break;
@@ -175,7 +179,7 @@ impl Env {
                         to: sender,
                         content: Content::Status(status),
                     };
-                    test2timer.send(event).unwrap();
+                    self.test2timer.send(event).unwrap();
 
                     self.last_reach_consensus_time = Instant::now();
                     let event = Event {
@@ -183,9 +187,9 @@ impl Env {
                         to: vec![],
                         content: Content::LivenessTimeout(ch, 1),
                     };
-                    test2timer.send(event).unwrap();
+                    self.test2timer.send(event).unwrap();
 
-                    self.try_sync(test2timer.clone());
+                    self.try_sync();
                 } else {
                     panic!("jump height from {} to {}", status.height, commit.height);
                 }
@@ -216,7 +220,7 @@ impl Env {
                                 to: vec![],
                                 content: Content::LivenessTimeout(height, n + 1),
                             };
-                            test2timer.send(event).unwrap();
+                            self.test2timer.send(event).unwrap();
                         }
                     }
                 }
@@ -250,7 +254,7 @@ impl Env {
         status
     }
 
-    pub fn try_sync(&mut self, test2timer: Sender<Event>) {
+    pub fn try_sync(&mut self) {
         let cur_h = self.status.height;
         let status = self.status.clone();
         self.nodes_height.iter().for_each(|(address, height)| {
@@ -261,7 +265,7 @@ impl Env {
                     to: address.clone(),
                     content: Content::Status(status.clone()),
                 };
-                test2timer.send(event).unwrap();
+                self.test2timer.send(event).unwrap();
             }
         });
     }
