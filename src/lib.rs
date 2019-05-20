@@ -462,7 +462,7 @@ impl Decodable for Proof {
                 let value_list: Vec<Signature> = r.list_at(4)?;
                 if key_list.len() != value_list.len() {
                     error!(
-                        "Bft decode proof error, key_list_len {}, value_list_len{}",
+                        "Decode proof error, key_list_len {}, value_list_len{}",
                         key_list.len(),
                         value_list.len()
                     );
@@ -478,10 +478,7 @@ impl Decodable for Proof {
                 })
             }
             _ => {
-                error!(
-                    "Bft decode proof error, the prototype is {:?}",
-                    r.prototype()
-                );
+                error!("Decode proof error, the prototype is {:?}", r.prototype());
                 Err(DecoderError::RlpInconsistentLengthAndData)
             }
         }

@@ -51,7 +51,7 @@ pub(crate) fn handle_err<T>(result: BftResult<T>) {
             BftError::NotReady(_)
             | BftError::ObsoleteMsg(_)
             | BftError::HigherMsg(_)
-            | BftError::RecvMsgAgain(_) => trace!("Bft encounters {:?}", e),
+            | BftError::RecvMsgAgain(_) => trace!("{:?}", e),
 
             BftError::CheckProofFailed(_)
             | BftError::CheckBlockFailed(_)
@@ -60,7 +60,7 @@ pub(crate) fn handle_err<T>(result: BftResult<T>) {
             | BftError::CheckTxFailed(_)
             | BftError::DecodeErr(_)
             | BftError::InvalidSender(_)
-            | BftError::MismatchingBlock(_) => warn!("Bft encounters {:?}", e),
+            | BftError::MismatchingBlock(_) => warn!("{:?}", e),
 
             BftError::ShouldNotHappen(_)
             | BftError::SendMsgErr(_)
@@ -68,7 +68,7 @@ pub(crate) fn handle_err<T>(result: BftResult<T>) {
             | BftError::CommitFailed(_)
             | BftError::SaveWalErr(_)
             | BftError::SignFailed(_)
-            | BftError::GetBlockFailed(_) => error!("Bft encounters {:?}", e),
+            | BftError::GetBlockFailed(_) => error!("{:?}", e),
 
             BftError::ObsoleteTimer(_) => {}
         }

@@ -26,18 +26,21 @@ where
 {
     pub(crate) fn load_wal_log(&mut self) {
         // TODO: should prevent saving wal
-        info!("Bft starts to load wal log!");
+        info!("Node {:?} starts to load wal log!", self.params.address);
         let vec_buf = self.wal_log.load();
         for (log_type, encode) in vec_buf {
             handle_err(self.process_wal_log(log_type, encode));
         }
-        info!("Bft successfully processes the whole wal log!");
+        info!(
+            "Node {:?} successfully processes the whole wal log!",
+            self.params.address
+        );
     }
 
     fn process_wal_log(&mut self, log_type: LogType, encode: Vec<u8>) -> BftResult<()> {
         match log_type {
             LogType::Proposal => {
-                info!("Load proposal");
+                info!("Node {:?} load proposal", self.params.address);
                 let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                 })?;
@@ -55,37 +58,37 @@ where
                 self.process(BftMsg::Proposal(proposal_block_encode), false)?;
             }
             LogType::Vote => {
-                info!("Load vote");
+                info!("Node {:?} load vote", self.params.address);
                 self.process(BftMsg::Vote(encode), false)?;
             }
             LogType::Feed => {
-                info!("Load feed");
+                info!("Node {:?} load feed", self.params.address);
                 let feed: Feed = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("feed encounters {:?}", e)))?;
                 self.process(BftMsg::Feed(feed), false)?;
             }
             LogType::Status => {
-                info!("Load status");
+                info!("Node {:?} load status", self.params.address);
                 let status: Status = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("status encounters {:?}", e)))?;
                 self.process(BftMsg::Status(status), false)?;
             }
             LogType::Proof => {
-                info!("Load proof");
+                info!("Node {:?} load proof", self.params.address);
                 let proof: Proof = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("proof encounters {:?}", e)))?;
                 self.proof = proof;
             }
             #[cfg(feature = "verify_req")]
             LogType::VerifyResp => {
-                info!("Load verify_resp");
+                info!("Node {:?} load verify_resp", self.params.address);
                 let verify_resp: VerifyResp = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("verify_resp encounters {:?}", e)))?;
                 self.process(BftMsg::VerifyResp(verify_resp), false)?;
             }
 
             LogType::TimeOutInfo => {
-                info!("Load time_out_info");
+                info!("Node {:?} load timeout_info", self.params.address);
                 let time_out_info: TimeoutInfo = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("time_out_info encounters {:?}", e))
                 })?;
@@ -93,7 +96,7 @@ where
             }
 
             LogType::Block => {
-                info!("Load block");
+                info!("Node {:?} load block", self.params.address);
                 let (height, block) = decode_block(&encode);
                 let block_hash = self.function.crypt_hash(block);
                 self.blocks.add(height, &block_hash, block);
@@ -155,7 +158,6 @@ where
     fn get_authorities(&self, height: u64) -> BftResult<&Vec<Node>> {
         let p = &self.authority_manage;
         let authorities = if height == p.authority_h_old {
-            trace!("Bft sets the authority manage with old authorities!");
             &p.authorities_old
         } else {
             &p.authorities
@@ -194,7 +196,12 @@ where
             .collect();
         let proposer: &Address = &authorities
             .get(get_index(nonce, &weight))
-            .expect("The select proposer index is not in authorities, it should not happen!")
+            .unwrap_or_else(|| {
+                panic!(
+                    "Node {:?} selects a proposer not in authorities, it should not happen!",
+                    self.params.address
+                )
+            })
             .address;
         Ok(proposer)
     }
@@ -209,7 +216,11 @@ where
     pub(crate) fn set_status(&mut self, status: &Status) {
         self.authority_manage
             .receive_authorities_list(status.height, status.authority_list.clone());
-        trace!("Bft updates authority_manage {:?}", self.authority_manage);
+        trace!(
+            "Node {:?} updates authority_manage {:?}",
+            self.params.address,
+            self.authority_manage
+        );
 
         if self.consensus_power
             && !status
@@ -218,8 +229,8 @@ where
                 .any(|node| node.address == self.params.address)
         {
             info!(
-                "Bft loses consensus power in height {} and stops the bft-rs process!",
-                status.height
+                "Node {:?} loses consensus power in height {} and stops the bft-rs process!",
+                self.params.address, status.height
             );
             self.consensus_power = false;
         } else if !self.consensus_power
@@ -229,8 +240,8 @@ where
                 .any(|node| node.address == self.params.address)
         {
             info!(
-                "Bft accesses consensus power in height {} and starts the bft-rs process!",
-                status.height
+                "Node {:?} accesses consensus power in height {} and starts the bft-rs process!",
+                self.params.address, status.height
             );
             self.consensus_power = true;
         }
@@ -250,7 +261,8 @@ where
         });
 
         debug!(
-            "Bft sets a PoLC at height {:?}, round {:?}, on proposal {:?}",
+            "Node {:?} sets a PoLC at height {:?}, round {:?}, on proposal {:?}",
+            self.params.address,
             self.height,
             self.round,
             hash.to_owned()
@@ -259,7 +271,10 @@ where
 
     #[inline]
     pub(crate) fn set_timer(&self, duration: Duration, step: Step) {
-        debug!("Bft sets {:?} timer for {:?}", step, duration);
+        debug!(
+            "Node {:?} sets {:?} timer for {:?}",
+            self.params.address, step, duration
+        );
         let timestamp = Instant::now() + duration;
         let since = timestamp - self.htime;
         self.timer_seter
@@ -363,7 +378,10 @@ where
         encode: &[u8],
         need_wal: bool,
     ) -> BftResult<()> {
-        debug!("Bft receives {:?}", signed_proposal);
+        debug!(
+            "Node {:?} receives {:?}",
+            self.params.address, signed_proposal
+        );
         let proposal = &signed_proposal.proposal;
         let block_hash = &proposal.block_hash;
         let height = proposal.height;
@@ -441,7 +459,7 @@ where
         signed_vote: &SignedVote,
         need_wal: bool,
     ) -> BftResult<()> {
-        debug!("Bft receives {:?}", signed_vote);
+        debug!("Node {:?} receives {:?}", self.params.address, signed_vote);
         let vote = &signed_vote.vote;
         let height = vote.height;
         let round = vote.round;
@@ -606,14 +624,15 @@ where
             let block = block.to_vec();
             let block_hash = block_hash.clone();
             let proposal_hash = proposal_hash.to_owned();
+            let address = self.params.address.clone();
             thread::spawn(move || {
                 let is_pass =
                     match function.check_txs(&block, &block_hash, &proposal_hash, height, round) {
                         Ok(_) => true,
                         Err(e) => {
                             warn!(
-                                "Bft encounters BftError::CheckTxsFailed({:?} of {:?})",
-                                e, proposal
+                                "Node {:?} encounters BftError::CheckTxsFailed({:?})",
+                                address, e
                             );
                             false
                         }
@@ -931,8 +950,8 @@ where
         self.block_hash = None;
         self.lock_status = None;
         debug!(
-            "Bft cleans PoLC at height {:?}, round {:?}",
-            self.height, self.round
+            "Node {:?} cleans PoLC at height {:?}, round {:?}",
+            self.params.address, self.height, self.round
         );
     }
 

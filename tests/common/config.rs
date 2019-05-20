@@ -10,21 +10,21 @@ pub const RANDOM_U8: RandomMode = RandomMode::Uniform(0u64, MAX_U8 as u64);
 pub const RANDOM_U64: RandomMode = RandomMode::Uniform(0u64, MAX_U64);
 
 #[derive(Clone, Copy)]
-pub struct Config{
+pub struct Config {
     pub block_size: RandomMode,
     pub max_block_size: usize,
     pub min_block_size: usize,
     pub check_txs_failed_rate: f64,
     pub message_lost_rate: f64,
-    pub max_delay: u64,  // ms
-    pub min_delay: u64,  // ms
+    pub max_delay: u64, // ms
+    pub min_delay: u64, // ms
     pub check_txs_delay: RandomMode,
     pub commit_delay: RandomMode,
     pub sync_delay: RandomMode,
     pub message_delay: RandomMode,
 }
 
-pub const NORMAL_CONFIG: Config = Config{
+pub const NORMAL_CONFIG: Config = Config {
     block_size: RandomMode::Normal(1_024_000.0, 512_000.0),
     max_block_size: 10_240_000,
     min_block_size: 100,

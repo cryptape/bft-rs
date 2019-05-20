@@ -1,8 +1,8 @@
 extern crate bft_rs;
 
 use self::bft_rs::{Address, BftMsg, BftSupport, Commit, Signature as BftSig, Status};
-use super::utils::*;
 use super::config::Config;
+use super::utils::*;
 use crossbeam::crossbeam_channel::Sender;
 use std::thread;
 

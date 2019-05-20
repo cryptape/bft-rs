@@ -1,4 +1,4 @@
-use crate::error::{handle_err, BftError};
+use crate::error::BftError;
 use crate::objects::Step;
 use crate::{Height, Round};
 
@@ -6,6 +6,7 @@ use std::cmp::{Ord, Ordering, PartialOrd};
 use std::time::{Duration, Instant};
 
 use crossbeam::crossbeam_channel::{Receiver, Sender};
+use log::warn;
 use min_max_heap::MinMaxHeap;
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 
@@ -135,9 +136,9 @@ where
                     && now >= timer_heap.peek_min().cloned().unwrap().get_instant()
                 {
                     let time_info = timer_heap.pop_min().unwrap();
-                    handle_err(self.timer_notify.send(time_info).map_err(|e| {
-                        BftError::SendMsgErr(format!("send time notification failed with {:?}", e))
-                    }));
+                    if let Err(e) = self.timer_notify.send(time_info) {
+                        warn!("send time notification failed with {:?}", e);
+                    };
                 }
             }
         }

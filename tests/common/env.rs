@@ -2,7 +2,7 @@ extern crate bft_rs;
 
 use self::bft_rs::timer::{GetInstant, WaitTimer};
 use self::bft_rs::Address;
-use super::config::{LIVENESS_TICK, WAL_ROOT, Config};
+use super::config::{Config, LIVENESS_TICK, WAL_ROOT};
 use super::honest_node::HonestNode;
 use super::utils::*;
 use bft_rs::{BftActuator, BftMsg, Commit, Node, Status};
@@ -290,14 +290,20 @@ impl Env {
                     to: address.clone(),
                     content: Content::Status(status.clone()),
                 };
-                info!("node {:?} is fall behind {} height, start syncing", address, cur_h - height);
+                info!(
+                    "node {:?} is fall behind {} height, start syncing",
+                    address,
+                    cur_h - height
+                );
                 self.test2timer.send(event).unwrap();
             }
         });
     }
 
-    pub fn get_node_address(&self, i: usize) -> Option<Address>{
-        self.authority_list.get(i).and_then(|node| Some(node.address.clone()))
+    pub fn get_node_address(&self, i: usize) -> Option<Address> {
+        self.authority_list
+            .get(i)
+            .and_then(|node| Some(node.address.clone()))
     }
 
     pub fn set_node(&mut self, i: usize, content: Content, duration: Duration) {
@@ -348,7 +354,7 @@ impl GetInstant for Event {
 pub enum Content {
     Msg(BftMsg),
     Status(Status),
-    LivenessTimeout(u64, usize),    // Duration, count
+    LivenessTimeout(u64, usize), // Duration, count
     Stop,
     Start(usize),
 }
