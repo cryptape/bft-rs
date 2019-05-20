@@ -5,7 +5,7 @@ use std::u8::MAX as MAX_U8;
 
 pub const LIVENESS_TICK: Duration = Duration::from_secs(60);
 
-pub const BLOCK_SIZE: RandomMode = RandomMode::Normal(10_240_000.0, 1_000.0);
+pub const BLOCK_SIZE: RandomMode = RandomMode::Normal(2_000.0, 100.0);
 pub const MAX_BLOCK_SIZE: usize = 2_048_000;
 pub const MIN_BLOCK_SIZE: usize = 100;
 

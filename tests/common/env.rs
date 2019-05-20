@@ -13,12 +13,14 @@ use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub struct Env {
     pub honest_nodes: HashMap<Vec<u8>, Box<BftActuator>>,
     pub msg_recv: Receiver<(BftMsg, Address)>,
+    pub msg_send: Sender<(BftMsg, Address)>,
     pub commit_recv: Receiver<(Commit, Address)>,
+    pub commit_send: Sender<(Commit, Address)>,
     pub test4timer: Receiver<Event>,
     pub test2timer: Sender<Event>,
     pub authority_list: Vec<Node>,
@@ -38,7 +40,6 @@ impl Env {
         let (msg_send, msg_recv) = unbounded();
         let (commit_send, commit_recv) = unbounded();
         for i in 0..honest_num {
-            let wal_path = format!("{}{}", WAL_ROOT, i);
             let address = generate_address();
             info!("create node {:?}", address);
 
@@ -54,6 +55,7 @@ impl Env {
                 msg_send: msg_send.clone(),
                 commit_send: commit_send.clone(),
             };
+            let wal_path = format!("{}{}", WAL_ROOT, i);
             let actuator = BftActuator::new(Arc::new(honest_support), address.clone(), &wal_path);
             honest_nodes.insert(address.clone(), Box::new(actuator));
             nodes_height.insert(address, 0);
@@ -80,7 +82,9 @@ impl Env {
         Env {
             honest_nodes,
             msg_recv,
+            msg_send,
             commit_recv,
+            commit_send,
             test4timer,
             test2timer,
             authority_list,
@@ -128,8 +132,8 @@ impl Env {
                 let sh = self.status.height;
                 if sh > 1 && ch < sh - 1 {
                     info!(
-                        "reach very old consensus in height {} of node {:?}",
-                        ch, sender
+                        "node {:?} reach very old consensus in height {}",
+                        sender, ch
                     );
                     self.check_consistency(&commit);
 
@@ -141,7 +145,7 @@ impl Env {
                     };
                     self.test2timer.send(event).unwrap();
                 } else if sh > 0 && ch == sh - 1 {
-                    info!("reach old consensus in height {} of node {:?}", ch, sender);
+                    info!("node {:?} reach old consensus in height {}", sender, ch);
                     self.check_consistency(&commit);
 
                     let delay = commit_delay();
@@ -153,7 +157,7 @@ impl Env {
                     };
                     self.test2timer.send(event.clone()).unwrap();
                 } else if ch == sh {
-                    info!("reach consensus in height {} of node {:?}", ch, sender);
+                    info!("node {:?} reach consensus in height {}", sender, ch);
                     self.check_consistency(&commit);
 
                     let delay = commit_delay();
@@ -168,8 +172,8 @@ impl Env {
                         break;
                     }
                     info!(
-                        "first reach new consensus in height {} of node {:?}",
-                        ch, sender
+                        "node {:?} first reach new consensus in height {}",
+                        sender, ch
                     );
                     self.commits.insert(ch, hash(&commit.block));
                     let delay = commit_delay();
@@ -199,20 +203,20 @@ impl Env {
                 let to = event.to;
                 match content {
                     Content::Msg(bft_msg) => {
-                        self.honest_nodes.get(&to).unwrap().send(bft_msg).unwrap();
+                        if let Some(actuator) = self.honest_nodes.get(&to) {
+                            actuator.send(bft_msg).unwrap();
+                        }
                     }
                     Content::Status(status) => {
                         self.nodes_height.insert(to.clone(), status.height);
-                        self.honest_nodes
-                            .get(&to)
-                            .unwrap()
-                            .send(BftMsg::Status(status))
-                            .unwrap();
+                        if let Some(actuator) = self.honest_nodes.get(&to) {
+                            actuator.send(BftMsg::Status(status)).unwrap();
+                        }
                     }
                     Content::LivenessTimeout(height, n) => {
                         if height == self.status.height {
                             info!(
-                                "WARNING! not reach consensus in last {} minutes at height {}",
+                                "WARNING! no node reach consensus in last {} minutes at height {}",
                                 n, height
                             );
                             let event = Event {
@@ -223,11 +227,28 @@ impl Env {
                             self.test2timer.send(event).unwrap();
                         }
                     }
+                    Content::Start(i) => {
+                        let actuator = self.generate_node(to.clone(), i);
+                        self.honest_nodes.insert(to, Box::new(actuator));
+                    }
+                    Content::Stop => {
+                        self.honest_nodes.remove(&to);
+                    }
                 }
             }
         }
 
         info!("Successfully pass the test!");
+    }
+
+    pub fn generate_node(&self, address: Address, i: usize) -> BftActuator {
+        let honest_support = HonestNode {
+            address: address.clone(),
+            msg_send: self.msg_send.clone(),
+            commit_send: self.commit_send.clone(),
+        };
+        let wal_path = format!("{}{}", WAL_ROOT, i);
+        BftActuator::new(Arc::new(honest_support), address, &wal_path)
     }
 
     pub fn check_consistency(&mut self, commit: &Commit) {
@@ -265,9 +286,25 @@ impl Env {
                     to: address.clone(),
                     content: Content::Status(status.clone()),
                 };
+                info!("node {:?} is fall behind {} height, start syncing", address, cur_h - height);
                 self.test2timer.send(event).unwrap();
             }
         });
+    }
+
+    pub fn get_node_address(&self, i: usize) -> Option<Address>{
+        self.authority_list.get(i).and_then(|node| Some(node.address.clone()))
+    }
+
+    pub fn set_node(&mut self, i: usize, content: Content, duration: Duration) {
+        if let Some(address) = self.get_node_address(i) {
+            let event = Event {
+                process_time: Instant::now() + duration,
+                to: address.clone(),
+                content,
+            };
+            self.test2timer.send(event).unwrap();
+        }
     }
 }
 
@@ -307,5 +344,7 @@ impl GetInstant for Event {
 pub enum Content {
     Msg(BftMsg),
     Status(Status),
-    LivenessTimeout(u64, usize),
+    LivenessTimeout(u64, usize),    // Duration, count
+    Stop,
+    Start(usize),
 }

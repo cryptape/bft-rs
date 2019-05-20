@@ -387,8 +387,6 @@ where
             )));
         }
 
-        info!("{:?} before save proposal", self.params.address);
-
         // prevent too many higher proposals flush out current proposal
         // because self.height - 1 is allowed, so judge height < self.height + CACHE_N - 1
         if height < self.height + CACHE_N - 1 && round < self.round + CACHE_N {
@@ -422,8 +420,6 @@ where
             }
         }
 
-        info!("{:?} after save proposal", self.params.address);
-
         if height > self.height || (height == self.height && round >= self.round + CACHE_N) {
             return Err(BftError::HigherMsg(format!("{:?}", signed_proposal)));
         }
@@ -434,7 +430,6 @@ where
         if height == self.height - 1 {
             return Ok(());
         }
-        info!("{:?} check block", self.params.address);
         self.check_block_txs(proposal, block, &self.function.crypt_hash(encode))?;
         self.check_proof(height, &proposal.proof)?;
 
