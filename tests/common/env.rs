@@ -236,7 +236,8 @@ impl Env {
                         self.honest_nodes.insert(to, Box::new(actuator));
                     }
                     Content::Stop => {
-                        self.honest_nodes.remove(&to);
+                        let actuator = self.honest_nodes.remove(&to).unwrap();
+                        actuator.send(BftMsg::Kill).unwrap();
                         info!("Node {:?} is stopped", to);
                     }
                 }

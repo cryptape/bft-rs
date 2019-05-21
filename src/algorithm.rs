@@ -153,7 +153,14 @@ where
                         handle_err(engine.timeout_process(msg, true));
                     }
                     if let Ok(msg) = get_msg {
-                        handle_err(engine.process(msg, true));
+                        match msg {
+                            BftMsg::Kill => {
+                                break;
+                            }
+                            _ => {
+                                handle_err(engine.process(msg, true));
+                            }
+                        }
                     }
                 }
             })
@@ -261,6 +268,8 @@ where
                 info!("Node {:?} receives clear {:?}", self.params.address, &proof);
                 self.clear(proof);
             }
+
+            _ => {}
         }
 
         Ok(())
