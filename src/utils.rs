@@ -405,8 +405,7 @@ where
         }
 
         // prevent too many higher proposals flush out current proposal
-        // because self.height - 1 is allowed, so judge height < self.height + CACHE_N - 1
-        if height < self.height + CACHE_N - 1 && round < self.round + CACHE_N {
+        if height >= self.height && height < self.height + CACHE_N && round < self.round + CACHE_N {
             self.proposals.add(&signed_proposal)?;
             let save = self.blocks.add(height, block_hash, block);
 
@@ -479,7 +478,7 @@ where
         }
 
         // prevent too many high proposals flush out current proposal
-        if height < self.height + CACHE_N && round < self.round + CACHE_N {
+        if height >= self.height && height < self.height + CACHE_N && round < self.round + CACHE_N {
             let vote_weight = self.get_vote_weight(vote.height, &vote.voter);
             let result = self.votes.add(&signed_vote, vote_weight, self.height);
             if need_wal && result.is_ok() {
