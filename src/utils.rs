@@ -54,7 +54,7 @@ where
                             "can not fetch block from cache when load signed_proposal".to_string(),
                         )
                     })?;
-                let proposal_block_encode = combine_proposal_block(&encode, block);
+                let proposal_block_encode = combine_two(&encode, block);
                 self.process(BftMsg::Proposal(proposal_block_encode), false)?;
             }
             LogType::Vote => {
@@ -97,9 +97,8 @@ where
 
             LogType::Block => {
                 info!("Node {:?} load block", self.params.address);
-                let (height, block) = decode_block(&encode);
-                let block_hash = self.function.crypt_hash(block);
-                self.blocks.add(height, &block_hash, block);
+                let (height, block, block_hash) = decode_block(&encode)?;
+                self.blocks.add(height, block_hash, block);
             }
         }
         Ok(())
@@ -120,7 +119,7 @@ where
                     "can not fetch block from cache when send signed_proposal".to_string(),
                 )
             })?;
-        let encode = combine_proposal_block(&signed_proposal_encode, block);
+        let encode = combine_two(&signed_proposal_encode, block);
         Ok(encode)
     }
 
@@ -333,7 +332,7 @@ where
                     )
                 })?;
             let proposal_encode = rlp::encode(signed_proposal);
-            let encode = combine_proposal_block(&proposal_encode, block);
+            let encode = combine_two(&proposal_encode, block);
             let msg = BftMsg::Proposal(encode);
             let info = format!("{:?}", &msg);
             self.msg_sender
@@ -413,7 +412,7 @@ where
 
             if need_wal {
                 if save {
-                    let encode = encode_block(height, block);
+                    let encode = encode_block(height, block, block_hash);
                     handle_err(
                         self.wal_log
                             .save(height, LogType::Block, &encode)
@@ -1021,50 +1020,52 @@ pub fn get_votes_weight(authorities: &[Node], vote_addresses: &[Address]) -> u64
     votes_weight.iter().sum()
 }
 
-pub fn combine_proposal_block(proposal: &[u8], block: &[u8]) -> Vec<u8> {
-    let proposal_len = proposal.len() as u64;
-    let len_mark = proposal_len.to_be_bytes();
-    let mut encode = Vec::with_capacity(8 + proposal.len() + block.len());
+pub fn combine_two(first: &[u8], second: &[u8]) -> Vec<u8> {
+    let first_len = first.len() as u64;
+    let len_mark = first_len.to_be_bytes();
+    let mut encode = Vec::with_capacity(8 + first.len() + second.len());
     encode.extend_from_slice(&len_mark);
-    encode.extend_from_slice(proposal);
-    encode.extend_from_slice(block);
+    encode.extend_from_slice(first);
+    encode.extend_from_slice(second);
     encode
 }
 
-pub fn extract_proposal_block(encode: &[u8]) -> BftResult<(&[u8], &[u8])> {
+pub fn extract_two(encode: &[u8]) -> BftResult<(&[u8], &[u8])> {
     let encode_len = encode.len();
     if encode_len < 8 {
         return Err(BftError::DecodeErr(format!(
-            "extract_proposal_block failed, encode.len {} is less than 8",
+            "extract_two failed, encode.len {} is less than 8",
             encode_len
         )));
     }
     let mut len: [u8; 8] = [0; 8];
     len.copy_from_slice(&encode[0..8]);
-    let proposal_len = u64::from_be_bytes(len) as usize;
-    if encode_len < proposal_len + 8 {
+    let first_len = u64::from_be_bytes(len) as usize;
+    if encode_len < first_len + 8 {
         return Err(BftError::DecodeErr(format!(
-            "extract_proposal_block failed, encode.len {} is less than proposal_len + 8",
+            "extract_two failed, encode.len {} is less than first_len + 8",
             encode_len
         )));
     }
-    let (combine, block) = encode.split_at(proposal_len + 8);
-    let (_, proposal) = combine.split_at(8);
-    Ok((proposal, block))
+    let (combine, two) = encode.split_at(first_len + 8);
+    let (_, one) = combine.split_at(8);
+    Ok((one, two))
 }
 
-pub fn encode_block(height: u64, block: &[u8]) -> Vec<u8> {
+pub fn encode_block(height: u64, block: &[u8], block_hash: &[u8]) -> Vec<u8> {
     let height_mark = height.to_be_bytes();
     let mut encode = Vec::with_capacity(8 + block.len());
     encode.extend_from_slice(&height_mark);
-    encode.extend_from_slice(block);
+    let combine = combine_two(block_hash, block);
+    encode.extend_from_slice(&combine);
     encode
 }
 
-pub fn decode_block(encode: &[u8]) -> (u64, &[u8]) {
-    let (h, block) = encode.split_at(8);
+pub fn decode_block(encode: &[u8]) -> BftResult<(u64, &[u8], &[u8])> {
+    let (h, combine) = encode.split_at(8);
+    let (block_hash, block) = extract_two(combine)?;
     let mut height_mark: [u8; 8] = [0; 8];
     height_mark.copy_from_slice(h);
     let height = u64::from_be_bytes(height_mark);
-    (height, block)
+    Ok((height, block, block_hash))
 }

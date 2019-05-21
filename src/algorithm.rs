@@ -5,7 +5,7 @@ use crate::{
     objects::*,
     params::BftParams,
     timer::{TimeoutInfo, WaitTimer},
-    utils::extract_proposal_block,
+    utils::extract_two,
     wal::Wal,
 };
 
@@ -164,7 +164,7 @@ where
         match msg {
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
-                    let (proposal_encode, block) = extract_proposal_block(&encode)?;
+                    let (proposal_encode, block) = extract_two(&encode)?;
                     let signed_proposal: SignedProposal =
                         rlp::decode(&proposal_encode).map_err(|e| {
                             BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))

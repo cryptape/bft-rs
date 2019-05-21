@@ -232,10 +232,12 @@ impl Env {
                     }
                     Content::Start(i) => {
                         let actuator = self.generate_node(to.clone(), i);
+                        info!("Node {:?} is started", to);
                         self.honest_nodes.insert(to, Box::new(actuator));
                     }
                     Content::Stop => {
                         self.honest_nodes.remove(&to);
+                        info!("Node {:?} is stopped", to);
                     }
                 }
             }
