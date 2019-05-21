@@ -11,7 +11,7 @@ fn test_basic() {
     let path = "log/test_basic.log";
     clean_wal();
     clean_log_file(path);
-    set_log_file(path, LevelFilter::Info);
+    set_log_file(path, LevelFilter::Debug);
     let mut env = Env::new(NORMAL_CONFIG, 4, 0);
     env.run(10);
 }
@@ -21,10 +21,11 @@ fn test_restart_nodes() {
     let path = "log/test_restart_nodes.log";
     clean_wal();
     clean_log_file(path);
-    set_log_file(path, LevelFilter::Debug);
+    set_log_file(path, LevelFilter::Info);
     let mut env = Env::new(NORMAL_CONFIG, 4, 0);
     // stop node 0, 1 start node 1
-    env.set_node(0, Content::Stop, Duration::from_millis(2_000));
+    // The first stop time can not be too short, or may break sync. It's not the bft-rs problem, but env framework's problem
+    env.set_node(0, Content::Stop, Duration::from_millis(5_000));
     env.set_node(1, Content::Stop, Duration::from_millis(8_000));
     env.set_node(1, Content::Start(1), Duration::from_millis(15_000));
     // stop all nodes, start all nodes

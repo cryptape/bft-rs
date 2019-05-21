@@ -212,6 +212,7 @@ impl Env {
                     }
                     Content::Status(status) => {
                         self.nodes_height.insert(to.clone(), status.height);
+                        info!("nodes_height {:?}", self.nodes_height);
                         if let Some(actuator) = self.honest_nodes.get(&to) {
                             actuator.send(BftMsg::Status(status)).unwrap();
                         }
