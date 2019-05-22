@@ -55,16 +55,13 @@ pub fn check_txs_delay(config: &Config) -> Duration {
 }
 
 pub fn sync_delay(height_diff: u64, config: &Config) -> Duration {
-    if height_diff < 2 {
-        return Duration::from_millis(0u64);
-    }
     let rand_num = get_random_integer(config.sync_delay);
     let delay = if rand_num < config.min_delay {
         config.min_delay
     } else {
         rand_num
     };
-    Duration::from_millis(delay * height_diff)
+    Duration::from_millis(config.sync_trigger_duration + delay * height_diff)
 }
 
 pub fn commit_delay(config: &Config) -> Duration {

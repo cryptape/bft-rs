@@ -286,7 +286,7 @@ impl Env {
         let cur_h = self.status.height;
         let status = self.status.clone();
         self.nodes_height.iter().for_each(|(address, height)| {
-            if *height < cur_h - 2 {
+            if *height < cur_h {
                 let delay = sync_delay(cur_h - height, &self.config);
                 let event = Event {
                     process_time: Instant::now() + delay,

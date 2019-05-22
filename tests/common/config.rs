@@ -20,6 +20,7 @@ pub struct Config {
     pub min_delay: u64, // ms
     pub check_txs_delay: RandomMode,
     pub commit_delay: RandomMode,
+    pub sync_trigger_duration: u64, //ms
     pub sync_delay: RandomMode,
     pub message_delay: RandomMode,
 }
@@ -34,6 +35,7 @@ pub const NORMAL_CONFIG: Config = Config {
     min_delay: 5,
     check_txs_delay: RandomMode::Normal(100.0, 30.0),
     commit_delay: RandomMode::Normal(50.0, 20.0),
+    sync_trigger_duration: 3_000,
     sync_delay: RandomMode::Normal(10.0, 2.0),
     message_delay: RandomMode::Normal(30.0, 20.0),
 };
