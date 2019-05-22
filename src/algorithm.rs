@@ -69,7 +69,7 @@ where
         ts: Sender<TimeoutInfo>,
         tn: Receiver<TimeoutInfo>,
         f: Arc<T>,
-        local_address: Hash,
+        local_address: Address,
         wal_path: &str,
     ) -> Self {
         info!(
