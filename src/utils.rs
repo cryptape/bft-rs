@@ -641,7 +641,7 @@ where
                     sender
                         .send(BftMsg::VerifyResp(verify_resp))
                         .map_err(|e| BftError::SendMsgErr(format!("{:?}", e))),
-                    &self.params.address,
+                    &address,
                 );
             });
 

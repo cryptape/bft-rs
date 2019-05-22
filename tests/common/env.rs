@@ -95,7 +95,7 @@ impl Env {
             old_status: None,
             last_reach_consensus_time: Instant::now(),
             commits: LruCache::new(16),
-            nodes_height: HashMap::new(),
+            nodes_height,
         }
     }
 
@@ -211,7 +211,6 @@ impl Env {
                     }
                     Content::Status(status) => {
                         self.nodes_height.insert(to.clone(), status.height);
-                        info!("nodes_height {:?}", self.nodes_height);
                         if let Some(actuator) = self.honest_nodes.get(&to) {
                             actuator.send(BftMsg::Status(status)).unwrap();
                         }

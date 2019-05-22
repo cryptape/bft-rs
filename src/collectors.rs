@@ -61,7 +61,6 @@ impl VoteCollector {
                     *counter += vote_weight;
                 }
             }
-            debug!("Bft set prevote_count by {} of round {}", counter, round);
         } else {
             let counter = self.precommit_count.entry(round).or_insert(0);
             if self.votes.contains_key(&height) {
@@ -82,7 +81,6 @@ impl VoteCollector {
                     *counter += vote_weight;
                 }
             }
-            debug!("Bft set precommit_count by {} of round {}", counter, round);
         }
         Ok(())
     }
@@ -219,11 +217,6 @@ impl VoteSet {
             .votes_by_proposal
             .entry(vote.block_hash.clone())
             .or_insert(0) += vote_weight;
-
-        debug!(
-            "Bft set voteset with count: {}, votes_by_proposal: {:?}",
-            self.count, self.votes_by_proposal
-        );
         Ok(())
     }
 

@@ -39,3 +39,19 @@ pub const NORMAL_CONFIG: Config = Config {
     sync_delay: RandomMode::Normal(10.0, 2.0),
     message_delay: RandomMode::Normal(30.0, 20.0),
 };
+
+pub const PERFECT_CONFIG: Config = Config {
+    block_size: RandomMode::Normal(1_000.0, 100.0),
+    max_block_size: 2_000,
+    min_block_size: 100,
+    check_txs_failed_rate: 0.0,
+    message_lost_rate: 0.0,
+    max_delay: 60_000,
+    min_delay: 1,
+    check_txs_delay: RandomMode::Normal(3.0, 1.0),
+    commit_delay: RandomMode::Normal(3.0, 1.0),
+    sync_trigger_duration: 3_000,
+    sync_delay: RandomMode::Normal(3.0, 1.0),
+    message_delay: RandomMode::Normal(10.0, 5.0),
+};
+
