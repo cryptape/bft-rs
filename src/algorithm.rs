@@ -52,7 +52,7 @@ pub struct Bft<T: BftSupport> {
     pub(crate) blocks: BlockCollector,
     pub(crate) proposals: ProposalCollector,
     pub(crate) votes: VoteCollector,
-    pub(crate) wal_log: Wal, // TODO: async save
+    pub(crate) wal_log: Wal,
 
     // user define
     pub(crate) function: Arc<T>,
@@ -72,7 +72,10 @@ where
         local_address: Hash,
         wal_path: &str,
     ) -> Self {
-        info!("Set address: {:?}, wal_path: {}", local_address, wal_path);
+        info!(
+            "Node: {:?} initializing with wal_path: {}",
+            local_address, wal_path
+        );
         Bft {
             msg_sender: s,
             msg_receiver: r,
@@ -150,7 +153,7 @@ where
                     }
 
                     if let Ok(msg) = get_timer_msg {
-                        handle_err(engine.timeout_process(msg, true));
+                        handle_err(engine.timeout_process(msg, true), &engine.params.address);
                     }
                     if let Ok(msg) = get_msg {
                         match msg {
@@ -158,7 +161,7 @@ where
                                 break;
                             }
                             _ => {
-                                handle_err(engine.process(msg, true));
+                                handle_err(engine.process(msg, true), &engine.params.address);
                             }
                         }
                     }
@@ -176,6 +179,10 @@ where
                         rlp::decode(&proposal_encode).map_err(|e| {
                             BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                         })?;
+                    debug!(
+                        "Node {:?} receives {:?}",
+                        self.params.address, &signed_proposal
+                    );
                     self.check_and_save_proposal(&signed_proposal, block, &encode, need_wal)?;
 
                     let proposal = signed_proposal.proposal;
@@ -194,6 +201,7 @@ where
                     let signed_vote: SignedVote = rlp::decode(&encode).map_err(|e| {
                         BftError::DecodeErr(format!("signed_vote encounters {:?}", e))
                     })?;
+                    debug!("Node {:?} receives {:?}", self.params.address, signed_vote);
                     self.check_and_save_vote(&signed_vote, need_wal)?;
 
                     let vote = signed_vote.vote;
@@ -256,16 +264,19 @@ where
 
             BftMsg::Pause => {
                 self.consensus_power = false;
-                info!("Pause Bft process");
+                info!("Node {:?} pauses bft process", self.params.address);
             }
 
             BftMsg::Start => {
                 self.consensus_power = true;
-                info!("Start Bft process");
+                info!("Node {:?} starts bft process", self.params.address);
             }
 
             BftMsg::Clear(proof) => {
-                info!("Node {:?} receives clear {:?}", self.params.address, &proof);
+                info!(
+                    "Node {:?} receives clear with {:?}",
+                    self.params.address, &proof
+                );
                 self.clear(proof);
             }
 
@@ -300,6 +311,7 @@ where
                 self.wal_log
                     .save(self.height, LogType::TimeOutInfo, &rlp::encode(&tminfo))
                     .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, &tminfo)))),
+                &self.params.address,
             );
         }
 
@@ -329,7 +341,7 @@ where
                 self.transmit_precommit(false)?;
             }
             Step::Precommit => {
-                handle_err(self.transmit_prevote(true));
+                handle_err(self.transmit_prevote(true), &self.params.address);
                 self.transmit_precommit(true)?;
             }
             Step::PrecommitWait => {
@@ -346,7 +358,7 @@ where
             Step::CommitWait => {
                 self.set_status(&self.status.clone().unwrap());
                 self.goto_new_height(self.height + 1);
-                handle_err(self.flush_cache());
+                handle_err(self.flush_cache(), &self.params.address);
                 self.new_round_start(true)?;
             }
             _ => error!("Invalid Timeout Info!"),
@@ -377,16 +389,6 @@ where
     }
 
     fn handle_vote(&mut self, vote: Vote) -> BftResult<()> {
-        debug!(
-            "Node {:?} handles a {:?} vote of height {:?}, round {:?}, to {:?}, from {:?}",
-            self.params.address,
-            vote.vote_type,
-            vote.height,
-            vote.round,
-            vote.block_hash,
-            vote.voter
-        );
-
         if vote.height == self.height - 1 {
             if self.last_commit_round.is_some() && vote.round >= self.last_commit_round.unwrap() {
                 // deal with height fall behind one, round ge last commit round
@@ -398,10 +400,6 @@ where
                     self.retransmit_lower_votes(vote.round)?;
                 }
             }
-            return Err(BftError::ObsoleteMsg(format!(
-                "1 height lower of {:?}",
-                &vote
-            )));
         } else if vote.height == self.height && self.round != 0 && vote.round == self.round - 1 {
             // deal with equal height, round fall behind
             let voter = vote.voter.clone();
@@ -411,10 +409,6 @@ where
                 self.round_filter.insert(voter, Instant::now());
                 self.retransmit_nil_precommit(&vote)?;
             }
-            return Err(BftError::ObsoleteMsg(format!(
-                "1 round lower of {:?}",
-                &vote
-            )));
         } else if vote.height == self.height && vote.round >= self.round {
             return Ok(());
         }
@@ -483,6 +477,7 @@ where
 
         let function = self.function.clone();
         let sender = self.msg_sender.clone();
+        let address = self.params.address.clone();
         thread::spawn(move || {
             handle_err(
                 function
@@ -493,6 +488,7 @@ where
                             .send(BftMsg::Status(status))
                             .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
                     }),
+                &address,
             );
         });
 
@@ -535,11 +531,11 @@ where
 
             self.set_status(&status);
             self.goto_new_height(status.height + 1);
-            handle_err(self.flush_cache());
+            handle_err(self.flush_cache(), &self.params.address);
             self.new_round_start(true)?;
 
             debug!(
-                "Node {:?} receives rich status, goto new height {:?}",
+                "Node {:?} receives status, goto new height {:?}",
                 self.params.address,
                 status.height + 1
             );
@@ -572,7 +568,7 @@ where
         let msg = if self.lock_status.is_some() {
             // if is locked, boradcast the lock proposal
             debug!(
-                "Node {:?} is ready to transmit locked Proposal",
+                "Node {:?} is ready to transmit a locked proposal",
                 self.params.address
             );
             let lock_status = self.lock_status.clone().unwrap();
@@ -612,7 +608,7 @@ where
             });
             self.block_hash = Some(block_hash.clone());
             debug!(
-                "Node {:?} is ready to transmit new Proposal",
+                "Node {:?} is ready to transmit a new proposal",
                 self.params.address
             );
 
@@ -629,7 +625,7 @@ where
             BftMsg::Proposal(encode)
         };
         debug!(
-            "Node {:?} transmits proposal at height {:?}, round {:?}",
+            "Node {:?} transmits proposal at h:{}, r:{}",
             self.params.address, self.height, self.round
         );
         self.function.transmit(msg.clone());
@@ -646,11 +642,6 @@ where
             Vec::new()
         };
 
-        debug!(
-            "Node {:?} transmits prevote at height {:?}, round {:?}",
-            self.params.address, self.height, self.round
-        );
-
         let vote = Vote {
             vote_type: VoteType::Prevote,
             height: self.height,
@@ -662,13 +653,13 @@ where
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
 
         debug!(
-            "Node {:?} prevotes to {:?}",
-            self.params.address, block_hash
+            "Node {:?} prevotes to {:?} at h:{} r:{}",
+            self.params.address, block_hash, self.height, self.round
         );
         self.function.transmit(msg.clone());
         if !resend {
             self.change_to_step(Step::Prevote);
-            handle_err(self.send_bft_msg(msg));
+            handle_err(self.send_bft_msg(msg), &self.params.address);
         }
 
         self.set_timer(
@@ -687,11 +678,6 @@ where
             Vec::new()
         };
 
-        debug!(
-            "Node {:?} transmits precommit at height {:?}, round {:?}",
-            self.params.address, self.height, self.round
-        );
-
         let vote = Vote {
             vote_type: VoteType::Precommit,
             height: self.height,
@@ -703,13 +689,13 @@ where
         let msg = BftMsg::Vote(rlp::encode(&signed_vote));
 
         debug!(
-            "Node {:?} precommits to {:?}",
-            self.params.address, block_hash
+            "Node {:?} precommits to {:?} at h:{:?}, r:{:?}",
+            self.params.address, block_hash, self.height, self.round
         );
         self.function.transmit(msg.clone());
         if !resend {
             self.change_to_step(Step::Precommit);
-            handle_err(self.send_bft_msg(msg));
+            handle_err(self.send_bft_msg(msg), &self.params.address);
         }
 
         self.set_timer(
@@ -721,15 +707,8 @@ where
 
     fn retransmit_lower_votes(&self, round: u64) -> BftResult<()> {
         debug!(
-            "Node {:?} finds some nodes are at low height, retransmit votes of height {:?}, round {:?}", self.params.address,
-            self.height - 1,
-            round
-        );
-
-        debug!(
-            "Node {:?} retransmits votes to proposal {:?}",
-            self.params.address,
-            self.last_commit_block_hash.clone().unwrap()
+            "Node {:?} receives msg in lower height, retransmit votes",
+            self.params.address
         );
 
         let prevote = Vote {
@@ -767,7 +746,7 @@ where
         let signed_precommit = self.build_signed_vote(&precommit)?;
 
         debug!(
-            "Node {:?} finds some nodes fall behind, and sends nil vote to help them pursue",
+            "Node {:?} receives vote in lower round, retransmit nil precommit",
             self.params.address
         );
         self.function
@@ -778,7 +757,7 @@ where
     fn new_round_start(&mut self, new_round: bool) -> BftResult<()> {
         if self.step != Step::ProposeWait {
             info!(
-                "Node {:?} starts height {:?}, round {:?}",
+                "Node {:?} starts h:{}, r:{}",
                 self.params.address, self.height, self.round
             );
         }
@@ -790,6 +769,7 @@ where
                 let function = self.function.clone();
                 let sender = self.msg_sender.clone();
                 let height = self.height;
+                let address = self.params.address.clone();
 
                 thread::spawn(move || {
                     handle_err(
@@ -805,6 +785,7 @@ where
                                     }))
                                     .map_err(|e| BftError::SendMsgErr(format!("{:?}", e)))
                             }),
+                        &address,
                     );
                 });
             }
@@ -823,6 +804,7 @@ where
             self.wal_log
                 .set_height(new_height)
                 .map_err(|e| BftError::SaveWalErr(format!("{:?} of set_height", e))),
+            &self.params.address,
         );
 
         self.height = new_height;
@@ -830,7 +812,7 @@ where
 
         let now = Instant::now();
         info!(
-            "Node {:?} goto new height {}, last height cost {:?} to reach consensus",
+            "Node {:?} goto new height {}, last height costs {:?} to reach consensus",
             self.params.address,
             new_height,
             now - self.htime
@@ -840,11 +822,6 @@ where
 
     #[inline]
     fn goto_next_round(&mut self) {
-        debug!(
-            "Node {:?} goto next round {:?}",
-            self.params.address,
-            self.round + 1
-        );
         self.round_filter.clear();
         self.round += 1;
     }
@@ -852,13 +829,13 @@ where
     fn is_proposer(&self) -> BftResult<bool> {
         let proposer = self.get_proposer(self.height, self.round)?;
         debug!(
-            "Node {:?} chooses proposer {:?} at height {}, round {}",
+            "Node {:?} chooses proposer {:?} at h:{}, r:{}",
             self.params.address, proposer, self.height, self.round
         );
 
         if self.params.address == *proposer {
             debug!(
-                "Node {:?} becomes proposer at height {}, round {}",
+                "Node {:?} becomes proposer at h:{}, r:{}",
                 self.params.address, self.height, self.round
             );
             return Ok(true);
@@ -887,11 +864,9 @@ where
         {
             // receive a proposal with a later PoLC
             debug!(
-                    "Node {:?} handles a proposal with the PoLC that proposal is {:?}, lock round is {:?}, lock votes are {:?}", self.params.address,
-                    block_hash,
-                    proposal.lock_round,
-                    proposal.lock_votes
-                );
+                "Node {:?} handles a proposal with a PoLC",
+                self.params.address
+            );
 
             if self.round < proposal.round {
                 self.round_filter.clear();
@@ -910,8 +885,8 @@ where
         {
             // receive a proposal without PoLC
             debug!(
-                "Node {:?} handles a proposal without PoLC, the proposal is {:?}",
-                self.params.address, block_hash
+                "Node {:?} handles a proposal without a PoLC",
+                self.params.address
             );
             self.block_hash = Some(block_hash);
         } else {
@@ -927,7 +902,7 @@ where
         let mut flag = false;
         for (round, prevote_count) in self.votes.prevote_count.iter() {
             debug!(
-                "Node {:?} have received {} prevotes in round {}",
+                "Node {:?} received {} prevotes in r:{}",
                 self.params.address, prevote_count, round
             );
             if self.cal_above_threshold(*prevote_count) && *round >= self.round {
@@ -941,10 +916,6 @@ where
         if !flag {
             return false;
         }
-        debug!(
-            "Node {:?} collects over 2/3 prevotes at height {:?}, round {:?}",
-            self.params.address, self.height, self.round
-        );
 
         if let Some(prevote_set) =
             self.votes
@@ -964,8 +935,8 @@ where
                         if hash.is_empty() {
                             // receive +2/3 prevote to nil, clean lock info
                             debug!(
-                                "Node {:?} collects over 2/3 prevotes to nil at height {:?}, round {:?}", self.params.address,
-                                self.height, self.round
+                                "Node {:?} collects over 2/3 prevotes on nil at h:{}, r:{}",
+                                self.params.address, self.height, self.round
                             );
                             self.clean_polc();
                             self.block_hash = None;
@@ -994,7 +965,7 @@ where
         let mut flag = false;
         for (round, precommit_count) in self.votes.precommit_count.iter() {
             debug!(
-                "Node {:?} have received {} precommit_count in round {}",
+                "Node {:?} received {} precommits in r:{}",
                 self.params.address, precommit_count, round
             );
             if self.cal_above_threshold(*precommit_count) && *round >= self.round {
@@ -1008,19 +979,11 @@ where
         if !flag {
             return PrecommitRes::Below;
         }
-        debug!(
-            "Node {:?} collects over 2/3 precommits at height {:?}, round {:?}",
-            self.params.address, self.height, self.round
-        );
 
         if let Some(precommit_set) =
             self.votes
                 .get_voteset(self.height, self.round, &VoteType::Precommit)
         {
-            debug!(
-                "Node {:?} have received {} precommits in round {}",
-                self.params.address, precommit_set.count, self.round
-            );
             let tv = if self.cal_all_vote(precommit_set.count) {
                 Duration::new(0, 0)
             } else {
@@ -1029,11 +992,6 @@ where
             if !self.cal_above_threshold(precommit_set.count) {
                 return PrecommitRes::Below;
             }
-
-            debug!(
-                "Node {:?} collects over 2/3 precommits at height {:?}, round {:?}",
-                self.params.address, self.height, self.round
-            );
 
             for (hash, count) in &precommit_set.votes_by_proposal {
                 if self.cal_above_threshold(*count) {

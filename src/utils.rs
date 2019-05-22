@@ -25,14 +25,13 @@ where
     T: BftSupport + 'static,
 {
     pub(crate) fn load_wal_log(&mut self) {
-        // TODO: should prevent saving wal
-        info!("Node {:?} starts to load wal log!", self.params.address);
+        info!("Node {:?} starts loading wal log!", self.params.address);
         let vec_buf = self.wal_log.load();
         for (log_type, encode) in vec_buf {
-            handle_err(self.process_wal_log(log_type, encode));
+            handle_err(self.process_wal_log(log_type, encode), &self.params.address);
         }
         info!(
-            "Node {:?} successfully processes the whole wal log!",
+            "Node {:?} successfully processed the whole wal log!",
             self.params.address
         );
     }
@@ -40,7 +39,7 @@ where
     fn process_wal_log(&mut self, log_type: LogType, encode: Vec<u8>) -> BftResult<()> {
         match log_type {
             LogType::Proposal => {
-                info!("Node {:?} load proposal", self.params.address);
+                info!("Node {:?} loads proposal", self.params.address);
                 let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                 })?;
@@ -58,37 +57,37 @@ where
                 self.process(BftMsg::Proposal(proposal_block_encode), false)?;
             }
             LogType::Vote => {
-                info!("Node {:?} load vote", self.params.address);
+                info!("Node {:?} loads vote", self.params.address);
                 self.process(BftMsg::Vote(encode), false)?;
             }
             LogType::Feed => {
-                info!("Node {:?} load feed", self.params.address);
+                info!("Node {:?} loads feed", self.params.address);
                 let feed: Feed = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("feed encounters {:?}", e)))?;
                 self.process(BftMsg::Feed(feed), false)?;
             }
             LogType::Status => {
-                info!("Node {:?} load status", self.params.address);
+                info!("Node {:?} loads status", self.params.address);
                 let status: Status = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("status encounters {:?}", e)))?;
                 self.process(BftMsg::Status(status), false)?;
             }
             LogType::Proof => {
-                info!("Node {:?} load proof", self.params.address);
+                info!("Node {:?} loads proof", self.params.address);
                 let proof: Proof = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("proof encounters {:?}", e)))?;
                 self.proof = proof;
             }
             #[cfg(feature = "verify_req")]
             LogType::VerifyResp => {
-                info!("Node {:?} load verify_resp", self.params.address);
+                info!("Node {:?} loads verify_resp", self.params.address);
                 let verify_resp: VerifyResp = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("verify_resp encounters {:?}", e)))?;
                 self.process(BftMsg::VerifyResp(verify_resp), false)?;
             }
 
             LogType::TimeOutInfo => {
-                info!("Node {:?} load timeout_info", self.params.address);
+                info!("Node {:?} loads timeout_info", self.params.address);
                 let time_out_info: TimeoutInfo = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("time_out_info encounters {:?}", e))
                 })?;
@@ -96,7 +95,7 @@ where
             }
 
             LogType::Block => {
-                info!("Node {:?} load block", self.params.address);
+                info!("Node {:?} loads block", self.params.address);
                 let (height, block, block_hash) = decode_block(&encode)?;
                 self.blocks.add(height, block_hash, block);
             }
@@ -260,18 +259,18 @@ where
         });
 
         debug!(
-            "Node {:?} sets a PoLC at height {:?}, round {:?}, on proposal {:?}",
+            "Node {:?} sets a PoLC on block_hash {:?} at h:{:?} r:{:?} ",
             self.params.address,
+            hash.to_owned(),
             self.height,
-            self.round,
-            hash.to_owned()
+            self.round
         );
     }
 
     #[inline]
     pub(crate) fn set_timer(&self, duration: Duration, step: Step) {
         debug!(
-            "Node {:?} sets {:?} timer for {:?}",
+            "Node {:?} will process {:?} after {:?}",
             self.params.address, step, duration
         );
         let timestamp = Instant::now() + duration;
@@ -377,10 +376,6 @@ where
         encode: &[u8],
         need_wal: bool,
     ) -> BftResult<()> {
-        debug!(
-            "Node {:?} receives {:?}",
-            self.params.address, signed_proposal
-        );
         let proposal = &signed_proposal.proposal;
         let block_hash = &proposal.block_hash;
         let height = proposal.height;
@@ -421,6 +416,7 @@ where
                                     e, height, round
                                 )))
                             }),
+                        &self.params.address,
                     );
                 }
                 handle_err(
@@ -432,6 +428,7 @@ where
                                 e, signed_proposal
                             )))
                         }),
+                    &self.params.address,
                 );
             }
         }
@@ -457,7 +454,6 @@ where
         signed_vote: &SignedVote,
         need_wal: bool,
     ) -> BftResult<()> {
-        debug!("Node {:?} receives {:?}", self.params.address, signed_vote);
         let vote = &signed_vote.vote;
         let height = vote.height;
         let round = vote.round;
@@ -491,9 +487,10 @@ where
                                 e, signed_vote
                             )))
                         }),
+                    &self.params.address,
                 );
             }
-            handle_err(result);
+            handle_err(result, &self.params.address);
         }
 
         if height > self.height || round >= self.round + CACHE_N {
@@ -524,12 +521,14 @@ where
                             e, &self.proof
                         )))
                     }),
+                &self.params.address,
             );
             let status_height = status.height;
             handle_err(
                 self.wal_log
                     .save(status_height + 1, LogType::Status, &rlp::encode(status))
                     .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, status)))),
+                &self.params.address,
             );
         }
 
@@ -547,6 +546,7 @@ where
                 self.wal_log
                     .save(self.height, LogType::VerifyResp, &rlp::encode(verify_resp))
                     .or(Err(BftError::SaveWalErr(format!("{:?}", verify_resp)))),
+                &self.params.address,
             );
         }
         self.save_verify_res(verify_resp.round, verify_resp.is_pass)?;
@@ -577,6 +577,7 @@ where
                             e, height
                         )))
                     }),
+                &self.params.address,
             );
         }
 
@@ -640,6 +641,7 @@ where
                     sender
                         .send(BftMsg::VerifyResp(verify_resp))
                         .map_err(|e| BftError::SendMsgErr(format!("{:?}", e))),
+                    &self.params.address,
                 );
             });
 
@@ -948,7 +950,7 @@ where
         self.block_hash = None;
         self.lock_status = None;
         debug!(
-            "Node {:?} cleans PoLC at height {:?}, round {:?}",
+            "Node {:?} cleans PoLC at h:{}, r:{}",
             self.params.address, self.height, self.round
         );
     }

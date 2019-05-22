@@ -45,13 +45,13 @@ pub enum BftError {
     ObsoleteTimer(String),
 }
 
-pub(crate) fn handle_err<T>(result: BftResult<T>) {
+pub(crate) fn handle_err<T>(result: BftResult<T>, address: &[u8]) {
     if let Err(e) = result {
         match e {
             BftError::NotReady(_)
             | BftError::ObsoleteMsg(_)
             | BftError::HigherMsg(_)
-            | BftError::RecvMsgAgain(_) => trace!("{:?}", e),
+            | BftError::RecvMsgAgain(_) => trace!("Node {:?} encounters {:?}", address, e),
 
             BftError::CheckProofFailed(_)
             | BftError::CheckBlockFailed(_)
@@ -60,7 +60,7 @@ pub(crate) fn handle_err<T>(result: BftResult<T>) {
             | BftError::CheckTxFailed(_)
             | BftError::DecodeErr(_)
             | BftError::InvalidSender(_)
-            | BftError::MismatchingBlock(_) => warn!("{:?}", e),
+            | BftError::MismatchingBlock(_) => warn!("Node {:?} encounters {:?}", address, e),
 
             BftError::ShouldNotHappen(_)
             | BftError::SendMsgErr(_)
@@ -68,7 +68,7 @@ pub(crate) fn handle_err<T>(result: BftResult<T>) {
             | BftError::CommitFailed(_)
             | BftError::SaveWalErr(_)
             | BftError::SignFailed(_)
-            | BftError::GetBlockFailed(_) => error!("{:?}", e),
+            | BftError::GetBlockFailed(_) => error!("Node {:?} encounters {:?}", address, e),
 
             BftError::ObsoleteTimer(_) => {}
         }

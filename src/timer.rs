@@ -1,4 +1,3 @@
-use crate::error::BftError;
 use crate::objects::Step;
 use crate::{Height, Round};
 
@@ -105,7 +104,7 @@ where
     pub fn start(&self) {
         let mut timer_heap = MinMaxHeap::<T>::new();
 
-        loop {
+        'outer: loop {
             // take the peek of the min-heap-timer sub now as the sleep time otherwise set timeout as 100
             let timeout = if !timer_heap.is_empty() {
                 let peek_min_time = timer_heap.peek_min().unwrap().get_instant();
@@ -138,6 +137,7 @@ where
                     let time_info = timer_heap.pop_min().unwrap();
                     if let Err(e) = self.timer_notify.send(time_info) {
                         warn!("send time notification failed with {:?}", e);
+                        break 'outer;
                     };
                 }
             }

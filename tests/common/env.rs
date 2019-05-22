@@ -42,7 +42,6 @@ impl Env {
         let (commit_send, commit_recv) = unbounded();
         for i in 0..honest_num {
             let address = generate_address();
-            info!("create node {:?}", address);
 
             let node = Node {
                 address: address.clone(),
