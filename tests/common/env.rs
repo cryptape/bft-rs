@@ -100,10 +100,12 @@ impl Env {
     }
 
     pub fn run(&mut self, stop_height: u64) {
-        let status = self.status.clone();
-        self.honest_nodes
-            .iter()
-            .for_each(|(_, actuator)| actuator.send(BftMsg::Status(status.clone())).unwrap());
+        let event = Event {
+            process_time: Instant::now(),
+            to: vec![],
+            content: Content::Sync,
+        };
+        self.test2timer.send(event).unwrap();
 
         loop {
             let mut get_msg = Err(RecvError);
@@ -194,10 +196,8 @@ impl Env {
                         content: Content::LivenessTimeout(ch, 1),
                     };
                     self.test2timer.send(event).unwrap();
-
-                    self.try_sync();
                 } else {
-                    panic!("jump height from {} to {}", status.height, commit.height);
+                    panic!("jump height from {} to {}", self.status.height, commit.height);
                 }
             }
             if let Ok(event) = get_timer {
@@ -228,6 +228,9 @@ impl Env {
                             };
                             self.test2timer.send(event).unwrap();
                         }
+                    }
+                    Content::Sync => {
+                        self.try_sync();
                     }
                     Content::Start(i) => {
                         let actuator = self.generate_node(to.clone(), i);
@@ -285,21 +288,22 @@ impl Env {
         let cur_h = self.status.height;
         let status = self.status.clone();
         self.nodes_height.iter().for_each(|(address, height)| {
-            if *height < cur_h {
+            if *height < cur_h || *height == 0 {
                 let delay = sync_delay(cur_h - height, &self.config);
                 let event = Event {
                     process_time: Instant::now() + delay,
                     to: address.clone(),
                     content: Content::Status(status.clone()),
                 };
-                info!(
-                    "node {:?} is fall behind {} height, start syncing",
-                    address,
-                    cur_h - height
-                );
                 self.test2timer.send(event).unwrap();
             }
         });
+        let event = Event {
+            process_time: Instant::now() + Duration::from_millis(self.config.sync_trigger_duration),
+            to: vec![],
+            content: Content::Sync,
+        };
+        self.test2timer.send(event).unwrap();
     }
 
     pub fn get_node_address(&self, i: usize) -> Option<Address> {
@@ -357,6 +361,7 @@ pub enum Content {
     Msg(BftMsg),
     Status(Status),
     LivenessTimeout(u64, usize), // Duration, count
+    Sync,
     Stop,
     Start(usize),
 }

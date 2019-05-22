@@ -61,7 +61,7 @@ pub fn sync_delay(height_diff: u64, config: &Config) -> Duration {
     } else {
         rand_num
     };
-    Duration::from_millis(config.sync_trigger_duration + delay * height_diff)
+    Duration::from_millis(delay * height_diff)
 }
 
 pub fn commit_delay(config: &Config) -> Duration {

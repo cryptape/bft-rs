@@ -35,7 +35,7 @@ pub const NORMAL_CONFIG: Config = Config {
     min_delay: 5,
     check_txs_delay: RandomMode::Normal(100.0, 30.0),
     commit_delay: RandomMode::Normal(50.0, 20.0),
-    sync_trigger_duration: 3_000,
+    sync_trigger_duration: 6_000,
     sync_delay: RandomMode::Normal(10.0, 2.0),
     message_delay: RandomMode::Normal(30.0, 20.0),
 };
@@ -50,7 +50,7 @@ pub const PERFECT_CONFIG: Config = Config {
     min_delay: 1,
     check_txs_delay: RandomMode::Normal(3.0, 1.0),
     commit_delay: RandomMode::Normal(3.0, 1.0),
-    sync_trigger_duration: 3_000,
+    sync_trigger_duration: 6_000,
     sync_delay: RandomMode::Normal(3.0, 1.0),
     message_delay: RandomMode::Normal(10.0, 5.0),
 };
