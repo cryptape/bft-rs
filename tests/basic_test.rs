@@ -1,6 +1,6 @@
 pub mod common;
 
-use crate::common::config::{NORMAL_CONFIG, PERFECT_CONFIG};
+use crate::common::config::{NORMAL_CONFIG, PERFECT_CONFIG, BAD_CONFIG, HELL_CONFIG};
 use crate::common::env::{Content, Env};
 use crate::common::utils::{clean_log_file, clean_wal, set_log_file};
 use log::LevelFilter;
@@ -9,20 +9,22 @@ use std::time::Duration;
 #[test]
 fn test_basic() {
     let path = "log/test_basic.log";
-    clean_wal();
+    let wal_dir = "wal/test_basic/wal";
+    clean_wal(wal_dir);
     clean_log_file(path);
-    set_log_file(path, LevelFilter::Debug);
-    let mut env = Env::new(NORMAL_CONFIG, 4, 0);
-    env.run(100);
+    set_log_file(path, LevelFilter::Info);
+    let mut env = Env::new(PERFECT_CONFIG, 4, 0, wal_dir);
+    env.run(3);
 }
 
 #[test]
 fn test_restart_nodes() {
     let path = "log/test_restart_nodes.log";
-    clean_wal();
+    let wal_dir = "wal/test_restart_nodes/wal";
+    clean_wal(wal_dir);
     clean_log_file(path);
-    set_log_file(path, LevelFilter::Info);
-    let mut env = Env::new(PERFECT_CONFIG, 4, 0);
+    set_log_file(path, LevelFilter::Debug);
+    let mut env = Env::new(NORMAL_CONFIG, 4, 0, wal_dir);
     // stop node 0, 1 start node 1
     env.set_node(0, Content::Stop, Duration::from_millis(2_000));
     env.set_node(1, Content::Stop, Duration::from_millis(8_000));
@@ -36,5 +38,5 @@ fn test_restart_nodes() {
     env.set_node(2, Content::Start(2), Duration::from_millis(36_000));
     env.set_node(3, Content::Start(3), Duration::from_millis(40_000));
 
-    env.run(100);
+    env.run(3);
 }

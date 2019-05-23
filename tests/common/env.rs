@@ -2,7 +2,7 @@ extern crate bft_rs;
 
 use self::bft_rs::timer::{GetInstant, WaitTimer};
 use self::bft_rs::Address;
-use super::config::{Config, LIVENESS_TICK, WAL_ROOT};
+use super::config::{Config, LIVENESS_TICK};
 use super::honest_node::HonestNode;
 use super::utils::*;
 use bft_rs::{BftActuator, BftMsg, Commit, Node, Status};
@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 
 pub struct Env {
     pub config: Config,
+    pub wal_dir: &'static str,
     pub honest_live_nodes: HashMap<Vec<u8>, Box<BftActuator>>,
     pub msg_recv: Receiver<(BftMsg, Address)>,
     pub msg_send: Sender<(BftMsg, Address)>,
@@ -35,7 +36,7 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn new(config: Config, honest_num: usize, _byzantine_num: usize) -> Env {
+    pub fn new(config: Config, honest_num: usize, _byzantine_num: usize, wal_dir: &'static str) -> Env {
         let mut honest_live_nodes = HashMap::new();
         let mut nodes_height = HashMap::new();
         let mut authority_list = vec![];
@@ -57,7 +58,7 @@ impl Env {
                 msg_send: msg_send.clone(),
                 commit_send: commit_send.clone(),
             };
-            let wal_path = format!("{}{}", WAL_ROOT, i);
+            let wal_path = format!("{}{}", wal_dir, i);
             let actuator = BftActuator::new(Arc::new(honest_support), address.clone(), &wal_path);
             honest_live_nodes.insert(address.clone(), Box::new(actuator));
             nodes_height.insert(address, 0);
@@ -86,6 +87,7 @@ impl Env {
 
         Env {
             config,
+            wal_dir,
             honest_live_nodes,
             msg_recv,
             msg_send,
@@ -165,6 +167,8 @@ impl Env {
                     self.test2timer.send(event).unwrap();
                 } else if ch == sh + 1 {
                     if ch == stop_height {
+                        self.honest_live_nodes.iter()
+                            .for_each(|(_, actuator)| actuator.send(BftMsg::Kill).unwrap());
                         break;
                     }
                     info!(
@@ -248,7 +252,7 @@ impl Env {
             msg_send: self.msg_send.clone(),
             commit_send: self.commit_send.clone(),
         };
-        let wal_path = format!("{}{}", WAL_ROOT, i);
+        let wal_path = format!("{}{}", self.wal_dir, i);
         BftActuator::new(Arc::new(honest_support), address, &wal_path)
     }
 

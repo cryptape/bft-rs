@@ -112,13 +112,13 @@ pub fn sign(_hash_value: &[u8], address: &[u8]) -> Vec<u8> {
     address.to_vec()
 }
 
-pub fn clean_wal() {
+pub fn clean_wal(wal_dir: &str) {
     let mut i = 0;
-    let mut dir = format!("{}{}", WAL_ROOT, i);
+    let mut dir = format!("{}{}", wal_dir, i);
     while read_dir(&dir).is_ok() {
         fs::remove_dir_all(&dir).unwrap();
         i += 1;
-        dir = format!("{}{}", WAL_ROOT, i);
+        dir = format!("{}{}", wal_dir, i);
     }
     info!("Successfully clean wal logs!");
 }
@@ -138,7 +138,7 @@ pub fn set_log_file(path: &str, level: LevelFilter) {
         .appender(Appender::builder().build("logfile", Box::new(logfile)))
         .build(Root::builder().appender("logfile").build(level))
         .unwrap();
-    log4rs::init_config(config).unwrap();
+    let _ = log4rs::init_config(config);
 }
 
 fn get_dice_result(likelihood: f64) -> bool {
