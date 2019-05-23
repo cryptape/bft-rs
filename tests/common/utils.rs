@@ -141,7 +141,7 @@ pub fn set_log_file(path: &str, level: LevelFilter) {
     let _ = log4rs::init_config(config);
 }
 
-fn get_dice_result(likelihood: f64) -> bool {
+pub fn get_dice_result(likelihood: f64) -> bool {
     let rand_num = get_random_integer(RANDOM_U64) as f64;
     let rate = rand_num / ((MAX_U64 - 1) as f64);
     rate > likelihood
@@ -153,7 +153,7 @@ pub enum RandomMode {
     Uniform(u64, u64),
 }
 
-fn get_random_integer(mode: RandomMode) -> u64 {
+pub fn get_random_integer(mode: RandomMode) -> u64 {
     let v;
     match mode {
         RandomMode::Normal(_, _) => {
@@ -167,7 +167,7 @@ fn get_random_integer(mode: RandomMode) -> u64 {
     v
 }
 
-fn get_random_float(mode: RandomMode) -> f64 {
+pub fn get_random_float(mode: RandomMode) -> f64 {
     let v;
     match mode {
         RandomMode::Normal(mean, standard_deviation) => {
