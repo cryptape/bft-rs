@@ -1,11 +1,13 @@
 pub mod common;
 
-use crate::common::config::{NORMAL_CONFIG, PERFECT_CONFIG, BAD_CONFIG, HELL_CONFIG};
+use crate::common::config::{BAD_CONFIG, NORMAL_CONFIG, PERFECT_CONFIG};
 use crate::common::env::{Content, Env};
-use crate::common::utils::{clean_log_file, clean_wal, set_log_file, get_random_integer, RandomMode, get_dice_result};
-use log::{LevelFilter, info};
-use std::time::Duration;
+use crate::common::utils::{
+    clean_log_file, clean_wal, get_random_integer, set_log_file, RandomMode,
+};
+use log::{info, LevelFilter};
 use std::collections::HashMap;
+use std::time::Duration;
 
 #[test]
 fn test_basic_function() {
@@ -49,9 +51,8 @@ fn test_wild_restart() {
     clean_wal(wal_dir);
     clean_log_file(path);
     set_log_file(path, LevelFilter::Info);
-    let mut env = Env::new(NORMAL_CONFIG, 4, 0, wal_dir);
+    let mut env = Env::new(BAD_CONFIG, 4, 0, wal_dir);
 
-    // stop node 0, 1 start node 1
     let mut stat = HashMap::new();
     for i in 0..4 {
         stat.insert(i, Content::Start(i));
@@ -83,7 +84,7 @@ fn test_wild_restart() {
         }
     });
 
-    stat.iter().for_each(|(i, stat)|{
+    stat.iter().for_each(|(i, stat)| {
         if let &Content::Stop = stat {
             let duration = Duration::from_millis(max_duration);
             env.set_node(*i, Content::Start(*i), duration);

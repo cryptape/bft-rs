@@ -18,8 +18,8 @@ use std::time::{Duration, Instant};
 
 pub(crate) const INIT_HEIGHT: u64 = 0;
 pub(crate) const INIT_ROUND: u64 = 0;
-const PROPOSAL_TIMES_COEF: u64 = 4;
-const TIMEOUT_RETRANSE_COEF: u32 = 15;
+pub(crate) const PROPOSAL_TIMES_COEF: u64 = 4;
+pub(crate) const TIMEOUT_RETRANSE_COEF: u32 = 15;
 
 #[cfg(feature = "verify_req")]
 const VERIFY_AWAIT_COEF: u32 = 50;
@@ -57,6 +57,9 @@ pub struct Bft<T: BftSupport> {
     // user define
     pub(crate) function: Arc<T>,
     pub(crate) consensus_power: bool,
+
+    // byzantine mark
+    pub(crate) is_byzantine: bool,
 }
 
 impl<T> Bft<T>
@@ -103,6 +106,7 @@ where
             wal_log: Wal::new(wal_path).unwrap(),
             function: f,
             consensus_power: false,
+            is_byzantine: false,
         }
     }
 
@@ -278,6 +282,10 @@ where
                     self.params.address, &proof
                 );
                 self.clear(proof);
+            }
+
+            BftMsg::Corrupt => {
+                self.is_byzantine = true;
             }
 
             _ => {}
@@ -545,6 +553,10 @@ where
     }
 
     fn transmit_proposal(&mut self) -> BftResult<()> {
+        if self.is_byzantine {
+            return self.transmit_byzantine_proposal();
+        }
+
         if self.lock_status.is_none()
             && (self.feed.is_none() || self.proof.height != self.height - 1)
         {
@@ -633,7 +645,11 @@ where
         Ok(())
     }
 
-    fn transmit_prevote(&mut self, resend: bool) -> BftResult<()> {
+    pub(crate) fn transmit_prevote(&mut self, resend: bool) -> BftResult<()> {
+        if self.is_byzantine {
+            return self.transmit_byzantine_prevote(resend);
+        }
+
         let block_hash = if let Some(lock_status) = self.lock_status.clone() {
             lock_status.block_hash
         } else if let Some(block_hash) = self.block_hash.clone() {
@@ -671,6 +687,10 @@ where
     }
 
     fn transmit_precommit(&mut self, resend: bool) -> BftResult<()> {
+        if self.is_byzantine {
+            return self.transmit_byzantine_precommit(resend);
+        }
+
         let block_hash = if let Some(lock_status) = self.lock_status.clone() {
             lock_status.block_hash
         } else {
@@ -706,6 +726,10 @@ where
     }
 
     fn retransmit_lower_votes(&self, round: u64) -> BftResult<()> {
+        if self.is_byzantine {
+            return self.retransmit_byzantine_lower_votes();
+        }
+
         debug!(
             "Node {:?} receives msg in lower height, retransmit votes",
             self.params.address
@@ -736,6 +760,10 @@ where
     }
 
     fn retransmit_nil_precommit(&self, vote: &Vote) -> BftResult<()> {
+        if self.is_byzantine {
+            return self.retransmit_byzantine_nil_precommit();
+        }
+
         let precommit = Vote {
             vote_type: VoteType::Precommit,
             height: vote.height,

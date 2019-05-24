@@ -2,13 +2,6 @@
 //!
 //!
 
-//#![deny(missing_docs)]
-
-//#[macro_use]
-//pub extern crate crossbeam;
-//#[macro_use]
-//extern crate log;
-
 use crate::{
     algorithm::Bft,
     error::{BftError, BftResult},
@@ -26,6 +19,8 @@ use std::sync::Arc;
 
 /// The core algorithm of the BFT state machine.
 pub mod algorithm;
+
+pub mod byzantine;
 /// Collectors for proposals and signed_votes.
 pub mod collectors;
 /// Bft errors defined.
@@ -89,10 +84,13 @@ pub enum BftMsg {
     #[cfg(feature = "verify_req")]
     VerifyResp(VerifyResp),
     Feed(Feed),
+
     Pause,
     Start,
     Clear(Proof),
+
     Kill,
+    Corrupt,
 }
 
 #[cfg(feature = "verify_req")]

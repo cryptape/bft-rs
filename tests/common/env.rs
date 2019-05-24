@@ -29,14 +29,19 @@ pub struct Env {
     pub interval: Option<u64>,
     pub status: Status,
     pub status_list: LruCache<u64, Status>,
-//    pub old_status: Option<Status>,
+    //    pub old_status: Option<Status>,
     pub last_reach_consensus_time: Instant,
     pub commits: LruCache<u64, Vec<u8>>,
     pub nodes_height: HashMap<Vec<u8>, u64>,
 }
 
 impl Env {
-    pub fn new(config: Config, honest_num: usize, _byzantine_num: usize, wal_dir: &'static str) -> Env {
+    pub fn new(
+        config: Config,
+        honest_num: usize,
+        _byzantine_num: usize,
+        wal_dir: &'static str,
+    ) -> Env {
         let mut honest_live_nodes = HashMap::new();
         let mut nodes_height = HashMap::new();
         let mut authority_list = vec![];
@@ -141,10 +146,7 @@ impl Env {
                 let ch = commit.height;
                 let sh = self.status.height;
                 if ch < sh {
-                    info!(
-                        "node {:?} reach old consensus in height {}",
-                        sender, ch
-                    );
+                    info!("node {:?} reach old consensus in height {}", sender, ch);
                     self.check_consistency(&commit);
 
                     let delay = sync_delay(sh - ch, &self.config);
@@ -167,7 +169,8 @@ impl Env {
                     self.test2timer.send(event).unwrap();
                 } else if ch == sh + 1 {
                     if ch == stop_height {
-                        self.honest_live_nodes.iter()
+                        self.honest_live_nodes
+                            .iter()
                             .for_each(|(_, actuator)| actuator.send(BftMsg::Kill).unwrap());
                         break;
                     }
@@ -193,7 +196,10 @@ impl Env {
                     };
                     self.test2timer.send(event).unwrap();
                 } else {
-                    panic!("jump height from {} to {}", self.status.height, commit.height);
+                    panic!(
+                        "jump height from {} to {}",
+                        self.status.height, commit.height
+                    );
                 }
             }
             if let Ok(event) = get_timer {
@@ -280,8 +286,11 @@ impl Env {
     }
 
     pub fn try_sync(&mut self) {
-        let live_heights: HashMap<&Vec<u8>, &u64> = self.nodes_height.iter()
-            .filter(|(address, _)| self.honest_live_nodes.contains_key(*address)).collect();
+        let live_heights: HashMap<&Vec<u8>, &u64> = self
+            .nodes_height
+            .iter()
+            .filter(|(address, _)| self.honest_live_nodes.contains_key(*address))
+            .collect();
         if let Some(max_height) = live_heights.values().max() {
             let result = self.status_list.get_mut(*max_height).cloned();
             if let Some(status) = result {

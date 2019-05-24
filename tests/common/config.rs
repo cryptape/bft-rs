@@ -83,4 +83,3 @@ pub const HELL_CONFIG: Config = Config {
     sync_delay: RandomMode::Normal(1000.0, 1000.0),
     message_delay: RandomMode::Normal(5000.0, 3000.0),
 };
-
