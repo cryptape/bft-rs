@@ -37,11 +37,7 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn new(
-        config: Config,
-        nodes_num: usize,
-        wal_dir: &'static str,
-    ) -> Env {
+    pub fn new(config: Config, nodes_num: usize, wal_dir: &'static str) -> Env {
         let mut live_nodes = HashMap::new();
         let mut nodes_height = HashMap::new();
         let mut authority_list = vec![];
@@ -294,7 +290,9 @@ impl Env {
         let live_honest_heights: HashMap<&Vec<u8>, &u64> = self
             .nodes_height
             .iter()
-            .filter(|(address, _)| self.live_nodes.contains_key(*address) && !self.byzantine_nodes.contains(*address))
+            .filter(|(address, _)| {
+                self.live_nodes.contains_key(*address) && !self.byzantine_nodes.contains(*address)
+            })
             .collect();
         if let Some(max_height) = live_honest_heights.values().max() {
             let result = self.status_list.get_mut(*max_height).cloned();
@@ -322,7 +320,7 @@ impl Env {
     }
 
     pub fn corrupt(&self) {
-        self.live_nodes.iter().for_each(|(address, actuator)|{
+        self.live_nodes.iter().for_each(|(address, actuator)| {
             if self.byzantine_nodes.contains(address) {
                 actuator.send(BftMsg::Corrupt).unwrap();
             }

@@ -17,7 +17,7 @@ fn test_basic() {
     clean_log_file(path);
     set_log_file(path, LevelFilter::Debug);
     let mut env = Env::new(PERFECT_CONFIG, 4, wal_dir);
-    env.run(3);
+    env.run(30);
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn test_restart() {
     clean_wal(wal_dir);
     clean_log_file(path);
     set_log_file(path, LevelFilter::Debug);
-    let mut env = Env::new(NORMAL_CONFIG, 4,  wal_dir);
+    let mut env = Env::new(NORMAL_CONFIG, 4, wal_dir);
 
     env.set_node(0, Content::Stop, Duration::from_millis(2_000));
     env.set_node(1, Content::Stop, Duration::from_millis(8_000));
@@ -51,7 +51,7 @@ fn test_wild() {
     clean_wal(wal_dir);
     clean_log_file(path);
     set_log_file(path, LevelFilter::Debug);
-    let mut env = Env::new(BAD_CONFIG, 4,  wal_dir);
+    let mut env = Env::new(BAD_CONFIG, 4, wal_dir);
 
     let mut stat = HashMap::new();
     for i in 0..4 {

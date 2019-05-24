@@ -302,41 +302,41 @@ where
     }
 
     pub(crate) fn flush_cache(&mut self) -> BftResult<()> {
-        let proposals = &mut self.proposals.proposals;
-        let round_proposals = proposals.get_mut(&self.height);
-        let mut proposal_collector = ProposalRoundCollector::new();
+        self.fetch_proposal(self.height, 0)?;
+        self.fetch_votes(self.height)?;
+        Ok(())
+    }
 
-        let votes = &mut self.votes.votes;
-        let round_votes = votes.get_mut(&self.height);
-        let mut vote_collector = RoundCollector::new();
+    pub(crate) fn fetch_proposal(&mut self, height: Height, round: Round) -> BftResult<()> {
+        let opt = self.proposals.get_proposal(height, round).clone();
+        if let Some(signed_proposal) = opt {
+            self.proposals.remove(height, round);
 
-        if round_proposals.is_some() {
-            proposal_collector = round_proposals.unwrap().clone();
-            self.proposals.remove(self.height);
-        }
-
-        if round_votes.is_some() {
-            vote_collector = round_votes.unwrap().clone();
-            self.votes.remove(self.height);
-        }
-
-        for (_, signed_proposal) in proposal_collector.round_proposals.iter() {
             let block_hash = signed_proposal.proposal.block_hash.clone();
-            let block = self
-                .blocks
-                .get_block(self.height, &block_hash)
-                .ok_or_else(|| {
-                    BftError::ShouldNotHappen(
-                        "can not fetch block from cache when load signed_proposal".to_string(),
-                    )
-                })?;
-            let proposal_encode = rlp::encode(signed_proposal);
+            let block = self.blocks.get_block(height, &block_hash).ok_or_else(|| {
+                BftError::ShouldNotHappen(
+                    "can not fetch block from cache when load signed_proposal".to_string(),
+                )
+            })?;
+            let proposal_encode = rlp::encode(&signed_proposal);
             let encode = combine_two(&proposal_encode, block);
             let msg = BftMsg::Proposal(encode);
             let info = format!("{:?}", &msg);
             self.msg_sender
                 .send(msg)
                 .map_err(|_| BftError::SendMsgErr(info))?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn fetch_votes(&mut self, height: Height) -> BftResult<()> {
+        let votes = &mut self.votes.votes;
+        let round_votes = votes.get_mut(&height);
+        let mut vote_collector = RoundCollector::new();
+
+        if round_votes.is_some() {
+            vote_collector = round_votes.unwrap().clone();
+            self.votes.remove(height);
         }
 
         for (_, step_votes) in vote_collector.round_votes.iter() {
@@ -351,7 +351,6 @@ where
                 }
             }
         }
-
         Ok(())
     }
 

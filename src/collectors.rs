@@ -268,8 +268,10 @@ impl ProposalCollector {
             .and_then(|prc| prc.get_proposal(round))
     }
 
-    pub(crate) fn remove(&mut self, current_height: Height) {
-        self.proposals.remove(&current_height);
+    pub(crate) fn remove(&mut self, height: Height, round: Round) -> Option<SignedProposal> {
+        self.proposals
+            .get_mut(&height)
+            .and_then(|prc| prc.remove(round))
     }
 }
 
@@ -295,6 +297,10 @@ impl ProposalRoundCollector {
 
     pub(crate) fn get_proposal(&mut self, round: Round) -> Option<SignedProposal> {
         self.round_proposals.get_mut(&round).cloned()
+    }
+
+    pub(crate) fn remove(&mut self, round: Round) -> Option<SignedProposal> {
+        self.round_proposals.remove(&round)
     }
 }
 

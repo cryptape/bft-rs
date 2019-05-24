@@ -285,10 +285,7 @@ where
             }
 
             BftMsg::Corrupt => {
-                info!(
-                    "Node {:?} is corrupt to be byzantine",
-                    self.params.address
-                );
+                info!("Node {:?} is corrupt to be byzantine", self.params.address);
                 self.is_byzantine = true;
             }
 
@@ -856,6 +853,10 @@ where
     fn goto_next_round(&mut self) {
         self.round_filter.clear();
         self.round += 1;
+        handle_err(
+            self.fetch_proposal(self.height, self.round),
+            &self.params.address,
+        );
     }
 
     fn is_proposer(&self) -> BftResult<bool> {

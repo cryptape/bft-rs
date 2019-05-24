@@ -17,17 +17,17 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::hash::{Hash as Hashable, Hasher};
 use std::sync::Arc;
 
-/// The core algorithm of the BFT state machine.
+/// The core Bft algorithm.
 pub mod algorithm;
-
+/// Define simple byzantine behavior.
 pub mod byzantine;
-/// Collectors for proposals and signed_votes.
+/// Collectors of blocks, signed_proposals, signed_votes.
 pub mod collectors;
-/// Bft errors defined.
+/// Define Bft errors.
 pub mod error;
-/// Bft structures only for this crate.
+/// Define structures only for this crate.
 pub mod objects;
-/// BFT params include time interval and local address.
+/// Define BFT params including time interval and local address.
 pub mod params;
 /// Select a proposer Probabilistic according to the proposal_weight of Nodes.
 pub mod random;
