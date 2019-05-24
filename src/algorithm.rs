@@ -285,6 +285,10 @@ where
             }
 
             BftMsg::Corrupt => {
+                info!(
+                    "Node {:?} is corrupt to be byzantine",
+                    self.params.address
+                );
                 self.is_byzantine = true;
             }
 

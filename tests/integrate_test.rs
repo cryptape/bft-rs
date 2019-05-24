@@ -10,24 +10,24 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 #[test]
-fn test_basic_function() {
-    let path = "log/test_basic_function.log";
-    let wal_dir = "wal/test_basic_function/wal";
+fn test_basic() {
+    let path = "log/test_basic.log";
+    let wal_dir = "wal/test_basic/wal";
     clean_wal(wal_dir);
     clean_log_file(path);
     set_log_file(path, LevelFilter::Debug);
-    let mut env = Env::new(PERFECT_CONFIG, 4, 0, wal_dir);
-    env.run(100);
+    let mut env = Env::new(PERFECT_CONFIG, 4, wal_dir);
+    env.run(3);
 }
 
 #[test]
-fn test_basic_restart() {
-    let path = "log/test_basic_restart.log";
-    let wal_dir = "wal/test_basic_restart/wal";
+fn test_restart() {
+    let path = "log/test_restart.log";
+    let wal_dir = "wal/test_restart/wal";
     clean_wal(wal_dir);
     clean_log_file(path);
     set_log_file(path, LevelFilter::Debug);
-    let mut env = Env::new(NORMAL_CONFIG, 4, 0, wal_dir);
+    let mut env = Env::new(NORMAL_CONFIG, 4,  wal_dir);
 
     env.set_node(0, Content::Stop, Duration::from_millis(2_000));
     env.set_node(1, Content::Stop, Duration::from_millis(8_000));
@@ -45,13 +45,13 @@ fn test_basic_restart() {
 }
 
 #[test]
-fn test_wild_restart() {
-    let path = "log/test_wild_restart.log";
-    let wal_dir = "wal/test_wild_restart/wal";
+fn test_wild() {
+    let path = "log/test_wild.log";
+    let wal_dir = "wal/test_wild/wal";
     clean_wal(wal_dir);
     clean_log_file(path);
-    set_log_file(path, LevelFilter::Info);
-    let mut env = Env::new(BAD_CONFIG, 4, 0, wal_dir);
+    set_log_file(path, LevelFilter::Debug);
+    let mut env = Env::new(BAD_CONFIG, 4,  wal_dir);
 
     let mut stat = HashMap::new();
     for i in 0..4 {
@@ -93,4 +93,16 @@ fn test_wild_restart() {
     });
 
     env.run(50);
+}
+
+#[test]
+fn test_byzantine() {
+    let path = "log/test_byzantine.log";
+    let wal_dir = "wal/test_byzantine/wal";
+    clean_wal(wal_dir);
+    clean_log_file(path);
+    set_log_file(path, LevelFilter::Debug);
+    let mut env = Env::new(NORMAL_CONFIG, 4, wal_dir);
+    env.set_node(0, Content::Corrupt, Duration::from_millis(1000));
+    env.run(100);
 }

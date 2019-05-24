@@ -6,14 +6,14 @@ use super::utils::*;
 use crossbeam::crossbeam_channel::Sender;
 use std::thread;
 
-pub struct HonestNode {
+pub struct Support {
     pub config: Config,
     pub address: Vec<u8>,
     pub msg_send: Sender<(BftMsg, Address)>,
     pub commit_send: Sender<(Commit, Address)>,
 }
 
-impl BftSupport for HonestNode {
+impl BftSupport for Support {
     type Error = TestError;
     fn check_block(&self, block: &[u8], _block_hash: &[u8], _height: u64) -> Result<(), TestError> {
         if check_block_result(block) {

@@ -3,7 +3,7 @@ extern crate bft_rs;
 use self::bft_rs::timer::{GetInstant, WaitTimer};
 use self::bft_rs::Address;
 use super::config::{Config, LIVENESS_TICK};
-use super::honest_node::HonestNode;
+use super::support::Support;
 use super::utils::*;
 use bft_rs::{BftActuator, BftMsg, Commit, Node, Status};
 use crossbeam::crossbeam_channel::{select, unbounded, Receiver, RecvError, Sender};
@@ -18,7 +18,8 @@ use std::time::{Duration, Instant};
 pub struct Env {
     pub config: Config,
     pub wal_dir: &'static str,
-    pub honest_live_nodes: HashMap<Vec<u8>, Box<BftActuator>>,
+    pub live_nodes: HashMap<Vec<u8>, Box<BftActuator>>,
+    pub byzantine_nodes: Vec<Address>,
     pub msg_recv: Receiver<(BftMsg, Address)>,
     pub msg_send: Sender<(BftMsg, Address)>,
     pub commit_recv: Receiver<(Commit, Address)>,
@@ -38,16 +39,15 @@ pub struct Env {
 impl Env {
     pub fn new(
         config: Config,
-        honest_num: usize,
-        _byzantine_num: usize,
+        nodes_num: usize,
         wal_dir: &'static str,
     ) -> Env {
-        let mut honest_live_nodes = HashMap::new();
+        let mut live_nodes = HashMap::new();
         let mut nodes_height = HashMap::new();
         let mut authority_list = vec![];
         let (msg_send, msg_recv) = unbounded();
         let (commit_send, commit_recv) = unbounded();
-        for i in 0..honest_num {
+        for i in 0..nodes_num {
             let address = generate_address();
 
             let node = Node {
@@ -57,15 +57,15 @@ impl Env {
             };
             authority_list.push(node);
 
-            let honest_support = HonestNode {
+            let node_support = Support {
                 config,
                 address: address.clone(),
                 msg_send: msg_send.clone(),
                 commit_send: commit_send.clone(),
             };
             let wal_path = format!("{}{}", wal_dir, i);
-            let actuator = BftActuator::new(Arc::new(honest_support), address.clone(), &wal_path);
-            honest_live_nodes.insert(address.clone(), Box::new(actuator));
+            let actuator = BftActuator::new(Arc::new(node_support), address.clone(), &wal_path);
+            live_nodes.insert(address.clone(), Box::new(actuator));
             nodes_height.insert(address, 0);
         }
 
@@ -93,7 +93,8 @@ impl Env {
         Env {
             config,
             wal_dir,
-            honest_live_nodes,
+            live_nodes,
+            byzantine_nodes: vec![],
             msg_recv,
             msg_send,
             commit_recv,
@@ -130,7 +131,7 @@ impl Env {
             }
 
             if let Ok((msg, from)) = get_msg {
-                self.honest_live_nodes.iter().for_each(|(address, _)| {
+                self.live_nodes.iter().for_each(|(address, _)| {
                     if address != &from {
                         let delay = message_delay(&self.config);
                         let event = Event {
@@ -169,7 +170,7 @@ impl Env {
                     self.test2timer.send(event).unwrap();
                 } else if ch == sh + 1 {
                     if ch == stop_height {
-                        self.honest_live_nodes
+                        self.live_nodes
                             .iter()
                             .for_each(|(_, actuator)| actuator.send(BftMsg::Kill).unwrap());
                         break;
@@ -207,13 +208,13 @@ impl Env {
                 let to = event.to;
                 match content {
                     Content::Msg(bft_msg) => {
-                        if let Some(actuator) = self.honest_live_nodes.get(&to) {
+                        if let Some(actuator) = self.live_nodes.get(&to) {
                             actuator.send(bft_msg).unwrap();
                         }
                     }
                     Content::Status(status) => {
                         self.nodes_height.insert(to.clone(), status.height);
-                        if let Some(actuator) = self.honest_live_nodes.get(&to) {
+                        if let Some(actuator) = self.live_nodes.get(&to) {
                             actuator.send(BftMsg::Status(status)).unwrap();
                         }
                     }
@@ -232,15 +233,19 @@ impl Env {
                         }
                     }
                     Content::Sync => {
+                        self.corrupt();
                         self.try_sync();
+                    }
+                    Content::Corrupt => {
+                        self.byzantine_nodes.push(to);
                     }
                     Content::Start(i) => {
                         let actuator = self.generate_node(to.clone(), i);
                         info!("Node {:?} is started", to);
-                        self.honest_live_nodes.insert(to, Box::new(actuator));
+                        self.live_nodes.insert(to, Box::new(actuator));
                     }
                     Content::Stop => {
-                        let actuator = self.honest_live_nodes.remove(&to).unwrap();
+                        let actuator = self.live_nodes.remove(&to).unwrap();
                         actuator.send(BftMsg::Kill).unwrap();
                         info!("Node {:?} is stopped", to);
                     }
@@ -252,14 +257,14 @@ impl Env {
     }
 
     pub fn generate_node(&self, address: Address, i: usize) -> BftActuator {
-        let honest_support = HonestNode {
+        let node_support = Support {
             config: self.config.clone(),
             address: address.clone(),
             msg_send: self.msg_send.clone(),
             commit_send: self.commit_send.clone(),
         };
         let wal_path = format!("{}{}", self.wal_dir, i);
-        BftActuator::new(Arc::new(honest_support), address, &wal_path)
+        BftActuator::new(Arc::new(node_support), address, &wal_path)
     }
 
     pub fn check_consistency(&mut self, commit: &Commit) {
@@ -286,12 +291,12 @@ impl Env {
     }
 
     pub fn try_sync(&mut self) {
-        let live_heights: HashMap<&Vec<u8>, &u64> = self
+        let live_honest_heights: HashMap<&Vec<u8>, &u64> = self
             .nodes_height
             .iter()
-            .filter(|(address, _)| self.honest_live_nodes.contains_key(*address))
+            .filter(|(address, _)| self.live_nodes.contains_key(*address) && !self.byzantine_nodes.contains(*address))
             .collect();
-        if let Some(max_height) = live_heights.values().max() {
+        if let Some(max_height) = live_honest_heights.values().max() {
             let result = self.status_list.get_mut(*max_height).cloned();
             if let Some(status) = result {
                 self.nodes_height.iter().for_each(|(address, height)| {
@@ -314,6 +319,14 @@ impl Env {
             content: Content::Sync,
         };
         self.test2timer.send(event).unwrap();
+    }
+
+    pub fn corrupt(&self) {
+        self.live_nodes.iter().for_each(|(address, actuator)|{
+            if self.byzantine_nodes.contains(address) {
+                actuator.send(BftMsg::Corrupt).unwrap();
+            }
+        });
     }
 
     pub fn get_node_address(&self, i: usize) -> Option<Address> {
@@ -374,4 +387,5 @@ pub enum Content {
     Sync,
     Stop,
     Start(usize),
+    Corrupt,
 }
