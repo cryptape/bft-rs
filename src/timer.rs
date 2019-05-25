@@ -144,22 +144,3 @@ where
         }
     }
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_time_out_info_rlp() {
-        let time_out_info = TimeoutInfo {
-            timestamp: Instant::now(),
-            duration: 10000000u64,
-            height: 1888787u64,
-            round: 23u64,
-            step: Step::Commit,
-        };
-        let encode = rlp::encode(&time_out_info);
-        let decode: TimeoutInfo = rlp::decode(&encode).unwrap();
-        assert_eq!(time_out_info.height, decode.height);
-    }
-}

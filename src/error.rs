@@ -1,4 +1,5 @@
 use log::{error, trace, warn};
+use crate::Address;
 
 pub type BftResult<T> = ::std::result::Result<T, BftError>;
 /// Error for Bft actuator.
@@ -45,7 +46,7 @@ pub enum BftError {
     ObsoleteTimer(String),
 }
 
-pub(crate) fn handle_err<T>(result: BftResult<T>, address: &[u8]) {
+pub(crate) fn handle_err<T>(result: BftResult<T>, address: &Address) {
     if let Err(e) = result {
         match e {
             BftError::NotReady(_)

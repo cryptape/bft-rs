@@ -10,11 +10,13 @@ use crate::{
 };
 
 use crossbeam::crossbeam_channel::{unbounded, Sender};
+use hex_fmt::HexFmt;
 use log::{debug, error, info, trace};
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::hash::{Hash as Hashable, Hasher};
+use std::ops::Deref;
 use std::sync::Arc;
 
 /// The core Bft algorithm.
@@ -39,15 +41,79 @@ pub mod utils;
 pub mod wal;
 
 /// Type for node address.
-pub type Address = Vec<u8>;
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub struct Address(Vec<u8>);
 /// Type for hash.
-pub type Hash = Vec<u8>;
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct Hash(Vec<u8>);
 /// Type for signature.
-pub type Signature = Vec<u8>;
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub struct Signature(Vec<u8>);
 
-pub type Block = Vec<u8>;
+#[derive(Clone, Eq, PartialEq)]
+pub struct Block(Vec<u8>);
 
-pub type Encode = Vec<u8>;
+macro_rules! impl_traits_for_vecu8_wraper {
+	($name: ident) => {
+		impl Default for $name {
+            fn default() -> Self {
+                $name(vec![])
+            }
+        }
+
+        impl Deref for $name {
+            type Target = [u8];
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+		impl Encodable for $name {
+			fn rlp_append(&self, s: &mut RlpStream) {
+                s.begin_list(1).append(&self.0);
+			}
+		}
+
+		impl Decodable for $name {
+            fn decode(r: &Rlp) -> Result<Self, DecoderError> {
+                match r.prototype()? {
+                    Prototype::List(1) => {
+                        let v: Vec<u8> = r.val_at(0)?;
+                        Ok($name(v))
+                    }
+                    _ => Err(DecoderError::RlpInconsistentLengthAndData),
+                }
+            }
+        }
+
+        impl From<Vec<u8>> for $name {
+            fn from(v: Vec<u8>) -> Self {
+                $name(v)
+            }
+        }
+
+        impl From<&[u8]> for $name {
+            fn from(v: &[u8]) -> Self {
+                $name(v.to_vec())
+            }
+        }
+
+        impl Debug for $name {
+            fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+                write!(
+                    f,
+                    "{:?}",
+                    &format!("{:<10}", HexFmt(&self.0)),
+                )
+            }
+        }
+	}
+}
+
+impl_traits_for_vecu8_wraper!(Address);
+impl_traits_for_vecu8_wraper!(Hash);
+impl_traits_for_vecu8_wraper!(Signature);
+impl_traits_for_vecu8_wraper!(Block);
 
 pub type Height = u64;
 
@@ -78,8 +144,8 @@ impl BftActuator {
 
 #[derive(Debug, Clone)]
 pub enum BftMsg {
-    Proposal(Encode),
-    Vote(Encode),
+    Proposal(Vec<u8>),
+    Vote(Vec<u8>),
     Status(Status),
     #[cfg(feature = "verify_req")]
     VerifyResp(VerifyResp),
@@ -118,20 +184,9 @@ impl Debug for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "Commit {{ height: {}, address: {:?}}}",
+            "Commit {{ h: {}, address: {:?}}}",
             self.height, self.address,
         )
-    }
-}
-
-impl Default for Commit {
-    fn default() -> Self {
-        Commit {
-            height: 0u64,
-            block: vec![],
-            proof: Proof::default(),
-            address: vec![],
-        }
     }
 }
 
@@ -176,16 +231,6 @@ pub struct Status {
     pub authority_list: Vec<Node>,
 }
 
-impl Default for Status {
-    fn default() -> Self {
-        Status {
-            height: 0u64,
-            interval: None,
-            authority_list: vec![],
-        }
-    }
-}
-
 impl Encodable for Status {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(3)
@@ -227,16 +272,6 @@ pub struct Feed {
 impl Debug for Feed {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Feed {{ height: {}}}", self.height)
-    }
-}
-
-impl Default for Feed {
-    fn default() -> Self {
-        Feed {
-            height: 0u64,
-            block: vec![],
-            block_hash: vec![],
-        }
     }
 }
 
@@ -293,7 +328,7 @@ impl Default for VerifyResp {
     fn default() -> Self {
         VerifyResp {
             is_pass: false,
-            round: 0u64,
+            round: 0,
         }
     }
 }
@@ -407,9 +442,9 @@ impl Debug for Proof {
 impl Default for Proof {
     fn default() -> Self {
         Proof {
-            height: 0u64,
-            round: 0u64,
-            block_hash: vec![],
+            height: 0,
+            round: 0,
+            block_hash: Hash::default(),
             precommit_votes: HashMap::new(),
         }
     }
@@ -430,11 +465,11 @@ impl Encodable for Proof {
             .append(&self.height)
             .append(&self.round)
             .append(&self.block_hash);
-        let mut key_values: Vec<(Address, Vec<u8>)> =
+        let mut key_values: Vec<(Address, Signature)> =
             self.precommit_votes.clone().into_iter().collect();
         key_values.sort();
         let mut key_list: Vec<Address> = vec![];
-        let mut value_list: Vec<Vec<u8>> = vec![];
+        let mut value_list: Vec<Signature> = vec![];
         key_values.iter().for_each(|(address, sig)| {
             key_list.push(address.to_owned());
             value_list.push(sig.to_owned());
@@ -490,18 +525,18 @@ pub trait BftSupport: Sync + Send {
     /// A user-defined function for block validation.
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate block format, block headers here.
-    fn check_block(&self, block: &[u8], block_hash: &[u8], height: u64) -> Result<(), Self::Error>;
+    fn check_block(&self, block: &Block, block_hash: &Hash, height: Height) -> Result<(), Self::Error>;
     /// A user-defined function for transactions validation.
     /// Every block bft received will call this function, even if the feed block.
     /// Users should validate transactions here.
     /// The [`proposal_hash`] is corresponding to the proposal of the [`proposal_hash`].
     fn check_txs(
         &self,
-        block: &[u8],
-        block_hash: &[u8],
-        signed_proposal_hash: &[u8],
-        height: u64,
-        round: u64,
+        block: &Block,
+        block_hash: &Hash,
+        signed_proposal_hash: &Hash,
+        height: Height,
+        round: Round,
     ) -> Result<(), Self::Error>;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,
@@ -513,13 +548,13 @@ pub trait BftSupport: Sync + Send {
     fn commit(&self, commit: Commit) -> Result<Status, Self::Error>;
     /// A user-defined function for feeding the bft consensus.
     /// The new block provided will feed for bft consensus of giving [`height`]
-    fn get_block(&self, height: u64) -> Result<(Vec<u8>, Vec<u8>), Self::Error>;
+    fn get_block(&self, height: Height) -> Result<(Block, Hash), Self::Error>;
     /// A user-defined function for signing a [`hash`].
-    fn sign(&self, hash: &[u8]) -> Result<Signature, Self::Error>;
+    fn sign(&self, hash: &Hash) -> Result<Signature, Self::Error>;
     /// A user-defined function for checking a [`signature`].
-    fn check_sig(&self, signature: &[u8], hash: &[u8]) -> Result<Address, Self::Error>;
+    fn check_sig(&self, signature: &Signature, hash: &Hash) -> Result<Address, Self::Error>;
     /// A user-defined function for hashing a [`msg`].
-    fn crypt_hash(&self, msg: &[u8]) -> Vec<u8>;
+    fn crypt_hash(&self, msg: &[u8]) -> Hash;
 }
 
 /// A public function for proof validation.
@@ -531,10 +566,10 @@ pub trait BftSupport: Sync + Send {
 /// - [`check_sig`]:  `fn(signature: &[u8], hash: &[u8]) -> Option<Address>`
 pub fn check_proof(
     proof: &Proof,
-    height: u64,
+    height: Height,
     authorities: &[Node],
-    crypt_hash: impl Fn(&[u8]) -> Vec<u8>,
-    check_sig: impl Fn(&[u8], &[u8]) -> Option<Address>,
+    crypt_hash: impl Fn(&[u8]) -> Hash,
+    check_sig: impl Fn(&Signature, &Hash) -> Option<Address>,
 ) -> bool {
     if proof.height == 0 {
         return true;

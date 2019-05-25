@@ -1,6 +1,6 @@
 extern crate bft_rs;
 
-use self::bft_rs::{Address, BftMsg, BftSupport, Commit, Signature as BftSig, Status};
+use self::bft_rs::*;
 use super::config::Config;
 use super::utils::*;
 use crossbeam::crossbeam_channel::Sender;
@@ -8,14 +8,14 @@ use std::thread;
 
 pub struct Support {
     pub config: Config,
-    pub address: Vec<u8>,
+    pub address: Address,
     pub msg_send: Sender<(BftMsg, Address)>,
     pub commit_send: Sender<(Commit, Address)>,
 }
 
 impl BftSupport for Support {
     type Error = TestError;
-    fn check_block(&self, block: &[u8], _block_hash: &[u8], _height: u64) -> Result<(), TestError> {
+    fn check_block(&self, block: &Block, _block_hash: &Hash, _height: Height) -> Result<(), TestError> {
         if check_block_result(block) {
             Ok(())
         } else {
@@ -25,11 +25,11 @@ impl BftSupport for Support {
 
     fn check_txs(
         &self,
-        _block: &[u8],
-        _block_hash: &[u8],
-        _signed_proposal_hash: &[u8],
-        _height: u64,
-        _round: u64,
+        _block: &Block,
+        _block_hash: &Hash,
+        _signed_proposal_hash: &Hash,
+        _height: Height,
+        _round: Round,
     ) -> Result<(), TestError> {
         let delay = check_txs_delay(&self.config);
         thread::sleep(delay);
@@ -50,21 +50,22 @@ impl BftSupport for Support {
         Err(TestError::CommitProposed)
     }
 
-    fn get_block(&self, _height: u64) -> Result<(Vec<u8>, Vec<u8>), TestError> {
+    fn get_block(&self, _height: Height) -> Result<(Block, Hash), TestError> {
         let block = generate_block(false, &self.config);
         let block_hash = hash(&block[0..self.config.min_block_size]);
         Ok((block, block_hash))
     }
 
-    fn sign(&self, hash: &[u8]) -> Result<BftSig, TestError> {
+    fn sign(&self, hash: &Hash) -> Result<Signature, TestError> {
         Ok(sign(hash, &self.address))
     }
 
-    fn check_sig(&self, signature: &[u8], _hash: &[u8]) -> Result<Address, TestError> {
-        Ok(signature.to_vec())
+    fn check_sig(&self, signature: &Signature, _hash: &Hash) -> Result<Address, TestError> {
+        let sig: &[u8] = signature;
+        Ok(sig.into())
     }
 
-    fn crypt_hash(&self, msg: &[u8]) -> Vec<u8> {
+    fn crypt_hash(&self, msg: &[u8]) -> Hash {
         hash(msg)
     }
 }

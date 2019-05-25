@@ -14,7 +14,7 @@ pub(crate) struct BftParams {
 
 impl BftParams {
     /// A function to create a new BFT params.
-    pub(crate) fn new(local_address: Hash) -> Self {
+    pub(crate) fn new(local_address: Address) -> Self {
         BftParams {
             address: local_address,
             timer: BftTimer::default(),

@@ -84,8 +84,8 @@ impl VoteCollector {
         Ok(())
     }
 
-    pub(crate) fn remove(&mut self, current_height: Height) {
-        self.votes.remove(&current_height);
+    pub(crate) fn remove(&mut self, height: Height) {
+        self.votes.remove(&height);
         self.clear_vote_count();
     }
 
@@ -199,7 +199,7 @@ impl VoteSet {
         VoteSet {
             votes_by_sender: HashMap::new(),
             votes_by_proposal: HashMap::new(),
-            count: 0u64,
+            count: 0,
         }
     }
 
@@ -220,12 +220,12 @@ impl VoteSet {
     }
 
     /// A function to abstract the PoLC of the round.
-    pub(crate) fn extract_polc(&self, block_hash: &[u8]) -> Vec<SignedVote> {
+    pub(crate) fn extract_polc(&self, block_hash: &Hash) -> Vec<SignedVote> {
         // abstract the votes for the polc proposal into a vec
         let mut polc = Vec::new();
         for signed_vote in self.votes_by_sender.values() {
             let hash = &signed_vote.vote.block_hash;
-            if hash.to_vec() == block_hash.to_vec() {
+            if hash == block_hash {
                 polc.push(signed_vote.to_owned());
             }
         }
@@ -315,7 +315,7 @@ impl BlockCollector {
         }
     }
 
-    pub(crate) fn add(&mut self, height: Height, block_hash: &[u8], block: &[u8]) -> bool {
+    pub(crate) fn add(&mut self, height: Height, block_hash: &Hash, block: &Block) -> bool {
         if self.blocks.contains_key(&height) {
             self.blocks.get_mut(&height).unwrap().add(block_hash, block)
         } else {
@@ -326,7 +326,7 @@ impl BlockCollector {
         }
     }
 
-    pub(crate) fn get_block(&mut self, height: Height, hash: &[u8]) -> Option<&Block> {
+    pub(crate) fn get_block(&mut self, height: Height, hash: &Hash) -> Option<&Block> {
         self.blocks
             .get_mut(&height)
             .and_then(|bs| bs.get_block(hash))
@@ -345,15 +345,15 @@ impl BlockSet {
         }
     }
 
-    pub(crate) fn add(&mut self, hash: &[u8], block: &[u8]) -> bool {
+    pub(crate) fn add(&mut self, hash: &Hash, block: &Block) -> bool {
         if self.block_set.contains_key(hash) {
             return false;
         }
-        self.block_set.insert(hash.to_vec(), block.to_vec());
+        self.block_set.insert(hash.clone(), block.clone());
         true
     }
 
-    pub(crate) fn get_block(&self, hash: &[u8]) -> Option<&Block> {
+    pub(crate) fn get_block(&self, hash: &Hash) -> Option<&Block> {
         self.block_set.get(hash)
     }
 }

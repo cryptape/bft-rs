@@ -17,7 +17,7 @@ fn test_basic() {
     clean_log_file(path);
     set_log_file(path, LevelFilter::Debug);
     let mut env = Env::new(PERFECT_CONFIG, 4, wal_dir);
-    env.run(30);
+    env.run(10);
 }
 
 #[test]

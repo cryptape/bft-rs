@@ -13,7 +13,7 @@ pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
     while res >= sum * x {
         res = rng.next_u64();
     }
-    let mut acc = 0u64;
+    let mut acc = 0;
     for (index, w) in weight.iter().enumerate() {
         acc += *w;
         if res < acc * x {
@@ -28,7 +28,7 @@ pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
     let sum: u64 = weight.iter().sum();
     let x = seed % sum;
 
-    let mut acc = 0u64;
+    let mut acc = 0;
     for (index, w) in weight.iter().enumerate() {
         acc += *w;
         if x < acc {
@@ -44,7 +44,7 @@ mod test {
 
     #[test]
     fn test_get_index() {
-        let weight = vec![1u64, 2u64, 1u64, 10u64];
+        let weight = vec![1, 2, 1, 10];
         let mut count_0 = 0;
         let mut count_1 = 0;
         let mut count_2 = 0;

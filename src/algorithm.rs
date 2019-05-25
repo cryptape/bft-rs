@@ -16,8 +16,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-pub(crate) const INIT_HEIGHT: u64 = 0;
-pub(crate) const INIT_ROUND: u64 = 0;
+pub(crate) const INIT_HEIGHT: Height = 0;
+pub(crate) const INIT_ROUND: Round = 0;
 pub(crate) const PROPOSAL_TIMES_COEF: u64 = 4;
 pub(crate) const TIMEOUT_RETRANSE_COEF: u32 = 15;
 
@@ -76,7 +76,7 @@ where
         wal_path: &str,
     ) -> Self {
         info!(
-            "Node: {:?} initializing with wal_path: {}",
+            "Node {:?} initializing with wal_path: {}",
             local_address, wal_path
         );
         Bft {
@@ -187,7 +187,7 @@ where
                         "Node {:?} receives {:?}",
                         self.params.address, &signed_proposal
                     );
-                    self.check_and_save_proposal(&signed_proposal, block, &encode, need_wal)?;
+                    self.check_and_save_proposal(&signed_proposal, &block.into(), &encode, need_wal)?;
 
                     let proposal = signed_proposal.proposal;
                     if self.step <= Step::ProposeWait {
@@ -656,7 +656,7 @@ where
         } else if let Some(block_hash) = self.block_hash.clone() {
             block_hash
         } else {
-            Vec::new()
+            Hash::default()
         };
 
         let vote = Vote {
@@ -667,7 +667,7 @@ where
             voter: self.params.address.clone(),
         };
         let signed_vote = self.build_signed_vote(&vote)?;
-        let msg = BftMsg::Vote(rlp::encode(&signed_vote));
+        let msg = BftMsg::Vote(rlp::encode(&signed_vote).into());
 
         debug!(
             "Node {:?} prevotes to {:?} at h:{} r:{}",
@@ -696,7 +696,7 @@ where
             lock_status.block_hash
         } else {
             self.block_hash = None;
-            Vec::new()
+            Hash::default()
         };
 
         let vote = Vote {
@@ -707,7 +707,7 @@ where
             voter: self.params.address.clone(),
         };
         let signed_vote = self.build_signed_vote(&vote)?;
-        let msg = BftMsg::Vote(rlp::encode(&signed_vote));
+        let msg = BftMsg::Vote(rlp::encode(&signed_vote).into());
 
         debug!(
             "Node {:?} precommits to {:?} at h:{:?}, r:{:?}",
@@ -726,7 +726,7 @@ where
         Ok(())
     }
 
-    fn retransmit_lower_votes(&self, round: u64) -> BftResult<()> {
+    fn retransmit_lower_votes(&self, round: Round) -> BftResult<()> {
         if self.is_byzantine {
             return self.retransmit_byzantine_lower_votes();
         }
@@ -745,7 +745,7 @@ where
         };
         let signed_prevote = self.build_signed_vote(&prevote)?;
         self.function
-            .transmit(BftMsg::Vote(rlp::encode(&signed_prevote)));
+            .transmit(BftMsg::Vote(rlp::encode(&signed_prevote).into()));
 
         let precommit = Vote {
             vote_type: VoteType::Precommit,
@@ -756,7 +756,7 @@ where
         };
         let signed_precommit = self.build_signed_vote(&precommit)?;
         self.function
-            .transmit(BftMsg::Vote(rlp::encode(&signed_precommit)));
+            .transmit(BftMsg::Vote(rlp::encode(&signed_precommit).into()));
         Ok(())
     }
 
@@ -769,7 +769,7 @@ where
             vote_type: VoteType::Precommit,
             height: vote.height,
             round: vote.round,
-            block_hash: Vec::new(),
+            block_hash: Hash::default(),
             voter: self.params.address.clone(),
         };
         let signed_precommit = self.build_signed_vote(&precommit)?;
@@ -779,7 +779,7 @@ where
             self.params.address
         );
         self.function
-            .transmit(BftMsg::Vote(rlp::encode(&signed_precommit)));
+            .transmit(BftMsg::Vote(rlp::encode(&signed_precommit).into()));
         Ok(())
     }
 
@@ -826,7 +826,7 @@ where
     }
 
     #[inline]
-    fn goto_new_height(&mut self, new_height: u64) {
+    fn goto_new_height(&mut self, new_height: Height) {
         self.clean_save_info();
         self.clean_filter();
         handle_err(
@@ -965,7 +965,7 @@ where
                     if self.lock_status.is_some()
                         && self.lock_status.clone().unwrap().round < self.round
                     {
-                        if hash.is_empty() {
+                        if hash.0.is_empty() {
                             // receive +2/3 prevote to nil, clean lock info
                             debug!(
                                 "Node {:?} collects over 2/3 prevotes on nil at h:{}, r:{}",
@@ -978,7 +978,7 @@ where
                             self.set_polc(hash, &prevote_set);
                         }
                     }
-                    if self.lock_status.is_none() && !hash.is_empty() {
+                    if self.lock_status.is_none() && !hash.0.is_empty() {
                         // receive a PoLC, lock the proposal
                         self.set_polc(&hash, &prevote_set);
                     }
@@ -1028,7 +1028,7 @@ where
 
             for (hash, count) in &precommit_set.votes_by_proposal {
                 if self.cal_above_threshold(*count) {
-                    if hash.is_empty() {
+                    if hash.0.is_empty() {
                         debug!(
                             "Node {:?} reaches nil consensus, goto next round {:?}",
                             self.params.address,

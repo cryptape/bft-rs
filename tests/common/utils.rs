@@ -3,9 +3,10 @@ use std::fs::{self, read_dir};
 use std::time::Duration;
 use std::u64::MAX as MAX_U64;
 
+use bft_rs::*;
 use super::config::*;
 use digest_hash::EndianInput;
-use digest_hash::{BigEndian, Hash};
+use digest_hash::{BigEndian, Hash as DigestHash};
 use log::info;
 use log::LevelFilter;
 use log4rs::append::file::FileAppender;
@@ -13,7 +14,7 @@ use log4rs::config::{Appender, Config as LogConfig, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use sha2::{Digest, Sha256};
 
-pub fn generate_block(byzantine: bool, config: &Config) -> Vec<u8> {
+pub fn generate_block(byzantine: bool, config: &Config) -> Block {
     let random_size = get_random_integer(config.block_size) as usize;
     let size = if random_size < config.max_block_size {
         if random_size < config.min_block_size {
@@ -33,10 +34,10 @@ pub fn generate_block(byzantine: bool, config: &Config) -> Vec<u8> {
     for i in 1..config.min_block_size {
         vec.insert(i, get_random_integer(RANDOM_U8) as u8);
     }
-    vec
+    vec.into()
 }
 
-pub fn check_block_result(block: &[u8]) -> bool {
+pub fn check_block_result(block: &Block) -> bool {
     !block.is_empty() && block[0] == 0u8
 }
 
@@ -54,7 +55,7 @@ pub fn check_txs_delay(config: &Config) -> Duration {
     Duration::from_millis(delay)
 }
 
-pub fn sync_delay(height_diff: u64, config: &Config) -> Duration {
+pub fn sync_delay(height_diff: Height, config: &Config) -> Duration {
     let rand_num = get_random_integer(config.sync_delay);
     let delay = if rand_num < config.min_delay {
         config.min_delay
@@ -92,24 +93,24 @@ pub fn message_delay(config: &Config) -> Duration {
     Duration::from_millis(cost_time)
 }
 
-pub fn generate_address() -> Vec<u8> {
+pub fn generate_address() -> Address {
     let mut vec = Vec::with_capacity(ADDRESS_SIZE);
     for _i in 0..ADDRESS_SIZE {
         vec.push(get_random_integer(RANDOM_U8) as u8);
     }
-    vec
+    vec.into()
 }
 
-pub fn hash(msg: &[u8]) -> Vec<u8> {
+pub fn hash(msg: &[u8]) -> Hash {
     let mut hasher = BigEndian::<Sha256>::new();
     hash_slice(msg, &mut hasher);
     let output = hasher.result().as_ref().to_vec();
-    output
+    output.into()
 }
 
 // simplified for test
-pub fn sign(_hash_value: &[u8], address: &[u8]) -> Vec<u8> {
-    address.to_vec()
+pub fn sign(_hash_value: &Hash, address: &Address) -> Signature {
+    address.to_vec().into()
 }
 
 pub fn clean_wal(wal_dir: &str) {
@@ -183,7 +184,7 @@ pub fn get_random_float(mode: RandomMode) -> f64 {
 
 fn hash_slice<T, H>(slice: &[T], digest: &mut H)
 where
-    T: Hash,
+    T: DigestHash,
     H: EndianInput,
 {
     for elem in slice {

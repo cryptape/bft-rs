@@ -1,7 +1,7 @@
 extern crate bft_rs;
 
 use self::bft_rs::timer::{GetInstant, WaitTimer};
-use self::bft_rs::Address;
+use self::bft_rs::{Address, Hash, Height};
 use super::config::{Config, LIVENESS_TICK};
 use super::support::Support;
 use super::utils::*;
@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 pub struct Env {
     pub config: Config,
     pub wal_dir: &'static str,
-    pub live_nodes: HashMap<Vec<u8>, Box<BftActuator>>,
+    pub live_nodes: HashMap<Address, Box<BftActuator>>,
     pub byzantine_nodes: Vec<Address>,
     pub msg_recv: Receiver<(BftMsg, Address)>,
     pub msg_send: Sender<(BftMsg, Address)>,
@@ -29,11 +29,11 @@ pub struct Env {
     pub authority_list: Vec<Node>,
     pub interval: Option<u64>,
     pub status: Status,
-    pub status_list: LruCache<u64, Status>,
+    pub status_list: LruCache<Height, Status>,
     //    pub old_status: Option<Status>,
     pub last_reach_consensus_time: Instant,
-    pub commits: LruCache<u64, Vec<u8>>,
-    pub nodes_height: HashMap<Vec<u8>, u64>,
+    pub commits: LruCache<Height, Hash>,
+    pub nodes_height: HashMap<Address, Height>,
 }
 
 impl Env {
@@ -110,7 +110,7 @@ impl Env {
     pub fn run(&mut self, stop_height: u64) {
         let event = Event {
             process_time: Instant::now(),
-            to: vec![],
+            to: Address::default(),
             content: Content::Sync,
         };
         self.test2timer.send(event).unwrap();
@@ -188,7 +188,7 @@ impl Env {
                     self.last_reach_consensus_time = Instant::now();
                     let event = Event {
                         process_time: Instant::now() + LIVENESS_TICK,
-                        to: vec![],
+                        to: Address::default(),
                         content: Content::LivenessTimeout(ch, 1),
                     };
                     self.test2timer.send(event).unwrap();
@@ -222,7 +222,7 @@ impl Env {
                             );
                             let event = Event {
                                 process_time: Instant::now() + LIVENESS_TICK,
-                                to: vec![],
+                                to: Address::default(),
                                 content: Content::LivenessTimeout(height, n + 1),
                             };
                             self.test2timer.send(event).unwrap();
@@ -287,7 +287,7 @@ impl Env {
     }
 
     pub fn try_sync(&mut self) {
-        let live_honest_heights: HashMap<&Vec<u8>, &u64> = self
+        let live_honest_heights: HashMap<&Address, &Height> = self
             .nodes_height
             .iter()
             .filter(|(address, _)| {
@@ -313,7 +313,7 @@ impl Env {
 
         let event = Event {
             process_time: Instant::now() + Duration::from_millis(self.config.sync_trigger_duration),
-            to: vec![],
+            to: Address::default(),
             content: Content::Sync,
         };
         self.test2timer.send(event).unwrap();

@@ -53,7 +53,7 @@ where
                             "can not fetch block from cache when load signed_proposal".to_string(),
                         )
                     })?;
-                let proposal_block_encode = combine_two(&encode, block);
+                let proposal_block_encode = combine_two(&encode, &block);
                 self.process(BftMsg::Proposal(proposal_block_encode), false)?;
             }
             LogType::Vote => {
@@ -97,7 +97,7 @@ where
             LogType::Block => {
                 info!("Node {:?} loads block", self.params.address);
                 let (height, block, block_hash) = decode_block(&encode)?;
-                self.blocks.add(height, block_hash, block);
+                self.blocks.add(height, &block_hash, &block);
             }
         }
         Ok(())
@@ -118,7 +118,7 @@ where
                     "can not fetch block from cache when send signed_proposal".to_string(),
                 )
             })?;
-        let encode = combine_two(&signed_proposal_encode, block);
+        let encode = combine_two(&signed_proposal_encode, &block);
         Ok(encode)
     }
 
@@ -153,7 +153,7 @@ where
     }
 
     #[inline]
-    fn get_authorities(&self, height: u64) -> BftResult<&Vec<Node>> {
+    fn get_authorities(&self, height: Height) -> BftResult<&Vec<Node>> {
         let p = &self.authority_manage;
         let authorities = if height == p.authority_h_old {
             &p.authorities_old
@@ -170,22 +170,22 @@ where
     }
 
     #[inline]
-    fn get_vote_weight(&self, height: u64, address: &[u8]) -> u64 {
+    fn get_vote_weight(&self, height: Height, address: &Address) -> u64 {
         if height != self.height {
-            return 1u64;
+            return 1;
         }
         if let Some(node) = self
             .authority_manage
             .authorities
             .iter()
-            .find(|node| node.address == address.to_vec())
+            .find(|node| &node.address == address)
         {
             return u64::from(node.vote_weight);
         }
-        1u64
+        1
     }
 
-    pub(crate) fn get_proposer(&self, height: u64, round: u64) -> BftResult<&Address> {
+    pub(crate) fn get_proposer(&self, height: Height, round: Round) -> BftResult<&Address> {
         let authorities = self.get_authorities(height)?;
         let nonce = height + round;
         let weight: Vec<u64> = authorities
@@ -250,7 +250,7 @@ where
         }
     }
 
-    pub(crate) fn set_polc(&mut self, hash: &[u8], voteset: &VoteSet) {
+    pub(crate) fn set_polc(&mut self, hash: &Hash, voteset: &VoteSet) {
         self.block_hash = Some(hash.to_owned());
         self.lock_status = Some(LockStatus {
             block_hash: hash.to_owned(),
@@ -319,7 +319,7 @@ where
                 )
             })?;
             let proposal_encode = rlp::encode(&signed_proposal);
-            let encode = combine_two(&proposal_encode, block);
+            let encode = combine_two(&proposal_encode, &block);
             let msg = BftMsg::Proposal(encode);
             let info = format!("{:?}", &msg);
             self.msg_sender
@@ -343,7 +343,7 @@ where
             for (_, vote_set) in step_votes.step_votes.iter() {
                 for (_, signed_vote) in vote_set.votes_by_sender.iter() {
                     let encode = rlp::encode(signed_vote);
-                    let msg = BftMsg::Vote(encode);
+                    let msg = BftMsg::Vote(encode.into());
                     let info = format!("{:?}", &msg);
                     self.msg_sender
                         .send(msg)
@@ -371,7 +371,7 @@ where
     pub(crate) fn check_and_save_proposal(
         &mut self,
         signed_proposal: &SignedProposal,
-        block: &[u8],
+        block: &Block,
         encode: &[u8],
         need_wal: bool,
     ) -> BftResult<()> {
@@ -589,8 +589,8 @@ where
     pub(crate) fn check_block_txs(
         &mut self,
         proposal: &Proposal,
-        block: &[u8],
-        proposal_hash: &[u8],
+        block: &Block,
+        proposal_hash: &Hash,
     ) -> BftResult<()> {
         let height = proposal.height;
         let round = proposal.round;
@@ -619,9 +619,9 @@ where
 
             let function = self.function.clone();
             let sender = self.msg_sender.clone();
-            let block = block.to_vec();
+            let block = block.clone();
             let block_hash = block_hash.clone();
-            let proposal_hash = proposal_hash.to_owned();
+            let proposal_hash = proposal_hash.clone();
             let address = self.params.address.clone();
             thread::spawn(move || {
                 let is_pass =
@@ -648,7 +648,7 @@ where
         }
     }
 
-    pub(crate) fn check_proof(&mut self, height: u64, proof: &Proof) -> BftResult<()> {
+    pub(crate) fn check_proof(&mut self, height: Height, proof: &Proof) -> BftResult<()> {
         if height != self.height {
             return Err(BftError::ShouldNotHappen(format!(
                 "check_proof for {:?}",
@@ -666,7 +666,7 @@ where
     pub(crate) fn check_proof_only(
         &self,
         proof: &Proof,
-        height: u64,
+        height: Height,
         authorities: &[Node],
     ) -> BftResult<()> {
         if proof.height == 0 {
@@ -741,7 +741,7 @@ where
     pub(crate) fn check_lock_votes(
         &mut self,
         proposal: &Proposal,
-        block_hash: &[u8],
+        block_hash: &Hash,
     ) -> BftResult<()> {
         let height = proposal.height;
         if height < self.height - 1 || height > self.height {
@@ -786,7 +786,7 @@ where
         &mut self,
         height: Height,
         round: Round,
-        block_hash: &[u8],
+        block_hash: &Hash,
         signed_vote: &SignedVote,
     ) -> BftResult<Address> {
         if height < self.height - 1 {
@@ -804,7 +804,7 @@ where
             )));
         }
 
-        if vote.block_hash != block_hash.to_vec() {
+        if &vote.block_hash != block_hash {
             return Err(BftError::CheckLockVotesFailed(format!(
                 "vote {:?} not for rightful block_hash {:?}",
                 vote, block_hash
@@ -888,7 +888,7 @@ where
         Ok(())
     }
 
-    pub(crate) fn filter_height(&self, voter: &[u8]) -> bool {
+    pub(crate) fn filter_height(&self, voter: &Address) -> bool {
         let mut trans_flag = false;
 
         if let Some(ins) = self.height_filter.get(voter) {
@@ -904,7 +904,7 @@ where
         trans_flag
     }
 
-    pub(crate) fn filter_round(&self, voter: &[u8]) -> bool {
+    pub(crate) fn filter_round(&self, voter: &Address) -> bool {
         let mut trans_flag = false;
 
         if let Some(ins) = self.round_filter.get(voter) {
@@ -1052,20 +1052,20 @@ pub fn extract_two(encode: &[u8]) -> BftResult<(&[u8], &[u8])> {
     Ok((one, two))
 }
 
-pub fn encode_block(height: u64, block: &[u8], block_hash: &[u8]) -> Vec<u8> {
+pub fn encode_block(height: Height, block: &Block, block_hash: &Hash) -> Vec<u8> {
     let height_mark = height.to_be_bytes();
-    let mut encode = Vec::with_capacity(8 + block.len());
+    let mut encode = Vec::with_capacity(8 + block.0.len());
     encode.extend_from_slice(&height_mark);
-    let combine = combine_two(block_hash, block);
+    let combine = combine_two(&block_hash.0, &block);
     encode.extend_from_slice(&combine);
     encode
 }
 
-pub fn decode_block(encode: &[u8]) -> BftResult<(u64, &[u8], &[u8])> {
+pub fn decode_block(encode: &[u8]) -> BftResult<(Height, Block, Hash)> {
     let (h, combine) = encode.split_at(8);
     let (block_hash, block) = extract_two(combine)?;
     let mut height_mark: [u8; 8] = [0; 8];
     height_mark.copy_from_slice(h);
-    let height = u64::from_be_bytes(height_mark);
-    Ok((height, block, block_hash))
+    let height = Height::from_be_bytes(height_mark);
+    Ok((height, block.into(), block_hash.into()))
 }

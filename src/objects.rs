@@ -65,7 +65,7 @@ impl Decodable for Proposal {
             Prototype::List(7) => {
                 let height: Height = r.val_at(0)?;
                 let round: Round = r.val_at(1)?;
-                let block_hash: Block = r.val_at(2)?;
+                let block_hash: Hash = r.val_at(2)?;
                 let proof: Proof = r.val_at(3)?;
                 let lock_round: Option<Round> = r.val_at(4)?;
                 let lock_votes: Vec<SignedVote> = r.list_at(5)?;
@@ -247,7 +247,7 @@ pub(crate) struct AuthorityManage {
     ///
     pub(crate) authorities_old: Vec<Node>,
     ///
-    pub(crate) authority_h_old: u64,
+    pub(crate) authority_h_old: Height,
 }
 
 impl AuthorityManage {
@@ -259,7 +259,7 @@ impl AuthorityManage {
         }
     }
 
-    pub(crate) fn receive_authorities_list(&mut self, height: u64, mut authorities: Vec<Node>) {
+    pub(crate) fn receive_authorities_list(&mut self, height: Height, mut authorities: Vec<Node>) {
         authorities.sort();
         if self.authorities != authorities {
             self.authorities_old.clear();
@@ -416,229 +416,4 @@ pub(crate) enum PrecommitRes {
     Below,
     Nil,
     Proposal,
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_proof_rlp() {
-        let address_1 = vec![87u8, 9u8, 17u8];
-        let address_2 = vec![84u8, 91u8, 17u8];
-        let signature_1 = vec![
-            23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8,
-        ];
-        let signature_2 = vec![
-            23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8,
-        ];
-        let mut precommit_votes: HashMap<Address, Signature> = HashMap::new();
-        precommit_votes.entry(address_1).or_insert(signature_1);
-        precommit_votes.entry(address_2).or_insert(signature_2);
-        let proof = Proof {
-            height: 1888787u64,
-            round: 23u64,
-            block_hash: vec![10u8, 90u8, 23u8, 65u8],
-            precommit_votes,
-        };
-        let encode = rlp::encode(&proof);
-        let decode: Proof = rlp::decode(&encode).unwrap();
-        assert_eq!(proof, decode);
-    }
-
-    #[test]
-    fn test_vote_rlp() {
-        let vote = Vote {
-            vote_type: VoteType::Prevote,
-            height: 10u64,
-            round: 2u64,
-            block_hash: vec![76u8, 8u8],
-            voter: vec![76u8, 8u8],
-        };
-
-        let signed_vote = SignedVote {
-            vote,
-            signature: vec![
-                23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8,
-                21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8,
-                10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-                32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8,
-                21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8,
-            ],
-        };
-        let encode = rlp::encode(&signed_vote);
-        let decode: SignedVote = rlp::decode(&encode).unwrap();
-        assert_eq!(signed_vote, decode);
-    }
-
-    #[test]
-    fn test_proposal_rlp() {
-        let address_1 = vec![87u8, 9u8, 17u8];
-        let address_2 = vec![84u8, 91u8, 17u8];
-        let signature_1 = vec![
-            23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8,
-        ];
-        let signature_2 = vec![
-            23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8,
-        ];
-        let mut precommit_votes: HashMap<Address, Signature> = HashMap::new();
-        precommit_votes.entry(address_1).or_insert(signature_1);
-        precommit_votes.entry(address_2).or_insert(signature_2);
-        let proposal = Proposal {
-            height: 787655u64,
-            round: 2u64,
-            block_hash: vec![76u8, 9u8, 12u8],
-            proof: Proof {
-                height: 1888787u64,
-                round: 23u64,
-                block_hash: vec![10u8, 90u8, 23u8, 65u8],
-                precommit_votes,
-            },
-            lock_round: Some(1u64),
-            lock_votes: vec![SignedVote {
-                vote: Vote {
-                    vote_type: VoteType::Prevote,
-                    height: 10u64,
-                    round: 2u64,
-                    block_hash: vec![76u8, 8u8],
-                    voter: vec![76u8, 8u8],
-                },
-                signature: vec![
-                    23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8,
-                    11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8,
-                    21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-                    9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8,
-                    10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8,
-                ],
-            }],
-            proposer: vec![10u8, 90u8, 23u8, 65u8],
-        };
-
-        let signed_proposal = SignedProposal {
-            proposal,
-            signature: vec![
-                23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8,
-                21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8,
-                10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-                32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8,
-                21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8,
-            ],
-        };
-
-        let encode = rlp::encode(&signed_proposal);
-        let decode: SignedProposal = rlp::decode(&encode).unwrap();
-        assert_eq!(signed_proposal, decode);
-    }
-
-    #[test]
-    fn test_feed_rlp() {
-        let feed = Feed {
-            height: 8797888u64,
-            block: vec![89u8, 12u8, 32u8],
-            block_hash: vec![89u8, 12u8, 32u8],
-        };
-        let encode = rlp::encode(&feed);
-        let decode: Feed = rlp::decode(&encode).unwrap();
-        assert_eq!(feed, decode);
-    }
-
-    #[test]
-    fn test_commit_rlp() {
-        let address_1 = vec![87u8, 9u8, 17u8];
-        let address_2 = vec![84u8, 91u8, 17u8];
-        let signature_1 = vec![
-            23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8,
-        ];
-        let signature_2 = vec![
-            23u8, 32u8, 11u8, 21u8, 9u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8,
-            9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8, 32u8, 11u8, 21u8, 9u8, 10u8, 23u8,
-            32u8, 11u8, 21u8, 9u8, 10u8,
-        ];
-        let mut precommit_votes: HashMap<Address, Signature> = HashMap::new();
-        precommit_votes.entry(address_1).or_insert(signature_1);
-        precommit_votes.entry(address_2).or_insert(signature_2);
-        let commit = Commit {
-            height: 878655u64,
-            block: vec![87u8, 23u8],
-            proof: Proof {
-                height: 1888787u64,
-                round: 23u64,
-                block_hash: vec![10u8, 90u8, 23u8, 65u8],
-                precommit_votes,
-            },
-            address: vec![87u8, 23u8],
-        };
-        let encode = rlp::encode(&commit);
-        let decode: Commit = rlp::decode(&encode).unwrap();
-        assert_eq!(commit, decode);
-    }
-
-    #[test]
-    fn test_node_rlp() {
-        let node = Node {
-            address: vec![99u8, 12u8],
-            proposal_weight: 43u32,
-            vote_weight: 98u32,
-        };
-        let encode = rlp::encode(&node);
-        let decode: Node = rlp::decode(&encode).unwrap();
-        assert_eq!(node, decode);
-    }
-
-    #[test]
-    fn test_status_rlp() {
-        let node_1 = Node {
-            address: vec![99u8, 12u8],
-            proposal_weight: 43u32,
-            vote_weight: 98u32,
-        };
-        let node_2 = Node {
-            address: vec![99u8, 12u8],
-            proposal_weight: 43u32,
-            vote_weight: 98u32,
-        };
-        let status = Status {
-            height: 7556u64,
-            interval: Some(6677u64),
-            authority_list: vec![node_1, node_2],
-        };
-
-        let encode = rlp::encode(&status);
-        let decode: Status = rlp::decode(&encode).unwrap();
-        assert_eq!(status, decode);
-    }
-
-    #[test]
-    #[cfg(feature = "verify_req")]
-    fn test_verify_resp_rlp() {
-        let verify_resp = VerifyResp {
-            is_pass: false,
-            round: 99u64,
-        };
-
-        let encode = rlp::encode(&verify_resp);
-        let decode: VerifyResp = rlp::decode(&encode).unwrap();
-        assert_eq!(verify_resp, decode);
-    }
 }

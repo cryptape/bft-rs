@@ -61,7 +61,7 @@ where
     fn send_byzantine_proposal(&mut self) -> BftResult<()> {
         let block = get_rand_vec(20);
         let block_hash = self.function.crypt_hash(&block);
-        self.blocks.add(self.height, &block_hash, &block);
+        self.blocks.add(self.height, &block_hash, &block.into());
         self.block_hash = Some(block_hash.clone());
 
         let proposal = Proposal {
@@ -98,11 +98,11 @@ where
             signature,
         };
         self.function
-            .transmit(BftMsg::Vote(rlp::encode(&signed_vote)));
+            .transmit(BftMsg::Vote(rlp::encode(&signed_vote).into()));
         Ok(())
     }
 
-    fn get_rand_hash(&self) -> Vec<u8> {
+    fn get_rand_hash(&self) -> Hash {
         self.function.crypt_hash(&get_rand_vec(20))
     }
 }
