@@ -132,7 +132,7 @@ pub fn clean_log_file(path: &str) {
 
 pub fn set_log_file(path: &str, level: LevelFilter) {
     let logfile = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{d} {l} - {m}\n")))
+        .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S .%f)} {l} - {m} - {M}-{L} {n}")))
         .build(path)
         .unwrap();
     let config = LogConfig::builder()

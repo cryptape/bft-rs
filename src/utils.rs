@@ -1,4 +1,3 @@
-use crate::collectors::ProposalRoundCollector;
 use crate::*;
 use crate::{
     algorithm::{Bft, INIT_HEIGHT, INIT_ROUND},
@@ -12,9 +11,10 @@ use crate::{
 #[cfg(feature = "verify_req")]
 use std::collections::{HashMap, HashSet};
 use std::fs;
+#[cfg(feature = "verify_req")]
 use std::thread;
 use std::time::{Duration, Instant};
-
+#[cfg(feature = "verify_req")]
 use log::warn;
 
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;

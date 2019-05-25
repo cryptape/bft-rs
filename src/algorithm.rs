@@ -232,7 +232,7 @@ where
             }
 
             BftMsg::Feed(feed) => {
-                debug!("Node {:?} receives feed {:?}", self.params.address, &feed);
+                debug!("Node {:?} receives {:?}", self.params.address, &feed);
                 self.check_and_save_feed(&feed, need_wal)?;
 
                 if self.step == Step::ProposeWait {
@@ -242,7 +242,7 @@ where
 
             BftMsg::Status(status) => {
                 debug!(
-                    "Node {:?} receives status {:?}",
+                    "Node {:?} receives {:?}",
                     self.params.address, &status
                 );
                 self.check_and_save_status(&status, need_wal)?;
@@ -252,7 +252,7 @@ where
             #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
                 debug!(
-                    "Node {:?} receives verify_resp {:?}",
+                    "Node {:?} receives {:?}",
                     self.params.address, &verify_resp
                 );
                 self.check_and_save_verify_resp(&verify_resp, need_wal)?;

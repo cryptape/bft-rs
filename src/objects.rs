@@ -40,8 +40,8 @@ impl Debug for Proposal {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "Proposal {{ height: {}, round: {}, proposer: {:?}}}",
-            self.height, self.round, self.proposer,
+            "Proposal {{ h: {}, r: {}, hash:{:?}, addr: {:?}}}",
+            self.height, self.round, self.block_hash, self.proposer,
         )
     }
 }
@@ -101,7 +101,7 @@ impl Debug for SignedProposal {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "SignedProposal {{ proposal: {:?}, signature: {:?}}}",
+            "SignedProposal {{ proposal: {:?}, sig: {:?}}}",
             self.proposal, self.signature,
         )
     }
@@ -150,7 +150,7 @@ impl Debug for Vote {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "Vote {{ vote_type: {:?}, height: {}, round: {}, block_hash: {:?}, voter: {:?}}}",
+            "{:?} {{ h: {}, r: {}, hash: {:?}, addr: {:?}}}",
             self.vote_type, self.height, self.round, self.block_hash, self.voter,
         )
     }
@@ -204,7 +204,7 @@ impl Debug for SignedVote {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "SignedVote {{ vote: {:?}, signature: {:?}}}",
+            "SignedVote {{ vote: {:?}, sig: {:?}}}",
             self.vote, self.signature,
         )
     }
