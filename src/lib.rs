@@ -52,6 +52,12 @@ pub struct Block(Vec<u8>);
 
 macro_rules! impl_traits_for_vecu8_wraper {
     ($name: ident) => {
+        impl $name {
+	        pub fn to_vec(&self) -> Vec<u8> {
+	            self.0.clone()
+	        }
+	    }
+
         impl Default for $name {
             fn default() -> Self {
                 $name(vec![])
