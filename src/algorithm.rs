@@ -187,7 +187,12 @@ where
                         "Node {:?} receives {:?}",
                         self.params.address, &signed_proposal
                     );
-                    self.check_and_save_proposal(&signed_proposal, &block.into(), &encode, need_wal)?;
+                    self.check_and_save_proposal(
+                        &signed_proposal,
+                        &block.into(),
+                        &encode,
+                        need_wal,
+                    )?;
 
                     let proposal = signed_proposal.proposal;
                     if self.step <= Step::ProposeWait {
@@ -241,20 +246,14 @@ where
             }
 
             BftMsg::Status(status) => {
-                debug!(
-                    "Node {:?} receives {:?}",
-                    self.params.address, &status
-                );
+                debug!("Node {:?} receives {:?}", self.params.address, &status);
                 self.check_and_save_status(&status, need_wal)?;
                 self.handle_status(status)?;
             }
 
             #[cfg(feature = "verify_req")]
             BftMsg::VerifyResp(verify_resp) => {
-                debug!(
-                    "Node {:?} receives {:?}",
-                    self.params.address, &verify_resp
-                );
+                debug!("Node {:?} receives {:?}", self.params.address, &verify_resp);
                 self.check_and_save_verify_resp(&verify_resp, need_wal)?;
 
                 if self.step == Step::VerifyWait {
@@ -667,7 +666,7 @@ where
             voter: self.params.address.clone(),
         };
         let signed_vote = self.build_signed_vote(&vote)?;
-        let msg = BftMsg::Vote(rlp::encode(&signed_vote).into());
+        let msg = BftMsg::Vote(rlp::encode(&signed_vote));
 
         debug!(
             "Node {:?} prevotes to {:?} at h:{} r:{}",
@@ -707,7 +706,7 @@ where
             voter: self.params.address.clone(),
         };
         let signed_vote = self.build_signed_vote(&vote)?;
-        let msg = BftMsg::Vote(rlp::encode(&signed_vote).into());
+        let msg = BftMsg::Vote(rlp::encode(&signed_vote));
 
         debug!(
             "Node {:?} precommits to {:?} at h:{:?}, r:{:?}",
@@ -745,7 +744,7 @@ where
         };
         let signed_prevote = self.build_signed_vote(&prevote)?;
         self.function
-            .transmit(BftMsg::Vote(rlp::encode(&signed_prevote).into()));
+            .transmit(BftMsg::Vote(rlp::encode(&signed_prevote)));
 
         let precommit = Vote {
             vote_type: VoteType::Precommit,
@@ -756,7 +755,7 @@ where
         };
         let signed_precommit = self.build_signed_vote(&precommit)?;
         self.function
-            .transmit(BftMsg::Vote(rlp::encode(&signed_precommit).into()));
+            .transmit(BftMsg::Vote(rlp::encode(&signed_precommit)));
         Ok(())
     }
 
@@ -779,7 +778,7 @@ where
             self.params.address
         );
         self.function
-            .transmit(BftMsg::Vote(rlp::encode(&signed_precommit).into()));
+            .transmit(BftMsg::Vote(rlp::encode(&signed_precommit)));
         Ok(())
     }
 

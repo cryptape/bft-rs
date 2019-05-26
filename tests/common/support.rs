@@ -15,7 +15,12 @@ pub struct Support {
 
 impl BftSupport for Support {
     type Error = TestError;
-    fn check_block(&self, block: &Block, _block_hash: &Hash, _height: Height) -> Result<(), TestError> {
+    fn check_block(
+        &self,
+        block: &Block,
+        _block_hash: &Hash,
+        _height: Height,
+    ) -> Result<(), TestError> {
         if check_block_result(block) {
             Ok(())
         } else {

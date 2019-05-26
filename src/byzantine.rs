@@ -98,7 +98,7 @@ where
             signature,
         };
         self.function
-            .transmit(BftMsg::Vote(rlp::encode(&signed_vote).into()));
+            .transmit(BftMsg::Vote(rlp::encode(&signed_vote)));
         Ok(())
     }
 

@@ -14,7 +14,7 @@ use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 pub(crate) struct TimeoutInfo {
     /// A timestamp of a timer.
     pub(crate) timestamp: Instant,
-
+    ///
     pub(crate) duration: u64,
     /// The height of the timer.
     pub(crate) height: Height,

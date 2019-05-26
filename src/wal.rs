@@ -1,21 +1,5 @@
-// CITA
-// Copyright 2016-2017 Cryptape Technologies LLC.
-
-// This program is free software: you can redistribute it
-// and/or modify it under the terms of the GNU General Public
-// License as published by the Free Software Foundation,
-// either version 3 of the License, or (at your option) any
-// later version.
-
-// This program is distributed in the hope that it will be
-// useful, but WITHOUT ANY WARRANTY; without even the implied
-// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-// PURPOSE. See the GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use crate::Height;
 use crate::objects::LogType;
+use crate::Height;
 use log::{trace, warn};
 use std::collections::BTreeMap;
 use std::fs::{read_dir, DirBuilder, File, OpenOptions};
@@ -169,7 +153,7 @@ impl Wal {
         let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
         let cur_height = self.current_height;
         if self.height_fs.is_empty() || cur_height == 0 {
-            return vec_out.into();
+            return vec_out;
         }
 
         for (height, mut fs) in &self.height_fs {
@@ -180,7 +164,7 @@ impl Wal {
             fs.seek(io::SeekFrom::Start(0)).expect(&expect_str);
             let res_fsize = fs.read_to_end(&mut vec_buf);
             if res_fsize.is_err() {
-                return vec_out.into();
+                return vec_out;
             }
             let expect_str = format!(
                 "Get size of buf of wal file {:?} of height {} failed!",
@@ -188,7 +172,7 @@ impl Wal {
             );
             let fsize = res_fsize.expect(&expect_str);
             if fsize <= 5 {
-                return vec_out.into();
+                return vec_out;
             }
             let mut index = 0;
             loop {
@@ -215,6 +199,6 @@ impl Wal {
                 index += bodylen;
             }
         }
-        vec_out.into()
+        vec_out
     }
 }

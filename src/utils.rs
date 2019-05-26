@@ -4,18 +4,21 @@ use crate::{
     collectors::{ProposalCollector, RoundCollector, VoteCollector, VoteSet, CACHE_N},
     error::{handle_err, BftError, BftResult},
     objects::*,
-    random::get_index,
     timer::TimeoutInfo,
     wal::Wal,
 };
 #[cfg(feature = "verify_req")]
-use std::collections::{HashMap, HashSet};
+use log::warn;
+#[cfg(feature = "random_proposer")]
+use rand_core::{RngCore, SeedableRng};
+#[cfg(feature = "random_proposer")]
+use rand_pcg::Pcg64Mcg as Pcg;
+#[cfg(feature = "verify_req")]
+use std::collections::HashMap;
 use std::fs;
 #[cfg(feature = "verify_req")]
 use std::thread;
 use std::time::{Duration, Instant};
-#[cfg(feature = "verify_req")]
-use log::warn;
 
 const TIMEOUT_LOW_HEIGHT_MESSAGE_COEF: u32 = 20;
 const TIMEOUT_LOW_ROUND_MESSAGE_COEF: u32 = 20;
@@ -76,7 +79,7 @@ where
                 info!("Node {:?} loads proof", self.params.address);
                 let proof: Proof = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("proof encounters {:?}", e)))?;
-                self.proof = proof;
+                self.set_proof(&proof);
             }
             #[cfg(feature = "verify_req")]
             LogType::VerifyResp => {
@@ -343,7 +346,7 @@ where
             for (_, vote_set) in step_votes.step_votes.iter() {
                 for (_, signed_vote) in vote_set.votes_by_sender.iter() {
                     let encode = rlp::encode(signed_vote);
-                    let msg = BftMsg::Vote(encode.into());
+                    let msg = BftMsg::Vote(encode);
                     let info = format!("{:?}", &msg);
                     self.msg_sender
                         .send(msg)
@@ -696,16 +699,7 @@ where
             .iter()
             .map(|node| node.address.clone())
             .collect();
-        let mut set = HashSet::new();
         for (voter, sig) in proof.precommit_votes.clone() {
-            // check repeat
-            if !set.insert(voter.clone()) {
-                return Err(BftError::CheckProofFailed(format!(
-                    "the proof contains repeat votes from the same voter {:?} \n {:?}",
-                    &voter, proof
-                )));
-            }
-
             if authority_addresses.contains(&voter) {
                 let vote = Vote {
                     vote_type: VoteType::Precommit,
@@ -1068,4 +1062,39 @@ pub fn decode_block(encode: &[u8]) -> BftResult<(Height, Block, Hash)> {
     height_mark.copy_from_slice(h);
     let height = Height::from_be_bytes(height_mark);
     Ok((height, block.into(), block_hash.into()))
+}
+
+#[cfg(feature = "random_proposer")]
+pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
+    let sum: u64 = weight.iter().sum();
+    let x = u64::max_value() / sum;
+
+    let mut rng = Pcg::seed_from_u64(seed);
+    let mut res = rng.next_u64();
+    while res >= sum * x {
+        res = rng.next_u64();
+    }
+    let mut acc = 0;
+    for (index, w) in weight.iter().enumerate() {
+        acc += *w;
+        if res < acc * x {
+            return index;
+        }
+    }
+    0
+}
+
+#[cfg(not(feature = "random_proposer"))]
+pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
+    let sum: u64 = weight.iter().sum();
+    let x = seed % sum;
+
+    let mut acc = 0;
+    for (index, w) in weight.iter().enumerate() {
+        acc += *w;
+        if x < acc {
+            return index;
+        }
+    }
+    0
 }

@@ -1,7 +1,4 @@
 //! An efficent and stable Rust library of BFT protocol for distributed system.
-//!
-//!
-
 use crate::{
     algorithm::Bft,
     error::{BftError, BftResult},
@@ -13,49 +10,48 @@ use crossbeam::crossbeam_channel::{unbounded, Sender};
 use hex_fmt::HexFmt;
 use log::{debug, error, info, trace};
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::hash::{Hash as Hashable, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-/// The core Bft algorithm.
+/// Define the core functions of the BFT state machine.
 pub mod algorithm;
-/// Define simple byzantine behavior.
+/// Define simple byzantine behaviors.
 pub mod byzantine;
-/// Collectors of blocks, signed_proposals, signed_votes.
+/// Define collectors of blocks, signed_proposals and signed_votes.
 pub mod collectors;
-/// Define Bft errors.
+/// Define errors.
 pub mod error;
-/// Define structures only for this crate.
+/// Define structures only for this crate, including Proposal, Vote, Step.
 pub mod objects;
-/// Define BFT params including time interval and local address.
+/// Define params including time interval and local address.
 pub mod params;
-/// Select a proposer Probabilistic according to the proposal_weight of Nodes.
-pub mod random;
-/// BFT timer.
+/// Define a timeout structure and the timer process.
 pub mod timer;
-/// The external functions of the BFT state machine.
+/// Define utils of the BFT state machine.
 pub mod utils;
-/// Wal
+/// Define wal support.
 pub mod wal;
 
-/// Type for node address.
+/// Define the structure of the node address.
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Address(Vec<u8>);
-/// Type for hash.
+/// Define the structure of the hash.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct Hash(Vec<u8>);
-/// Type for signature.
+/// Define the structure of the signature.
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Signature(Vec<u8>);
-
+/// Define the structure of the block.
+/// It is the consensus content, which should be serialized and wrapped.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Block(Vec<u8>);
 
 macro_rules! impl_traits_for_vecu8_wraper {
-	($name: ident) => {
-		impl Default for $name {
+    ($name: ident) => {
+        impl Default for $name {
             fn default() -> Self {
                 $name(vec![])
             }
@@ -68,13 +64,13 @@ macro_rules! impl_traits_for_vecu8_wraper {
             }
         }
 
-		impl Encodable for $name {
-			fn rlp_append(&self, s: &mut RlpStream) {
+        impl Encodable for $name {
+            fn rlp_append(&self, s: &mut RlpStream) {
                 s.begin_list(1).append(&self.0);
-			}
-		}
+            }
+        }
 
-		impl Decodable for $name {
+        impl Decodable for $name {
             fn decode(r: &Rlp) -> Result<Self, DecoderError> {
                 match r.prototype()? {
                     Prototype::List(1) => {
@@ -100,14 +96,10 @@ macro_rules! impl_traits_for_vecu8_wraper {
 
         impl Debug for $name {
             fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-                write!(
-                    f,
-                    "{:?}",
-                    &format!("{:<10}", HexFmt(&self.0)),
-                )
+                write!(f, "{:?}", &format!("{:<10}", HexFmt(&self.0)),)
             }
         }
-	}
+    };
 }
 
 impl_traits_for_vecu8_wraper!(Address);
@@ -168,15 +160,16 @@ pub enum VerifyResult {
 }
 
 /// A reaching consensus result of a giving height.
+/// It will send outside for block execution, and the current proof should be persisted for sync process.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Commit {
     /// the commit height
     pub height: Height,
-    /// the reaching-consensus block content
+    /// the reaching-consensus block content, which contains a proof of previous height.
     pub block: Block,
-    /// a proof for the above block
+    /// the proof of current height
     pub proof: Proof,
-    /// the address of the reaching-consensus proposer
+    /// the proposer address
     pub address: Address,
 }
 
@@ -221,6 +214,8 @@ impl Decodable for Commit {
 }
 
 /// The status of a giving height.
+/// It should be served from outside after block execution.
+/// After receiving status of a specified height, the consensus of next height will start immediately.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Status {
     /// the height of status
@@ -259,13 +254,14 @@ impl Decodable for Status {
 }
 
 /// A feed block for a giving height.
+/// It should be served from outside and supply as consensus content.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Feed {
     /// the height of the block
     pub height: Height,
     /// the content of the block
     pub block: Block,
-
+    /// the hash of the block
     pub block_hash: Hash,
 }
 
@@ -302,13 +298,14 @@ impl Decodable for Feed {
     }
 }
 
-/// The verify result.
+/// The result of transaction verification.
+/// If you want to verify transactions asynchronously, turn on verify_req feature.
 #[cfg(feature = "verify_req")]
 #[derive(Clone, PartialEq, Eq)]
 pub struct VerifyResp {
-    /// the response of verification
+    /// the result of transaction verification.
     pub is_pass: bool,
-    /// block hash
+    /// the round of the proposal whose block was sent to verify.
     pub round: Round,
 }
 
@@ -354,14 +351,14 @@ impl Decodable for VerifyResp {
     }
 }
 
-/// The bft Node
+/// The bft node
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node {
-    /// the address of node
+    /// the address of the node
     pub address: Address,
-    /// the weight for being a proposer
+    /// the weight of being a proposer
     pub proposal_weight: u32,
-    /// the weight for calculating vote
+    /// the weight of calculating vote
     pub vote_weight: u32,
 }
 
@@ -421,9 +418,9 @@ impl Node {
 pub struct Proof {
     /// proof height
     pub height: Height,
-    /// the round reaching consensus
+    /// the reaching-consensus round
     pub round: Round,
-    /// the block_hash reaching consensus
+    /// the reaching-consensus block hash
     pub block_hash: Hash,
     /// the voters and corresponding signatures
     pub precommit_votes: HashMap<Address, Signature>,
@@ -523,13 +520,18 @@ impl Decodable for Proof {
 pub trait BftSupport: Sync + Send {
     type Error: ::std::fmt::Debug;
     /// A user-defined function for block validation.
-    /// Every block bft received will call this function, even if the feed block.
+    /// Every proposal bft received will call this function, even if the feed block.
     /// Users should validate block format, block headers here.
-    fn check_block(&self, block: &Block, block_hash: &Hash, height: Height) -> Result<(), Self::Error>;
+    fn check_block(
+        &self,
+        block: &Block,
+        block_hash: &Hash,
+        height: Height,
+    ) -> Result<(), Self::Error>;
     /// A user-defined function for transactions validation.
-    /// Every block bft received will call this function, even if the feed block.
+    /// Every proposal bft received will call this function, even if the feed block.
     /// Users should validate transactions here.
-    /// The [`proposal_hash`] is corresponding to the proposal of the [`proposal_hash`].
+    /// The [`signed_proposal_hash`] is corresponding to the proposal of the [`block`].
     fn check_txs(
         &self,
         block: &Block,
@@ -540,11 +542,10 @@ pub trait BftSupport: Sync + Send {
     ) -> Result<(), Self::Error>;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,
-    /// users do not have to care about the structure of Proposal and Vote.
+    /// users do not have to care about the structure of SignedProposal and SignedVote.
     fn transmit(&self, msg: BftMsg);
     /// A user-defined function for processing the reaching-consensus block.
-    /// Users could execute the block inside and add it into chain.
-    /// The height of proof inside the commit equals to block height.
+    /// Users can execute the block and add it into chain.
     fn commit(&self, commit: Commit) -> Result<Status, Self::Error>;
     /// A user-defined function for feeding the bft consensus.
     /// The new block provided will feed for bft consensus of giving [`height`]
@@ -558,12 +559,9 @@ pub trait BftSupport: Sync + Send {
 }
 
 /// A public function for proof validation.
-/// The input [`height`] is the height of block involving the proof.
-/// The input [`authorities`] is the authority_list for the proof.
+/// The input [`height`] is the height of block containing the proof.
+/// The input [`authorities`] is the authority_list for the proof check.
 /// The fn [`crypt_hash`], [`check_sig`] are user-defined.
-/// signature of the functions:
-/// - [`crypt_hash`]: `fn(msg: &[u8]) -> Vec<u8>`
-/// - [`check_sig`]:  `fn(signature: &[u8], hash: &[u8]) -> Option<Address>`
 pub fn check_proof(
     proof: &Proof,
     height: Height,
@@ -588,9 +586,8 @@ pub fn check_proof(
         return false;
     }
 
-    let mut set = HashSet::new();
     proof.precommit_votes.iter().all(|(voter, sig)| {
-        if set.insert(voter.clone()) && authorities.iter().any(|node| node.address == *voter) {
+        if authorities.iter().any(|node| node.address == *voter) {
             let vote = Vote {
                 vote_type: VoteType::Precommit,
                 height: proof.height,

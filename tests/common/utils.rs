@@ -3,8 +3,8 @@ use std::fs::{self, read_dir};
 use std::time::Duration;
 use std::u64::MAX as MAX_U64;
 
-use bft_rs::*;
 use super::config::*;
+use bft_rs::*;
 use digest_hash::EndianInput;
 use digest_hash::{BigEndian, Hash as DigestHash};
 use log::info;
@@ -132,7 +132,9 @@ pub fn clean_log_file(path: &str) {
 
 pub fn set_log_file(path: &str, level: LevelFilter) {
     let logfile = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S .%f)} {l} - {m} - {M}-{L} {n}")))
+        .encoder(Box::new(PatternEncoder::new(
+            "{d(%Y-%m-%d %H:%M:%S .%f)} {l} - {m} - {M}-{L} {n}",
+        )))
         .build(path)
         .unwrap();
     let config = LogConfig::builder()

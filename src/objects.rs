@@ -1,38 +1,22 @@
-// CITA
-// Copyright 2016-2017 Cryptape Technologies LLC.
-
-// This program is free software: you can redistribute it
-// and/or modify it under the terms of the GNU General Public
-// License as published by the Free Software Foundation,
-// either version 3 of the License, or (at your option) any
-// later version.
-
-// This program is distributed in the hope that it will be
-// useful, but WITHOUT ANY WARRANTY; without even the implied
-// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-// PURPOSE. See the GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use crate::*;
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct Proposal {
-    /// The height of proposal.
+    /// the height of proposal
     pub(crate) height: Height,
-    /// The round of proposal.
+    /// the round of proposal
     pub(crate) round: Round,
-    /// The block hash.
+    /// block hash
     pub(crate) block_hash: Hash,
-    ///
+    /// the proof of previous height
     pub(crate) proof: Proof,
-    /// A lock round of the proposal.
+    /// the lock round of the proposal
     pub(crate) lock_round: Option<Round>,
-    /// The lock votes of the proposal.
+    /// the lock votes of the proposal
     pub(crate) lock_votes: Vec<SignedVote>,
-    /// The address of proposer.
+    /// proposer address
     pub(crate) proposer: Address,
 }
 
@@ -85,15 +69,9 @@ impl Decodable for Proposal {
     }
 }
 
-/// Something need to be consensus in a round.
-/// A `Proposal` includes `height`, `round`, `content`, `lock_round`, `lock_votes`
-/// and `proposer`. `lock_round` and `lock_votes` are `Option`, means the PoLC of
-/// the proposal. Therefore, these must have same variant of `Option`.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct SignedProposal {
-    /// The height of proposal.
     pub(crate) proposal: Proposal,
-
     pub(crate) signature: Signature,
 }
 
@@ -134,15 +112,15 @@ impl Decodable for SignedProposal {
 /// A vote to a proposal.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub(crate) struct Vote {
-    /// Prevote vote or precommit vote
+    /// Prevote or precommit
     pub(crate) vote_type: VoteType,
-    /// The height of vote
+    /// the height of vote
     pub(crate) height: Height,
-    /// The round of vote
+    /// the round of vote
     pub(crate) round: Round,
-    /// The vote proposal
+    /// the content vote for
     pub(crate) block_hash: Hash,
-    /// The address of voter
+    /// voter address
     pub(crate) voter: Address,
 }
 
@@ -191,12 +169,9 @@ impl Decodable for Vote {
     }
 }
 
-/// A vote to a proposal.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub(crate) struct SignedVote {
-    /// Prevote vote or precommit vote
     pub(crate) vote: Vote,
-    ///
     pub(crate) signature: Signature,
 }
 
@@ -232,21 +207,15 @@ impl Decodable for SignedVote {
 /// A PoLC.
 #[derive(Clone, Debug)]
 pub(crate) struct LockStatus {
-    /// The lock proposal
     pub(crate) block_hash: Hash,
-    /// The lock round
     pub(crate) round: Round,
-    /// The lock votes.
     pub(crate) votes: Vec<SignedVote>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct AuthorityManage {
-    ///
     pub(crate) authorities: Vec<Node>,
-    ///
     pub(crate) authorities_old: Vec<Node>,
-    ///
     pub(crate) authority_h_old: Height,
 }
 
@@ -272,27 +241,17 @@ impl AuthorityManage {
     }
 }
 
-/// BFT step
 #[derive(Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
 pub(crate) enum Step {
-    /// A step to determine proposer and proposer publish a proposal.
     Propose,
-    /// A step to wait for proposal or feed.
     ProposeWait,
-    /// A step to transmit prevote and check prevote count.
     Prevote,
-    /// A step to wait for more prevote if none of them reach 2/3.
     PrevoteWait,
-    /// A step to wait for proposal verify result.
     #[cfg(feature = "verify_req")]
     VerifyWait,
-    /// A step to transmit precommit and check precommit count.
     Precommit,
-    /// A step to wait for more prevote if none of them reach 2/3.
     PrecommitWait,
-    /// A step to do commit.
     Commit,
-    /// A step to wait for rich status.
     CommitWait,
 }
 
@@ -337,12 +296,9 @@ impl Into<u8> for Step {
     }
 }
 
-/// Bft vote types.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) enum VoteType {
-    /// Vote type prevote.
     Prevote,
-    /// Vote type precommit.
     Precommit,
 }
 
