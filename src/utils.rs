@@ -445,7 +445,11 @@ where
         if height == self.height - 1 {
             return Ok(());
         }
-        self.check_block_txs(proposal, block, &self.function.crypt_hash(signed_proposal_hash))?;
+        self.check_block_txs(
+            proposal,
+            block,
+            &self.function.crypt_hash(signed_proposal_hash),
+        )?;
         self.check_proof(height, &proposal.proof)?;
 
         Ok(())
@@ -627,17 +631,22 @@ where
             let signed_proposal_hash = signed_proposal_hash.clone();
             let address = self.params.address.clone();
             thread::spawn(move || {
-                let is_pass =
-                    match function.check_txs(&block, &block_hash, &signed_proposal_hash, height, round) {
-                        Ok(_) => true,
-                        Err(e) => {
-                            warn!(
-                                "Node {:?} encounters BftError::CheckTxsFailed({:?})",
-                                address, e
-                            );
-                            false
-                        }
-                    };
+                let is_pass = match function.check_txs(
+                    &block,
+                    &block_hash,
+                    &signed_proposal_hash,
+                    height,
+                    round,
+                ) {
+                    Ok(_) => true,
+                    Err(e) => {
+                        warn!(
+                            "Node {:?} encounters BftError::CheckTxsFailed({:?})",
+                            address, e
+                        );
+                        false
+                    }
+                };
                 let verify_resp = VerifyResp { is_pass, round };
                 handle_err(
                     sender

@@ -6,6 +6,7 @@ use crate::{
     utils::{get_total_weight, get_votes_weight},
 };
 
+use crate::utils::extract_two;
 use crossbeam::crossbeam_channel::{unbounded, Sender};
 use hex_fmt::HexFmt;
 use log::{debug, error, info, trace};
@@ -15,7 +16,6 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::hash::{Hash as Hashable, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
-use crate::utils::extract_two;
 
 /// Define the core functions of the BFT state machine.
 pub mod algorithm;
@@ -53,10 +53,10 @@ pub struct Block(Vec<u8>);
 macro_rules! impl_traits_for_vecu8_wraper {
     ($name: ident) => {
         impl $name {
-	        pub fn to_vec(&self) -> Vec<u8> {
-	            self.0.clone()
-	        }
-	    }
+            pub fn to_vec(&self) -> Vec<u8> {
+                self.0.clone()
+            }
+        }
 
         impl Default for $name {
             fn default() -> Self {
@@ -612,14 +612,10 @@ pub fn check_proof(
 }
 
 /// A public function for get_proposal_hash from BftMsg::Proposal
-pub fn get_proposal_hash(msg: BftMsg, crypt_hash: impl Fn(&[u8]) -> Hash) -> Option<Hash> {
-    match msg {
-        BftMsg::Proposal(encode) => {
-            if let Ok((signed_proposal_encode, _)) = extract_two(&encode){
-                return Some(crypt_hash(signed_proposal_encode));
-            }
-        }
-        _ => {}
+pub fn get_proposal_hash(encode: &[u8], crypt_hash: impl Fn(&[u8]) -> Hash) -> Option<Hash> {
+    if let Ok((signed_proposal_encode, _)) = extract_two(&encode) {
+        Some(crypt_hash(signed_proposal_encode))
+    } else {
+        None
     }
-    None
 }

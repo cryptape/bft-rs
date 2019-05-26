@@ -179,8 +179,8 @@ where
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
                     let (signed_proposal_encode, block) = extract_two(&encode)?;
-                    let signed_proposal: SignedProposal =
-                        rlp::decode(&signed_proposal_encode).map_err(|e| {
+                    let signed_proposal: SignedProposal = rlp::decode(&signed_proposal_encode)
+                        .map_err(|e| {
                             BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                         })?;
                     debug!(
