@@ -65,7 +65,7 @@ macro_rules! impl_traits_for_vecu8_wraper {
         }
 
         impl Deref for $name {
-            type Target = [u8];
+            type Target = Vec<u8>;
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
