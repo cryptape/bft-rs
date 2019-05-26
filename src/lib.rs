@@ -15,6 +15,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::hash::{Hash as Hashable, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
+use crate::utils::extract_two;
 
 /// Define the core functions of the BFT state machine.
 pub mod algorithm;
@@ -602,4 +603,17 @@ pub fn check_proof(
         }
         false
     })
+}
+
+/// A public function for get_proposal_hash from BftMsg::Proposal
+pub fn get_proposal_hash(msg: BftMsg, crypt_hash: impl Fn(&[u8]) -> Hash) -> Option<Hash> {
+    match msg {
+        BftMsg::Proposal(encode) => {
+            if let Ok((signed_proposal_encode, _)) = extract_two(&encode){
+                return Some(crypt_hash(signed_proposal_encode));
+            }
+        }
+        _ => {}
+    }
+    None
 }

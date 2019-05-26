@@ -375,7 +375,7 @@ where
         &mut self,
         signed_proposal: &SignedProposal,
         block: &Block,
-        encode: &[u8],
+        signed_proposal_hash: &[u8],
         need_wal: bool,
     ) -> BftResult<()> {
         let proposal = &signed_proposal.proposal;
@@ -445,7 +445,7 @@ where
         if height == self.height - 1 {
             return Ok(());
         }
-        self.check_block_txs(proposal, block, &self.function.crypt_hash(encode))?;
+        self.check_block_txs(proposal, block, &self.function.crypt_hash(signed_proposal_hash))?;
         self.check_proof(height, &proposal.proof)?;
 
         Ok(())
@@ -593,7 +593,7 @@ where
         &mut self,
         proposal: &Proposal,
         block: &Block,
-        proposal_hash: &Hash,
+        signed_proposal_hash: &Hash,
     ) -> BftResult<()> {
         let height = proposal.height;
         let round = proposal.round;
@@ -605,7 +605,7 @@ where
                 .check_block(block, block_hash, height)
                 .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
             self.function
-                .check_txs(block, block_hash, proposal_hash, height, round)
+                .check_txs(block, block_hash, signed_proposal_hash, height, round)
                 .map_err(|e| BftError::CheckTxFailed(format!("{:?} of {:?}", e, proposal)))?;
             Ok(())
         }
@@ -624,11 +624,11 @@ where
             let sender = self.msg_sender.clone();
             let block = block.clone();
             let block_hash = block_hash.clone();
-            let proposal_hash = proposal_hash.clone();
+            let signed_proposal_hash = signed_proposal_hash.clone();
             let address = self.params.address.clone();
             thread::spawn(move || {
                 let is_pass =
-                    match function.check_txs(&block, &block_hash, &proposal_hash, height, round) {
+                    match function.check_txs(&block, &block_hash, &signed_proposal_hash, height, round) {
                         Ok(_) => true,
                         Err(e) => {
                             warn!(

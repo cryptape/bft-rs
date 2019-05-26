@@ -178,9 +178,9 @@ where
         match msg {
             BftMsg::Proposal(encode) => {
                 if self.consensus_power {
-                    let (proposal_encode, block) = extract_two(&encode)?;
+                    let (signed_proposal_encode, block) = extract_two(&encode)?;
                     let signed_proposal: SignedProposal =
-                        rlp::decode(&proposal_encode).map_err(|e| {
+                        rlp::decode(&signed_proposal_encode).map_err(|e| {
                             BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                         })?;
                     debug!(
@@ -190,7 +190,7 @@ where
                     self.check_and_save_proposal(
                         &signed_proposal,
                         &block.into(),
-                        &encode,
+                        &signed_proposal_encode,
                         need_wal,
                     )?;
 
