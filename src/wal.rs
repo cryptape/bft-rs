@@ -1,32 +1,18 @@
-// CITA
-// Copyright 2016-2017 Cryptape Technologies LLC.
-
-// This program is free software: you can redistribute it
-// and/or modify it under the terms of the GNU General Public
-// License as published by the Free Software Foundation,
-// either version 3 of the License, or (at your option) any
-// later version.
-
-// This program is distributed in the hope that it will be
-// useful, but WITHOUT ANY WARRANTY; without even the implied
-// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-// PURPOSE. See the GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use crate::objects::LogType;
+use crate::Height;
+use log::{trace, warn};
 use std::collections::BTreeMap;
 use std::fs::{read_dir, DirBuilder, File, OpenOptions};
 use std::io::{self, Read, Seek, Write};
 use std::mem::transmute;
 use std::str;
 
-const DELETE_FILE_INTERVAL: u64 = 3u64;
+const DELETE_FILE_INTERVAL: u64 = 3;
 
 pub(crate) struct Wal {
-    height_fs: BTreeMap<u64, File>,
+    height_fs: BTreeMap<Height, File>,
     pub(crate) dir: String,
-    current_height: u64,
+    current_height: Height,
     ifile: File, // store off-line height
 }
 
@@ -52,13 +38,13 @@ impl Wal {
 
         let mut string_buf: String = String::new();
         let res_fsize = ifs.read_to_string(&mut string_buf)?;
-        let cur_height: u64;
+        let cur_height: Height;
         let last_file_path: String;
         if res_fsize == 0 {
             last_file_path = dir.to_string() + "/0.log";
-            cur_height = 0u64;
+            cur_height = 0;
         } else {
-            let hi_res = string_buf.parse::<u64>();
+            let hi_res = string_buf.parse::<Height>();
             if let Ok(hi) = hi_res {
                 cur_height = hi;
                 last_file_path = dir.to_string() + "/" + cur_height.to_string().as_str() + ".log"
@@ -87,14 +73,14 @@ impl Wal {
         })
     }
 
-    fn get_file_path(dir: &str, height: u64) -> String {
+    fn get_file_path(dir: &str, height: Height) -> String {
         let mut name = height.to_string();
         name += ".log";
         let pathname = dir.to_string() + "/";
         pathname.clone() + &*name
     }
 
-    pub(crate) fn set_height(&mut self, height: u64) -> Result<(), io::Error> {
+    pub(crate) fn set_height(&mut self, height: Height) -> Result<(), io::Error> {
         self.current_height = height;
         self.ifile.seek(io::SeekFrom::Start(0))?;
         let hstr = height.to_string();
@@ -125,7 +111,7 @@ impl Wal {
         Ok(())
     }
 
-    pub(crate) fn save(&mut self, height: u64, mtype: LogType, msg: &[u8]) -> io::Result<()> {
+    pub(crate) fn save(&mut self, height: Height, mtype: LogType, msg: &[u8]) -> io::Result<()> {
         trace!("Wal save mtype: {:?}, height: {}", mtype, height);
         if !self.height_fs.contains_key(&height) {
             // 2 more higher than current height, do not process it
@@ -153,7 +139,7 @@ impl Wal {
             fs.seek(io::SeekFrom::End(0))?;
             fs.write_all(&len_bytes[..])?;
             fs.write_all(&type_bytes[..])?;
-            fs.write_all(msg)?;
+            fs.write_all(&msg)?;
             fs.flush()?;
         } else {
             warn!("Can't find wal log in height {} ", height);

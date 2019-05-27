@@ -1,4 +1,4 @@
-use crate::{Address, Hash};
+use crate::Address;
 
 use std::cell::Cell;
 use std::time::Duration;
@@ -14,7 +14,7 @@ pub(crate) struct BftParams {
 
 impl BftParams {
     /// A function to create a new BFT params.
-    pub(crate) fn new(local_address: Hash) -> Self {
+    pub(crate) fn new(local_address: Address) -> Self {
         BftParams {
             address: local_address,
             timer: BftTimer::default(),
@@ -65,6 +65,7 @@ impl BftTimer {
         Duration::from_millis(self.total_duration.get() * self.precommit.0 / self.precommit.1)
     }
 
+    #[cfg(not(feature = "machine_gun"))]
     pub(crate) fn get_total_duration(&self) -> Duration {
         Duration::from_millis(self.total_duration.get())
     }

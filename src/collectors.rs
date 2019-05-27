@@ -1,5 +1,5 @@
 use crate::objects::{SignedProposal, SignedVote, VoteType};
-use crate::{Address, Hash, Height, Round};
+use crate::{Address, Block, Hash, Height, Round};
 
 use std::collections::HashMap;
 
@@ -15,6 +15,7 @@ pub(crate) struct VoteCollector {
     pub(crate) votes: LruCache<Height, RoundCollector>,
     /// A HashMap to record prevote count of each round.
     pub(crate) prevote_count: HashMap<Round, u64>,
+    pub(crate) precommit_count: HashMap<Round, u64>,
 }
 
 impl VoteCollector {
@@ -23,6 +24,7 @@ impl VoteCollector {
         VoteCollector {
             votes: LruCache::new(CACHE_N as usize),
             prevote_count: HashMap::new(),
+            precommit_count: HashMap::new(),
         }
     }
 
@@ -58,23 +60,33 @@ impl VoteCollector {
                     *counter += vote_weight;
                 }
             }
-            debug!("Bft set prevote_count by {} of round {}", counter, round);
-        } else if self.votes.contains_key(&height) {
-            self.votes
-                .get_mut(&height)
-                .unwrap()
-                .add(signed_vote, vote_weight)?
         } else {
-            let mut round_votes = RoundCollector::new();
-            round_votes.add(signed_vote, vote_weight)?;
-            self.votes.insert(height, round_votes);
+            let counter = self.precommit_count.entry(round).or_insert(0);
+            if self.votes.contains_key(&height) {
+                self.votes
+                    .get_mut(&height)
+                    .unwrap()
+                    .add(signed_vote, vote_weight)?;
+                if height == current_height {
+                    // update prevote count hashmap
+                    *counter += vote_weight;
+                }
+            } else {
+                let mut round_votes = RoundCollector::new();
+                round_votes.add(signed_vote, vote_weight)?;
+                self.votes.insert(height, round_votes);
+                // update prevote count hashmap
+                if height == current_height {
+                    *counter += vote_weight;
+                }
+            }
         }
         Ok(())
     }
 
-    pub(crate) fn remove(&mut self, current_height: Height) {
-        self.votes.remove(&current_height);
-        self.clear_prevote_count();
+    pub(crate) fn remove(&mut self, height: Height) {
+        self.votes.remove(&height);
+        self.clear_vote_count();
     }
 
     /// A function to get the vote set of the height, the round, and the vote type.
@@ -90,8 +102,9 @@ impl VoteCollector {
     }
 
     /// A function to clean prevote count HashMap at the begining of a height.
-    pub(crate) fn clear_prevote_count(&mut self) {
+    pub(crate) fn clear_vote_count(&mut self) {
         self.prevote_count.clear();
+        self.precommit_count.clear();
     }
 }
 
@@ -186,7 +199,7 @@ impl VoteSet {
         VoteSet {
             votes_by_sender: HashMap::new(),
             votes_by_proposal: HashMap::new(),
-            count: 0u64,
+            count: 0,
         }
     }
 
@@ -203,21 +216,16 @@ impl VoteSet {
             .votes_by_proposal
             .entry(vote.block_hash.clone())
             .or_insert(0) += vote_weight;
-
-        debug!(
-            "Bft set voteset with count: {}, votes_by_proposal: {:?}",
-            self.count, self.votes_by_proposal
-        );
         Ok(())
     }
 
     /// A function to abstract the PoLC of the round.
-    pub(crate) fn extract_polc(&self, block_hash: &[u8]) -> Vec<SignedVote> {
+    pub(crate) fn extract_polc(&self, block_hash: &Hash) -> Vec<SignedVote> {
         // abstract the votes for the polc proposal into a vec
         let mut polc = Vec::new();
         for signed_vote in self.votes_by_sender.values() {
             let hash = &signed_vote.vote.block_hash;
-            if hash.to_vec() == block_hash.to_vec() {
+            if hash == block_hash {
                 polc.push(signed_vote.to_owned());
             }
         }
@@ -260,8 +268,10 @@ impl ProposalCollector {
             .and_then(|prc| prc.get_proposal(round))
     }
 
-    pub(crate) fn remove(&mut self, current_height: Height) {
-        self.proposals.remove(&current_height);
+    pub(crate) fn remove(&mut self, height: Height, round: Round) -> Option<SignedProposal> {
+        self.proposals
+            .get_mut(&height)
+            .and_then(|prc| prc.remove(round))
     }
 }
 
@@ -287,5 +297,63 @@ impl ProposalRoundCollector {
 
     pub(crate) fn get_proposal(&mut self, round: Round) -> Option<SignedProposal> {
         self.round_proposals.get_mut(&round).cloned()
+    }
+
+    pub(crate) fn remove(&mut self, round: Round) -> Option<SignedProposal> {
+        self.round_proposals.remove(&round)
+    }
+}
+
+pub(crate) struct BlockCollector {
+    pub blocks: LruCache<Height, BlockSet>,
+}
+
+impl BlockCollector {
+    pub(crate) fn new() -> Self {
+        BlockCollector {
+            blocks: LruCache::new(CACHE_N as usize),
+        }
+    }
+
+    pub(crate) fn add(&mut self, height: Height, block_hash: &Hash, block: &Block) -> bool {
+        if self.blocks.contains_key(&height) {
+            self.blocks.get_mut(&height).unwrap().add(block_hash, block)
+        } else {
+            let mut block_set = BlockSet::new();
+            block_set.add(block_hash, block);
+            self.blocks.insert(height, block_set);
+            true
+        }
+    }
+
+    pub(crate) fn get_block(&mut self, height: Height, hash: &Hash) -> Option<&Block> {
+        self.blocks
+            .get_mut(&height)
+            .and_then(|bs| bs.get_block(hash))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct BlockSet {
+    pub block_set: HashMap<Hash, Block>,
+}
+
+impl BlockSet {
+    pub(crate) fn new() -> Self {
+        BlockSet {
+            block_set: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn add(&mut self, hash: &Hash, block: &Block) -> bool {
+        if self.block_set.contains_key(hash) {
+            return false;
+        }
+        self.block_set.insert(hash.clone(), block.clone());
+        true
+    }
+
+    pub(crate) fn get_block(&self, hash: &Hash) -> Option<&Block> {
+        self.block_set.get(hash)
     }
 }

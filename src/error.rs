@@ -1,3 +1,6 @@
+use crate::Address;
+use log::{error, trace, warn};
+
 pub type BftResult<T> = ::std::result::Result<T, BftError>;
 /// Error for Bft actuator.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -20,6 +23,8 @@ pub enum BftError {
 
     InvalidSender(String),
 
+    MismatchingBlock(String),
+
     CheckBlockFailed(String),
 
     CheckTxFailed(String),
@@ -41,13 +46,13 @@ pub enum BftError {
     ObsoleteTimer(String),
 }
 
-pub(crate) fn handle_err<T>(result: BftResult<T>) {
+pub(crate) fn handle_err<T>(result: BftResult<T>, address: &Address) {
     if let Err(e) = result {
         match e {
             BftError::NotReady(_)
             | BftError::ObsoleteMsg(_)
             | BftError::HigherMsg(_)
-            | BftError::RecvMsgAgain(_) => trace!("Bft encounters {:?}", e),
+            | BftError::RecvMsgAgain(_) => trace!("Node {:?} encounters {:?}", address, e),
 
             BftError::CheckProofFailed(_)
             | BftError::CheckBlockFailed(_)
@@ -55,7 +60,8 @@ pub(crate) fn handle_err<T>(result: BftResult<T>) {
             | BftError::CheckSigFailed(_)
             | BftError::CheckTxFailed(_)
             | BftError::DecodeErr(_)
-            | BftError::InvalidSender(_) => warn!("Bft encounters {:?}", e),
+            | BftError::InvalidSender(_)
+            | BftError::MismatchingBlock(_) => warn!("Node {:?} encounters {:?}", address, e),
 
             BftError::ShouldNotHappen(_)
             | BftError::SendMsgErr(_)
@@ -63,7 +69,7 @@ pub(crate) fn handle_err<T>(result: BftResult<T>) {
             | BftError::CommitFailed(_)
             | BftError::SaveWalErr(_)
             | BftError::SignFailed(_)
-            | BftError::GetBlockFailed(_) => error!("Bft encounters {:?}", e),
+            | BftError::GetBlockFailed(_) => error!("Node {:?} encounters {:?}", address, e),
 
             BftError::ObsoleteTimer(_) => {}
         }
