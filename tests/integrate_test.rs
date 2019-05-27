@@ -71,12 +71,12 @@ fn test_wild() {
         let duration = Duration::from_millis(n);
         let old_stat = stat.get(&ele).unwrap();
         match old_stat {
-            &Content::Start(_) => {
+            Content::Start(_) => {
                 env.set_node(ele, Content::Stop, duration);
                 stat.insert(ele, Content::Stop);
                 info!("stop node {} after {:?}", ele, duration);
             }
-            &Content::Stop => {
+            Content::Stop => {
                 env.set_node(ele, Content::Start(ele), duration);
                 stat.insert(ele, Content::Start(ele));
                 info!("start node {} after {:?}", ele, duration);
@@ -86,7 +86,7 @@ fn test_wild() {
     });
 
     stat.iter().for_each(|(i, stat)| {
-        if let &Content::Stop = stat {
+        if let Content::Stop = *stat {
             let duration = Duration::from_millis(max_duration);
             env.set_node(*i, Content::Start(*i), duration);
             info!("finally start node {} after {:?}", i, duration);

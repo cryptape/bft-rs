@@ -70,7 +70,7 @@ impl Env {
 
         let status = Status {
             height: 0u64,
-            interval: interval.clone(),
+            interval,
             authority_list: authority_list.clone(),
         };
 
@@ -255,7 +255,7 @@ impl Env {
 
     pub fn generate_node(&self, address: Address, i: usize) -> BftActuator {
         let node_support = Support {
-            config: self.config.clone(),
+            config: self.config,
             address: address.clone(),
             msg_send: self.msg_send.clone(),
             commit_send: self.commit_send.clone(),

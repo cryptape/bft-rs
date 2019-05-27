@@ -360,16 +360,17 @@ where
 
     #[cfg(feature = "verify_req")]
     pub(crate) fn save_verify_res(&mut self, round: Round, is_pass: bool) -> BftResult<()> {
-        if self.verify_results.contains_key(&round) {
-            if is_pass != *self.verify_results.get(&round).unwrap() {
-                return Err(BftError::ShouldNotHappen(format!(
-                    "get conflict verify result of round: {}",
-                    round
-                )));
-            }
+        if self.verify_results.contains_key(&round)
+            && is_pass != *self.verify_results.get(&round).unwrap()
+        {
+            Err(BftError::ShouldNotHappen(format!(
+                "get conflict verify result of round: {}",
+                round
+            )))
+        } else {
+            self.verify_results.entry(round).or_insert(is_pass);
+            Ok(())
         }
-        self.verify_results.entry(round).or_insert(is_pass);
-        Ok(())
     }
 
     pub(crate) fn check_and_save_proposal(
@@ -552,7 +553,7 @@ where
             handle_err(
                 self.wal_log
                     .save(self.height, LogType::VerifyResp, &rlp::encode(verify_resp))
-                    .or(Err(BftError::SaveWalErr(format!("{:?}", verify_resp)))),
+                    .or_else(|_| Err(BftError::SaveWalErr(format!("{:?}", verify_resp)))),
                 &self.params.address,
             );
         }
