@@ -10,7 +10,8 @@ use crate::{
 };
 
 use crossbeam::crossbeam_channel::{select, unbounded, Receiver, RecvError, Sender};
-use log::{debug, error, info};
+#[allow(unused_imports)]
+use log::{debug, error, info, log};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;

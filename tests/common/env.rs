@@ -7,7 +7,8 @@ use super::support::Support;
 use super::utils::*;
 use bft_rs::{BftActuator, BftMsg, Commit, Node, Status};
 use crossbeam::crossbeam_channel::{select, unbounded, Receiver, RecvError, Sender};
-use log::info;
+#[allow(unused_imports)]
+use log::{info, log};
 use lru_cache::LruCache;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::HashMap;

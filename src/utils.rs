@@ -8,7 +8,8 @@ use crate::{
     wal::Wal,
 };
 #[cfg(feature = "verify_req")]
-use log::warn;
+#[allow(unused_imports)]
+use log::{log, warn};
 #[cfg(feature = "random_proposer")]
 use rand_core::{RngCore, SeedableRng};
 #[cfg(feature = "random_proposer")]

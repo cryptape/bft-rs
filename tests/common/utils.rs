@@ -7,8 +7,9 @@ use super::config::*;
 use bft_rs::*;
 use digest_hash::EndianInput;
 use digest_hash::{BigEndian, Hash as DigestHash};
-use log::info;
 use log::LevelFilter;
+#[allow(unused_imports)]
+use log::{info, log};
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Config as LogConfig, Root};
 use log4rs::encode::pattern::PatternEncoder;

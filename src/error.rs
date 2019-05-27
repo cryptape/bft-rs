@@ -1,5 +1,6 @@
 use crate::Address;
-use log::{error, trace, warn};
+#[allow(unused_imports)]
+use log::{error, log, trace, warn};
 
 pub type BftResult<T> = ::std::result::Result<T, BftError>;
 /// Error for Bft actuator.

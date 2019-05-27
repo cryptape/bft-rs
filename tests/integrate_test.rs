@@ -5,7 +5,8 @@ use crate::common::env::{Content, Env};
 use crate::common::utils::{
     clean_log_file, clean_wal, get_random_integer, set_log_file, RandomMode,
 };
-use log::{info, LevelFilter};
+#[allow(unused_imports)]
+use log::{info, log, LevelFilter};
 use std::collections::HashMap;
 use std::time::Duration;
 
