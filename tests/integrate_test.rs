@@ -5,7 +5,8 @@ use crate::common::env::{Content, Env};
 use crate::common::utils::{
     clean_log_file, clean_wal, get_random_integer, set_log_file, RandomMode,
 };
-use log::{info, LevelFilter};
+#[allow(unused_imports)]
+use log::{info, log, LevelFilter};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -70,12 +71,12 @@ fn test_wild() {
         let duration = Duration::from_millis(n);
         let old_stat = stat.get(&ele).unwrap();
         match old_stat {
-            &Content::Start(_) => {
+            Content::Start(_) => {
                 env.set_node(ele, Content::Stop, duration);
                 stat.insert(ele, Content::Stop);
                 info!("stop node {} after {:?}", ele, duration);
             }
-            &Content::Stop => {
+            Content::Stop => {
                 env.set_node(ele, Content::Start(ele), duration);
                 stat.insert(ele, Content::Start(ele));
                 info!("start node {} after {:?}", ele, duration);
@@ -85,7 +86,7 @@ fn test_wild() {
     });
 
     stat.iter().for_each(|(i, stat)| {
-        if let &Content::Stop = stat {
+        if let Content::Stop = *stat {
             let duration = Duration::from_millis(max_duration);
             env.set_node(*i, Content::Start(*i), duration);
             info!("finally start node {} after {:?}", i, duration);

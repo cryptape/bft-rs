@@ -7,7 +7,8 @@ use super::support::Support;
 use super::utils::*;
 use bft_rs::{BftActuator, BftMsg, Commit, Node, Status};
 use crossbeam::crossbeam_channel::{select, unbounded, Receiver, RecvError, Sender};
-use log::info;
+#[allow(unused_imports)]
+use log::{info, log};
 use lru_cache::LruCache;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::HashMap;
@@ -69,7 +70,7 @@ impl Env {
 
         let status = Status {
             height: 0u64,
-            interval: interval.clone(),
+            interval,
             authority_list: authority_list.clone(),
         };
 
@@ -254,7 +255,7 @@ impl Env {
 
     pub fn generate_node(&self, address: Address, i: usize) -> BftActuator {
         let node_support = Support {
-            config: self.config.clone(),
+            config: self.config,
             address: address.clone(),
             msg_send: self.msg_send.clone(),
             commit_send: self.commit_send.clone(),

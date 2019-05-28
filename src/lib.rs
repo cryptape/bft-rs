@@ -9,7 +9,8 @@ use crate::{
 use crate::utils::extract_two;
 use crossbeam::crossbeam_channel::{unbounded, Sender};
 use hex_fmt::HexFmt;
-use log::{debug, error, info, trace};
+#[allow(unused_imports)]
+use log::{debug, error, info, log, trace};
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FmtResult};

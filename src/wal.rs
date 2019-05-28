@@ -1,6 +1,7 @@
 use crate::objects::LogType;
 use crate::Height;
-use log::{trace, warn};
+#[allow(unused_imports)]
+use log::{log, trace, warn};
 use std::collections::BTreeMap;
 use std::fs::{read_dir, DirBuilder, File, OpenOptions};
 use std::io::{self, Read, Seek, Write};

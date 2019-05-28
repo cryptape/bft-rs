@@ -5,7 +5,8 @@ use std::cmp::{Ord, Ordering, PartialOrd};
 use std::time::{Duration, Instant};
 
 use crossbeam::crossbeam_channel::{Receiver, Sender};
-use log::warn;
+#[allow(unused_imports)]
+use log::{log, warn};
 use min_max_heap::MinMaxHeap;
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 
