@@ -328,7 +328,6 @@ pub(crate) enum LogType {
     Status,
     Proof,
     Feed,
-    #[cfg(feature = "verify_req")]
     VerifyResp,
     TimeOutInfo,
     Block,
@@ -342,7 +341,6 @@ impl From<u8> for LogType {
             2 => LogType::Status,
             3 => LogType::Proof,
             4 => LogType::Feed,
-            #[cfg(feature = "verify_req")]
             5 => LogType::VerifyResp,
             6 => LogType::TimeOutInfo,
             7 => LogType::Block,
@@ -359,7 +357,6 @@ impl Into<u8> for LogType {
             LogType::Status => 2,
             LogType::Proof => 3,
             LogType::Feed => 4,
-            #[cfg(feature = "verify_req")]
             LogType::VerifyResp => 5,
             LogType::TimeOutInfo => 6,
             LogType::Block => 7,

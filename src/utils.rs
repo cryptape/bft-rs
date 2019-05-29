@@ -82,7 +82,6 @@ where
                     .map_err(|e| BftError::DecodeErr(format!("proof encounters {:?}", e)))?;
                 self.set_proof(&proof);
             }
-            #[cfg(feature = "verify_req")]
             LogType::VerifyResp => {
                 info!("Node {:?} loads verify_resp", self.params.address);
                 let verify_resp: VerifyResp = rlp::decode(&encode)
@@ -358,17 +357,22 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "verify_req")]
-    pub(crate) fn save_verify_res(&mut self, round: Round, is_pass: bool) -> BftResult<()> {
+    pub(crate) fn save_verify_res(
+        &mut self,
+        round: Round,
+        verify_resp: &VerifyResp,
+    ) -> BftResult<()> {
         if self.verify_results.contains_key(&round)
-            && is_pass != *self.verify_results.get(&round).unwrap()
+            && verify_resp.is_pass != self.verify_results.get(&round).unwrap().is_pass
         {
             Err(BftError::ShouldNotHappen(format!(
                 "get conflict verify result of round: {}",
                 round
             )))
         } else {
-            self.verify_results.entry(round).or_insert(is_pass);
+            self.verify_results
+                .entry(round)
+                .or_insert_with(|| verify_resp.clone());
             Ok(())
         }
     }
@@ -543,7 +547,6 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "verify_req")]
     pub(crate) fn check_and_save_verify_resp(
         &mut self,
         verify_resp: &VerifyResp,
@@ -557,7 +560,7 @@ where
                 &self.params.address,
             );
         }
-        self.save_verify_res(verify_resp.round, verify_resp.is_pass)?;
+        self.save_verify_res(verify_resp.round, verify_resp)?;
 
         Ok(())
     }
@@ -607,25 +610,20 @@ where
 
         #[cfg(not(feature = "verify_req"))]
         {
-            self.function
-                .check_block(block, block_hash, height)
+            let verify_resp = self
+                .function
+                .check_block(block, block_hash, signed_proposal_hash, height, round)
                 .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
-            self.function
-                .check_txs(block, block_hash, signed_proposal_hash, height, round)
-                .map_err(|e| BftError::CheckTxFailed(format!("{:?} of {:?}", e, proposal)))?;
-            Ok(())
+            self.check_and_save_verify_resp(&verify_resp, false)?;
+            if verify_resp.is_pass {
+                return Ok(());
+            } else {
+                return Err(BftError::CheckBlockFailed(format!("of {:?}", proposal)));
+            }
         }
 
         #[cfg(feature = "verify_req")]
         {
-            if let Err(e) = self.function.check_block(block, block_hash, height) {
-                self.save_verify_res(round, false)?;
-                return Err(BftError::CheckBlockFailed(format!(
-                    "{:?} of {:?}",
-                    e, proposal
-                )));
-            }
-
             let function = self.function.clone();
             let sender = self.msg_sender.clone();
             let block = block.clone();
@@ -633,29 +631,28 @@ where
             let signed_proposal_hash = signed_proposal_hash.clone();
             let address = self.params.address.clone();
             thread::spawn(move || {
-                let is_pass = match function.check_txs(
+                match function.check_block(
                     &block,
                     &block_hash,
                     &signed_proposal_hash,
                     height,
                     round,
                 ) {
-                    Ok(_) => true,
+                    Ok(verify_resp) => {
+                        handle_err(
+                            sender
+                                .send(BftMsg::VerifyResp(verify_resp))
+                                .map_err(|e| BftError::SendMsgErr(format!("{:?}", e))),
+                            &address,
+                        );
+                    }
                     Err(e) => {
                         warn!(
                             "Node {:?} encounters BftError::CheckTxsFailed({:?})",
                             address, e
                         );
-                        false
                     }
                 };
-                let verify_resp = VerifyResp { is_pass, round };
-                handle_err(
-                    sender
-                        .send(BftMsg::VerifyResp(verify_resp))
-                        .map_err(|e| BftError::SendMsgErr(format!("{:?}", e))),
-                    &address,
-                );
             });
 
             Ok(())

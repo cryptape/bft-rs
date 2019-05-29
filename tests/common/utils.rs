@@ -38,12 +38,19 @@ pub fn generate_block(byzantine: bool, config: &Config) -> Block {
     vec.into()
 }
 
-pub fn check_block_result(block: &Block) -> bool {
-    !block.is_empty() && block[0] == 0u8
+pub fn get_complete_block(block: &Block) -> Block {
+    let complete_block_len = block.as_slice().len() * 2;
+    let mut vec = Vec::with_capacity(complete_block_len);
+    unsafe {
+        vec.set_len(complete_block_len);
+    }
+    vec.extend_from_slice(block);
+    vec.extend_from_slice(block);
+    vec.into()
 }
 
-pub fn check_txs_result(config: &Config) -> bool {
-    get_dice_result(config.check_txs_failed_rate)
+pub fn check_block_result(block: &Block, config: &Config) -> bool {
+    !block.is_empty() && block[0] == 0u8 && get_dice_result(config.check_txs_failed_rate)
 }
 
 pub fn check_txs_delay(config: &Config) -> Duration {

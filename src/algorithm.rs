@@ -48,7 +48,7 @@ pub struct Bft<T: BftSupport> {
     // caches
     pub(crate) feed: Option<Hash>,
     pub(crate) status: Option<Status>,
-    pub(crate) verify_results: HashMap<Round, bool>,
+    pub(crate) verify_results: HashMap<Round, VerifyResp>,
     pub(crate) proof: Proof,
     pub(crate) blocks: BlockCollector,
     pub(crate) proposals: ProposalCollector,
@@ -462,16 +462,29 @@ where
                 )
             })?;
         let proposal = signed_proposal.proposal;
+        #[cfg(not(feature = "compact_block"))]
         let block = self
             .blocks
             .get_block(self.height, &proposal.block_hash)
             .ok_or_else(|| {
                 BftError::ShouldNotHappen("can not fetch block from cache when commit".to_string())
-            })?;
+            })?
+            .clone();
+        #[cfg(feature = "compact_block")]
+        let block = self
+            .verify_results
+            .get(&self.round)
+            .ok_or_else(|| {
+                BftError::ShouldNotHappen(
+                    "can not fetch complete block from cache when commit".to_string(),
+                )
+            })?
+            .clone()
+            .complete_block;
 
         let commit = Commit {
             height: self.height,
-            block: block.clone(),
+            block,
             proof,
             address: proposal.proposer.clone(),
         };
@@ -1053,7 +1066,7 @@ where
         if let Some(lock_status) = self.lock_status.clone() {
             let round = lock_status.round;
             if self.verify_results.contains_key(&round) {
-                if *self.verify_results.get(&round).unwrap() {
+                if self.verify_results.get(&round).unwrap().is_pass {
                     return VerifyResult::Approved;
                 } else {
                     // clean save info

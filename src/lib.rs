@@ -147,7 +147,6 @@ pub enum BftMsg {
     Proposal(Vec<u8>),
     Vote(Vec<u8>),
     Status(Status),
-    #[cfg(feature = "verify_req")]
     VerifyResp(VerifyResp),
     Feed(Feed),
 
@@ -306,53 +305,60 @@ impl Decodable for Feed {
     }
 }
 
-/// The result of transaction verification.
-/// If you want to verify transactions asynchronously, turn on verify_req feature.
-#[cfg(feature = "verify_req")]
+/// The result of block verification.
 #[derive(Clone, PartialEq, Eq)]
 pub struct VerifyResp {
-    /// the result of transaction verification.
+    /// the result of block verification.
     pub is_pass: bool,
-    /// the round of the proposal whose block was sent to verify.
+    /// the round of proposal which contains the block
     pub round: Round,
+    #[cfg(feature = "compact_block")]
+    /// the block with complete transactions.
+    pub complete_block: Block,
 }
 
-#[cfg(feature = "verify_req")]
 impl Debug for VerifyResp {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "VerifyResp {{ pass: {}, r: {:?}}}",
-            self.is_pass, self.round,
+            "VerifyResp {{ pass: {}, round: {}}}",
+            self.is_pass, self.round
         )
     }
 }
 
-#[cfg(feature = "verify_req")]
-impl Default for VerifyResp {
-    fn default() -> Self {
-        VerifyResp {
-            is_pass: false,
-            round: 0,
-        }
-    }
-}
-
-#[cfg(feature = "verify_req")]
 impl Encodable for VerifyResp {
     fn rlp_append(&self, s: &mut RlpStream) {
+        #[cfg(not(feature = "compact_block"))]
         s.begin_list(2).append(&self.is_pass).append(&self.round);
+
+        #[cfg(feature = "compact_block")]
+        s.begin_list(3)
+            .append(&self.is_pass)
+            .append(&self.round)
+            .append(&self.complete_block);
     }
 }
 
-#[cfg(feature = "verify_req")]
 impl Decodable for VerifyResp {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
+            #[cfg(not(feature = "compact_block"))]
             Prototype::List(2) => {
                 let is_pass: bool = r.val_at(0)?;
                 let round: Round = r.val_at(1)?;
                 Ok(VerifyResp { is_pass, round })
+            }
+            #[cfg(feature = "compact_block")]
+            Prototype::List(3) => {
+                let is_pass: bool = r.val_at(0)?;
+                let round: Round = r.val_at(1)?;
+                let complete_block: Block = r.val_at(2)?;
+                Ok(VerifyResp {
+                    is_pass,
+                    round,
+                    complete_block,
+                })
             }
             _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
@@ -529,25 +535,16 @@ pub trait BftSupport: Sync + Send {
     type Error: ::std::fmt::Debug;
     /// A user-defined function for block validation.
     /// Every proposal bft received will call this function, even if the feed block.
-    /// Users should validate block format, block headers here.
-    fn check_block(
-        &self,
-        block: &Block,
-        block_hash: &Hash,
-        height: Height,
-    ) -> Result<(), Self::Error>;
-    /// A user-defined function for transactions validation.
-    /// Every proposal bft received will call this function, even if the feed block.
-    /// Users should validate transactions here.
+    /// Users should validate block format, block headers, transactions here.
     /// The [`signed_proposal_hash`] is corresponding to the proposal of the [`block`].
-    fn check_txs(
+    fn check_block(
         &self,
         block: &Block,
         block_hash: &Hash,
         signed_proposal_hash: &Hash,
         height: Height,
         round: Round,
-    ) -> Result<(), Self::Error>;
+    ) -> Result<VerifyResp, Self::Error>;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,
     /// users do not have to care about the structure of SignedProposal and SignedVote.

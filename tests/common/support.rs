@@ -15,31 +15,24 @@ pub struct Support {
 
 impl BftSupport for Support {
     type Error = TestError;
+
     fn check_block(
         &self,
         block: &Block,
         _block_hash: &Hash,
-        _height: Height,
-    ) -> Result<(), TestError> {
-        if check_block_result(block) {
-            Ok(())
-        } else {
-            Err(TestError::CheckBlockFailed)
-        }
-    }
-
-    fn check_txs(
-        &self,
-        _block: &Block,
-        _block_hash: &Hash,
         _signed_proposal_hash: &Hash,
         _height: Height,
-        _round: Round,
-    ) -> Result<(), TestError> {
+        round: Round,
+    ) -> Result<VerifyResp, TestError> {
         let delay = check_txs_delay(&self.config);
         thread::sleep(delay);
-        if check_txs_result(&self.config) {
-            Ok(())
+        if check_block_result(block, &self.config) {
+            Ok(VerifyResp {
+                is_pass: true,
+                round,
+                #[cfg(feature = "compact_block")]
+                complete_block: get_complete_block(block),
+            })
         } else {
             Err(TestError::CheckTxsFailed)
         }
