@@ -398,6 +398,17 @@ where
             )));
         }
 
+        if height == self.height || height == self.height - 1 {
+            self.check_proposer(proposal)?;
+            self.check_lock_votes(proposal, block_hash)?;
+
+            if height == self.height - 1 {
+                return Ok(());
+            }
+            self.check_block_txs(proposal, block, &self.function.crypt_hash(encode))?;
+            self.check_proof(height, &proposal.proof)?;
+        }
+
         // prevent too many higher proposals flush out current proposal
         if height >= self.height && height < self.height + CACHE_N && round < self.round + CACHE_N {
             self.proposals.add(&signed_proposal)?;
@@ -436,15 +447,6 @@ where
             return Err(BftError::HigherMsg(format!("{:?}", signed_proposal)));
         }
 
-        self.check_proposer(proposal)?;
-        self.check_lock_votes(proposal, block_hash)?;
-
-        if height == self.height - 1 {
-            return Ok(());
-        }
-        self.check_block_txs(proposal, block, &self.function.crypt_hash(encode))?;
-        self.check_proof(height, &proposal.proof)?;
-
         Ok(())
     }
 
@@ -472,6 +474,10 @@ where
             )));
         }
 
+        if height == self.height {
+            self.check_voter(vote)?;
+        }
+
         // prevent too many high proposals flush out current proposal
         if height >= self.height && height < self.height + CACHE_N && round < self.round + CACHE_N {
             let vote_weight = self.get_vote_weight(vote.height, &vote.voter);
@@ -495,8 +501,6 @@ where
         if height > self.height || round >= self.round + CACHE_N {
             return Err(BftError::HigherMsg(format!("{:?}", signed_vote)));
         }
-
-        self.check_voter(vote)?;
 
         Ok(())
     }
