@@ -598,9 +598,11 @@ where
 
         #[cfg(not(feature = "verify_req"))]
         {
-            self.function
-                .check_block(block, block_hash, height)
-                .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
+            if proposal.lock_round.is_none() {
+                self.function
+                    .check_block(block, block_hash, height)
+                    .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
+            }
             self.function
                 .check_txs(block, block_hash, proposal_hash, height, round)
                 .map_err(|e| BftError::CheckTxFailed(format!("{:?} of {:?}", e, proposal)))?;
@@ -609,12 +611,14 @@ where
 
         #[cfg(feature = "verify_req")]
         {
-            if let Err(e) = self.function.check_block(block, block_hash, height) {
-                self.save_verify_res(round, false)?;
-                return Err(BftError::CheckBlockFailed(format!(
-                    "{:?} of {:?}",
-                    e, proposal
-                )));
+            if proposal.lock_round.is_none() {
+                if let Err(e) = self.function.check_block(block, block_hash, height) {
+                    self.save_verify_res(round, false)?;
+                    return Err(BftError::CheckBlockFailed(format!(
+                        "{:?} of {:?}",
+                        e, proposal
+                    )));
+                }
             }
 
             let function = self.function.clone();
