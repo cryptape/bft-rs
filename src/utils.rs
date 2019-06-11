@@ -616,7 +616,7 @@ where
         {
             let verify_resp = self
                 .function
-                .check_block(block, block_hash, signed_proposal_hash, height, round, proposal.lock_round.is_some())
+                .check_block(block, block_hash, signed_proposal_hash, (height, round), proposal.lock_round.is_some(), proposal.proposer)
                 .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
             self.check_and_save_verify_resp(&verify_resp, false)?;
             if verify_resp.is_pass {
@@ -635,14 +635,15 @@ where
             let is_lock = proposal.lock_round.is_some();
             let signed_proposal_hash = signed_proposal_hash.clone();
             let address = self.params.address.clone();
+            let proposer = proposal.proposer.clone();
             thread::spawn(move || {
                 match function.check_block(
                     &block,
                     &block_hash,
                     &signed_proposal_hash,
-                    height,
-                    round,
+                    (height ,round),
                     is_lock,
+                    proposer,
                 ) {
                     Ok(verify_resp) => {
                         handle_err(

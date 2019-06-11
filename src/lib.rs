@@ -542,9 +542,9 @@ pub trait BftSupport: Sync + Send {
         block: &Block,
         block_hash: &Hash,
         signed_proposal_hash: &Hash,
-        height: Height,
-        round: Round,
+        height_round: (Height, Round),
         is_lock: bool,
+        proposer: Address,
     ) -> Result<VerifyResp, Self::Error>;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,

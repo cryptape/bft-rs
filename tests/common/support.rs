@@ -21,16 +21,16 @@ impl BftSupport for Support {
         block: &Block,
         _block_hash: &Hash,
         _signed_proposal_hash: &Hash,
-        _height: Height,
-        round: Round,
+        height_round: (Height, Round),
         _is_lock: bool,
+        _proposer: Address,
     ) -> Result<VerifyResp, TestError> {
         let delay = check_txs_delay(&self.config);
         thread::sleep(delay);
         if check_block_result(block, &self.config) {
             Ok(VerifyResp {
                 is_pass: true,
-                round,
+                round: height_round.1,
                 #[cfg(feature = "compact_block")]
                 complete_block: get_complete_block(block),
             })
