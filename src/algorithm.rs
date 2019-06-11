@@ -360,7 +360,18 @@ where
 
             #[cfg(feature = "verify_req")]
             Step::VerifyWait => {
-                self.clean_polc();
+                let signed_proposal = self
+                    .proposals
+                    .get_proposal(self.height, self.round)
+                    .ok_or_else(|| {
+                        BftError::ShouldNotHappen(
+                            "can not fetch proposal from cache when handle commit".to_string(),
+                        )
+                    })?;
+                let proposal = signed_proposal.proposal;
+                if proposal.lock_round.is_none() {
+                    self.clean_polc();
+                }
                 self.transmit_precommit(false)?;
             }
 
