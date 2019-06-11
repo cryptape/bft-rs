@@ -608,7 +608,7 @@ where
                     .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
             }
             self.function
-                .check_txs(block, block_hash, proposal_hash, height, round)
+                .check_txs(block, block_hash, proposal_hash, height, round, &proposal.proposer)
                 .map_err(|e| BftError::CheckTxFailed(format!("{:?} of {:?}", e, proposal)))?;
             Ok(())
         }
@@ -631,9 +631,10 @@ where
             let block_hash = block_hash.clone();
             let proposal_hash = proposal_hash.to_owned();
             let address = self.params.address.clone();
+            let proposer = proposal.proposer.clone();
             thread::spawn(move || {
                 let is_pass =
-                    match function.check_txs(&block, &block_hash, &proposal_hash, height, round) {
+                    match function.check_txs(&block, &block_hash, &proposal_hash, height, round, &proposer) {
                         Ok(_) => true,
                         Err(e) => {
                             warn!(

@@ -502,6 +502,7 @@ pub trait BftSupport: Sync + Send {
         signed_proposal_hash: &[u8],
         height: u64,
         round: u64,
+        proposer: &[u8],
     ) -> Result<(), Self::Error>;
     /// A user-defined function for transmitting signed_proposals and signed_votes.
     /// The signed_proposals and signed_votes have been serialized,
