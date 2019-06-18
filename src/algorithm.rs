@@ -197,6 +197,11 @@ where
                             self.transmit_prevote(false)?;
                         }
                     }
+                    // handle commit after proposal is ready while bft process blocked in Commit Step
+                    if self.step == Step::Commit {
+                        info!("Node {:?} receives lacking proposal in commit step", self.params.address);
+                        self.handle_commit()?;
+                    }
                 }
             }
 
@@ -468,7 +473,7 @@ where
             .proposals
             .get_proposal(self.height, self.round)
             .ok_or_else(|| {
-                BftError::ShouldNotHappen(
+                BftError::NotReady(
                     "can not fetch proposal from cache when handle commit".to_string(),
                 )
             })?;
