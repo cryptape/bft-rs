@@ -23,7 +23,7 @@ impl BftSupport for Support {
         _signed_proposal_hash: &Hash,
         height_round: (Height, Round),
         _is_lock: bool,
-        _proposer: Address,
+        _proposer: &Address,
     ) -> Result<VerifyResp, TestError> {
         let delay = check_txs_delay(&self.config);
         thread::sleep(delay);

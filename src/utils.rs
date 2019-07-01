@@ -643,7 +643,7 @@ where
                     &signed_proposal_hash,
                     (height ,round),
                     is_lock,
-                    proposer,
+                    &proposer,
                 ) {
                     Ok(verify_resp) => {
                         handle_err(
