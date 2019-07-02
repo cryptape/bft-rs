@@ -205,7 +205,10 @@ where
                     }
                     // handle commit after proposal is ready while bft process blocked in Commit Step
                     if self.step == Step::Commit {
-                        info!("Node {:?} receives lacking proposal in commit step", self.params.address);
+                        info!(
+                            "Node {:?} receives lacking proposal in commit step",
+                            self.params.address
+                        );
                         self.handle_commit()?;
                     }
                 }

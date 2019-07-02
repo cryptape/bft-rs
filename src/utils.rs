@@ -144,7 +144,7 @@ where
     }
 
     pub(crate) fn build_signed_vote(&self, vote: &Vote) -> BftResult<SignedVote> {
-//        let encode = rlp::encode(vote);
+        //        let encode = rlp::encode(vote);
         // compatibility with CITA
         let encode = encode_compatible_with_cita(vote);
         let hash = self.function.crypt_hash(&encode);
@@ -480,7 +480,10 @@ where
             return Err(BftError::ObsoleteMsg(format!("{:?}", signed_vote)));
         }
 
-        let vote_hash = self.function.crypt_hash(&rlp::encode(vote));
+        //        let vote_hash = self.function.crypt_hash(&rlp::encode(vote));
+        // compatibility with cita
+        let vote_hash = self.function.crypt_hash(&encode_compatible_with_cita(vote));
+
         let address = self
             .function
             .check_sig(&signed_vote.signature, &vote_hash)
@@ -621,7 +624,14 @@ where
         {
             let verify_resp = self
                 .function
-                .check_block(block, block_hash, signed_proposal_hash, (height, round), proposal.lock_round.is_some(), proposal.proposer)
+                .check_block(
+                    block,
+                    block_hash,
+                    signed_proposal_hash,
+                    (height, round),
+                    proposal.lock_round.is_some(),
+                    &proposal.proposer,
+                )
                 .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
             self.check_and_save_verify_resp(&verify_resp, false)?;
             if verify_resp.is_pass {
@@ -646,7 +656,7 @@ where
                     &block,
                     &block_hash,
                     &signed_proposal_hash,
-                    (height ,round),
+                    (height, round),
                     is_lock,
                     &proposer,
                 ) {
@@ -728,7 +738,7 @@ where
                     block_hash: proof.block_hash.clone(),
                     voter: voter.clone(),
                 };
-//                let msg = rlp::encode(&vote);
+                //                let msg = rlp::encode(&vote);
                 // compatibility with cita
                 let msg = encode_compatible_with_cita(&vote);
                 let address = self
@@ -1124,8 +1134,12 @@ pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
 fn encode_compatible_with_cita(vote: &Vote) -> Vec<u8> {
     let h = vote.height as usize;
     let r = vote.round as usize;
-    let step = if vote.vote_type == VoteType::Prevote {CitaStep::Prevote} else {CitaStep::Precommit};
+    let step = if vote.vote_type == VoteType::Prevote {
+        CitaStep::Prevote
+    } else {
+        CitaStep::Precommit
+    };
     let sender = CitaAddr::from(vote.voter.0.as_slice());
     let proposal = H256::from(vote.block_hash.0.as_slice());
-    serialize(&(h,r,step,sender,Some(proposal)), Infinite).unwrap()
+    serialize(&(h, r, step, sender, Some(proposal)), Infinite).unwrap()
 }
