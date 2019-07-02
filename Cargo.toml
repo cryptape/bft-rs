@@ -12,6 +12,7 @@ An efficient and stable Rust library of BFT protocol for distributed system.
 """
 
 [dependencies]
+bincode = "0.8.0"
 crossbeam = "0.7"
 crossbeam-utils = "0.6.5"
 hex_fmt = "0.3.0"
@@ -25,7 +26,8 @@ rlp = "0.3.0"
 serde = "1.0"
 serde_derive = "1.0"
 time = "0.1.36"
-
+cita-types = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+proof = { git = "https://github.com/rev-chaos/cita-common.git", branch = "public_step" }
 
 [dev-dependencies]
 env_logger = "0.6.0"
@@ -35,8 +37,10 @@ sha2 = "0.8.0"
 
 
 [features]
-default = []
+default = ["secp256k1", "sha3hash"]
 verify_req = []
 machine_gun = []
 random_proposer = []
 compact_block = []
+secp256k1 = ["proof/secp256k1"]
+sha3hash = ["proof/sha3hash"]

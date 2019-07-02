@@ -7,9 +7,12 @@ use crate::{
     timer::TimeoutInfo,
     wal::Wal,
 };
+use bincode::{serialize, Infinite};
+use cita_types::{Address as CitaAddr, H256};
 #[cfg(feature = "verify_req")]
 #[allow(unused_imports)]
 use log::{log, warn};
+use proof::Step as CitaStep;
 #[cfg(feature = "random_proposer")]
 use rand_core::{RngCore, SeedableRng};
 #[cfg(feature = "random_proposer")]
@@ -141,7 +144,9 @@ where
     }
 
     pub(crate) fn build_signed_vote(&self, vote: &Vote) -> BftResult<SignedVote> {
-        let encode = rlp::encode(vote);
+//        let encode = rlp::encode(vote);
+        // compatibility with CITA
+        let encode = encode_compatible_with_cita(vote);
         let hash = self.function.crypt_hash(&encode);
 
         let signature = self
@@ -723,7 +728,9 @@ where
                     block_hash: proof.block_hash.clone(),
                     voter: voter.clone(),
                 };
-                let msg = rlp::encode(&vote);
+//                let msg = rlp::encode(&vote);
+                // compatibility with cita
+                let msg = encode_compatible_with_cita(&vote);
                 let address = self
                     .function
                     .check_sig(&sig, &self.function.crypt_hash(&msg))
@@ -1112,4 +1119,13 @@ pub(crate) fn get_index(seed: u64, weight: &[u64]) -> usize {
         }
     }
     0
+}
+
+fn encode_compatible_with_cita(vote: &Vote) -> Vec<u8> {
+    let h = vote.height as usize;
+    let r = vote.round as usize;
+    let step = if vote.vote_type == VoteType::Prevote {CitaStep::Prevote} else {CitaStep::Precommit};
+    let sender = CitaAddr::from(vote.voter.0.as_slice());
+    let proposal = H256::from(vote.block_hash.0.as_slice());
+    serialize(&(h,r,step,sender,Some(proposal)), Infinite).unwrap()
 }
