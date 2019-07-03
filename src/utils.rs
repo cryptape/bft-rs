@@ -389,7 +389,7 @@ where
         debug!("save {:?}", proof);
         handle_err(
             self.wal_log
-                .save(proof.height + 1, LogType::Proof, &rlp::encode(proof))
+                .save(proof.height, LogType::Proof, &rlp::encode(proof))
                 .or_else(|e| {
                     Err(BftError::SaveWalErr(format!(
                         "{:?} of {:?}",
