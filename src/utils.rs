@@ -386,6 +386,7 @@ where
     }
 
     fn save_proof(&mut self, proof: &Proof) {
+        debug!("save {:?}", proof);
         handle_err(
             self.wal_log
                 .save(proof.height + 1, LogType::Proof, &rlp::encode(proof))
