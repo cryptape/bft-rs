@@ -83,7 +83,7 @@ where
                 info!("Node {:?} loads proof", self.params.address);
                 let proof: Proof = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("proof encounters {:?}", e)))?;
-                self.set_proof(&proof);
+                self.set_proof(&proof, false);
             }
             LogType::VerifyResp => {
                 info!("Node {:?} loads verify_resp", self.params.address);
@@ -213,9 +213,12 @@ where
     }
 
     #[inline]
-    pub(crate) fn set_proof(&mut self, proof: &Proof) {
+    pub(crate) fn set_proof(&mut self, proof: &Proof, need_wal: bool) {
         if self.proof.height < proof.height {
             self.proof = proof.clone();
+            if need_wal {
+                self.save_proof(proof);
+            }
         }
     }
 
@@ -382,6 +385,20 @@ where
         }
     }
 
+    fn save_proof(&mut self, proof: &Proof) {
+        handle_err(
+            self.wal_log
+                .save(proof.height + 1, LogType::Proof, &rlp::encode(proof))
+                .or_else(|e| {
+                    Err(BftError::SaveWalErr(format!(
+                        "{:?} of {:?}",
+                        e, &self.proof
+                    )))
+                }),
+            &self.params.address,
+        );
+    }
+
     pub(crate) fn check_and_save_proposal(
         &mut self,
         signed_proposal: &SignedProposal,
@@ -536,17 +553,6 @@ where
             return Err(BftError::ObsoleteMsg(format!("{:?}", status)));
         }
         if need_wal {
-            handle_err(
-                self.wal_log
-                    .save(self.height + 1, LogType::Proof, &rlp::encode(&self.proof))
-                    .or_else(|e| {
-                        Err(BftError::SaveWalErr(format!(
-                            "{:?} of {:?}",
-                            e, &self.proof
-                        )))
-                    }),
-                &self.params.address,
-            );
             let status_height = status.height;
             handle_err(
                 self.wal_log
@@ -691,7 +697,7 @@ where
 
         let authorities = self.get_authorities(height)?;
         self.check_proof_only(proof, height, authorities)?;
-        self.set_proof(proof);
+        self.set_proof(proof, true);
 
         Ok(())
     }

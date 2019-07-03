@@ -470,7 +470,7 @@ where
             .unwrap_or_else(|| panic!("Node {:?} has no lock when commit!", self.params.address));
 
         let proof = self.generate_proof(lock_status.clone());
-        self.set_proof(&proof);
+        self.set_proof(&proof, true);
 
         let signed_proposal = self
             .proposals
