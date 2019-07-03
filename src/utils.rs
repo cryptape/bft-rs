@@ -847,7 +847,9 @@ where
         }
 
         let signature = &signed_vote.signature;
-        let vote_hash = self.function.crypt_hash(&rlp::encode(vote));
+        //        let vote_hash = self.function.crypt_hash(&rlp::encode(vote));
+        // compatibility with cita
+        let vote_hash = self.function.crypt_hash(&encode_compatible_with_cita(vote));
         let address = self
             .function
             .check_sig(signature, &vote_hash)
