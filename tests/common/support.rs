@@ -49,7 +49,7 @@ impl BftSupport for Support {
         Err(TestError::CommitProposed)
     }
 
-    fn get_block(&self, _height: Height) -> Result<(Block, Hash), TestError> {
+    fn get_block(&self, _height: Height, _proof: &Proof) -> Result<(Block, Hash), TestError> {
         let block = generate_block(false, &self.config);
         let block_hash = hash(&block[0..self.config.min_block_size]);
         Ok((block, block_hash))

@@ -555,7 +555,7 @@ pub trait BftSupport: Sync + Send {
     fn commit(&self, commit: Commit) -> Result<Status, Self::Error>;
     /// A user-defined function for feeding the bft consensus.
     /// The new block provided will feed for bft consensus of giving [`height`]
-    fn get_block(&self, height: Height) -> Result<(Block, Hash), Self::Error>;
+    fn get_block(&self, height: Height, proof: &Proof) -> Result<(Block, Hash), Self::Error>;
     /// A user-defined function for signing a [`hash`].
     fn sign(&self, hash: &Hash) -> Result<Signature, Self::Error>;
     /// A user-defined function for checking a [`signature`].

@@ -831,11 +831,12 @@ where
                 let sender = self.msg_sender.clone();
                 let height = self.height;
                 let address = self.params.address.clone();
+                let proof = self.proof.clone();
 
                 thread::spawn(move || {
                     handle_err(
                         function
-                            .get_block(height)
+                            .get_block(height, &proof)
                             .map_err(|e| BftError::GetBlockFailed(format!("{:?}", e)))
                             .and_then(|(block, block_hash)| {
                                 sender
