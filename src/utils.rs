@@ -217,7 +217,7 @@ where
         if self.proof.height < proof.height {
             self.proof = proof.clone();
             if need_wal {
-                self.save_proof(proof);
+                self.save_proof(proof.height, proof);
             }
         }
     }
@@ -385,11 +385,11 @@ where
         }
     }
 
-    fn save_proof(&mut self, proof: &Proof) {
+    fn save_proof(&mut self, height: Height, proof: &Proof) {
         debug!("save {:?}", proof);
         handle_err(
             self.wal_log
-                .save(proof.height, LogType::Proof, &rlp::encode(proof))
+                .save(height, LogType::Proof, &rlp::encode(proof))
                 .or_else(|e| {
                     Err(BftError::SaveWalErr(format!(
                         "{:?} of {:?}",
@@ -554,6 +554,7 @@ where
             return Err(BftError::ObsoleteMsg(format!("{:?}", status)));
         }
         if need_wal {
+            self.save_proof(self.height + 1, &self.proof.clone());
             let status_height = status.height;
             handle_err(
                 self.wal_log
