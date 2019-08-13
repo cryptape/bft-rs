@@ -643,9 +643,9 @@ where
                 .map_err(|e| BftError::CheckBlockFailed(format!("{:?} of {:?}", e, proposal)))?;
             self.check_and_save_verify_resp(&verify_resp, false)?;
             if verify_resp.is_pass {
-                return Ok(());
+                Ok(())
             } else {
-                return Err(BftError::CheckBlockFailed(format!("of {:?}", proposal)));
+                Err(BftError::CheckBlockFailed(format!("of {:?}", proposal)))
             }
         }
 

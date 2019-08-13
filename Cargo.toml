@@ -26,7 +26,7 @@ rlp = "0.3.0"
 serde = "1.0"
 serde_derive = "1.0"
 time = "0.1.36"
-cita-types = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+cita-types = { git = "https://github.com/cryptape/cita-common.git", branch = "remove-gpl" }
 proof = { git = "https://github.com/rev-chaos/cita-common.git", branch = "public_step" }
 
 [dev-dependencies]

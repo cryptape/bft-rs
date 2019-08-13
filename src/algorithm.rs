@@ -961,7 +961,6 @@ where
                 "Node {:?} handles a proposal with an earlier PoLC",
                 self.params.address
             );
-            return;
         }
     }
 
