@@ -178,6 +178,11 @@ where
     pub(crate) fn process(&mut self, msg: BftMsg, need_wal: bool) -> BftResult<()> {
         match msg {
             BftMsg::Proposal(encode) => {
+                trace!(
+                    "Node {:?} has consensus power {:?}",
+                    self.params.address,
+                    self.consensus_power
+                );
                 if self.consensus_power {
                     let (signed_proposal_encode, block) = extract_two(&encode)?;
                     let signed_proposal: SignedProposal = rlp::decode(&signed_proposal_encode)
@@ -334,13 +339,25 @@ where
 
         match tminfo.step {
             Step::ProposeWait => {
+                info!(
+                    "Node {:?} receives time event Step::ProposeWait",
+                    self.params.address
+                );
                 self.change_to_step(Step::Prevote);
                 self.transmit_prevote(false)?;
             }
             Step::Prevote => {
+                info!(
+                    "Node {:?} receives time event Step::Prevote",
+                    self.params.address
+                );
                 self.transmit_prevote(true)?;
             }
             Step::PrevoteWait => {
+                info!(
+                    "Node {:?} receives time event Step::PrevoteWait",
+                    self.params.address
+                );
                 // if there is no lock, clear the proposal
                 if self.lock_status.is_none() {
                     self.block_hash = None;
@@ -358,16 +375,28 @@ where
                 self.transmit_precommit(false)?;
             }
             Step::Precommit => {
+                info!(
+                    "Node {:?} receives time event Step::Precommit",
+                    self.params.address
+                );
                 handle_err(self.transmit_prevote(true), &self.params.address);
                 self.transmit_precommit(true)?;
             }
             Step::PrecommitWait => {
+                info!(
+                    "Node {:?} receives time event Step::PrecommitWait",
+                    self.params.address
+                );
                 self.goto_next_round();
                 self.new_round_start(true)?;
             }
 
             #[cfg(feature = "verify_req")]
             Step::VerifyWait => {
+                info!(
+                    "Node {:?} receives time event Step::VerifyWait",
+                    self.params.address
+                );
                 let signed_proposal = self
                     .proposals
                     .get_proposal(self.height, self.round)
@@ -377,13 +406,17 @@ where
                         )
                     })?;
                 let proposal = signed_proposal.proposal;
-                if proposal.lock_round.is_none() {
+                if proposal.lock_round.is_some() {
                     self.clean_polc();
                 }
                 self.transmit_precommit(false)?;
             }
 
             Step::CommitWait => {
+                info!(
+                    "Node {:?} receives time event Step::CommitWait",
+                    self.params.address
+                );
                 self.set_status(&self.status.clone().unwrap());
                 self.goto_new_height(self.height + 1);
                 handle_err(self.flush_cache(), &self.params.address);
@@ -819,8 +852,8 @@ where
     fn new_round_start(&mut self, new_round: bool) -> BftResult<()> {
         if self.step != Step::ProposeWait {
             info!(
-                "Node {:?} starts h:{}, r:{}",
-                self.params.address, self.height, self.round
+                "Node {:?} starts h:{}, r:{}, s: {:?}",
+                self.params.address, self.height, self.round, self.step
             );
         }
         self.change_to_step(Step::ProposeWait);

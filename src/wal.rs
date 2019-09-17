@@ -82,6 +82,7 @@ impl Wal {
     }
 
     pub(crate) fn set_height(&mut self, height: Height) -> Result<(), io::Error> {
+        trace!("Wal set height: {:?}", height);
         self.current_height = height;
         self.ifile.seek(io::SeekFrom::Start(0))?;
         let hstr = height.to_string();
