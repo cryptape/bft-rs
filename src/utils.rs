@@ -120,9 +120,10 @@ where
             .blocks
             .get_block(proposal.height, block_hash)
             .ok_or_else(|| {
-                BftError::ShouldNotHappen(
-                    "can not fetch block from cache when send signed_proposal".to_string(),
-                )
+                BftError::ShouldNotHappen(format!(
+                    "can not fetch block {:?} from cache when send signed_proposal",
+                    proposal.height
+                ))
             })?;
         let encode = combine_two(&signed_proposal_encode, &block);
         Ok(encode)
@@ -371,7 +372,7 @@ where
         verify_resp: &VerifyResp,
     ) -> BftResult<()> {
         if self.verify_results.contains_key(&round)
-            && verify_resp.is_pass != self.verify_results.get(&round).unwrap().is_pass
+            && verify_resp.is_pass != self.verify_results[&round].is_pass
         {
             Err(BftError::ShouldNotHappen(format!(
                 "get conflict verify result of round: {}",
@@ -966,6 +967,10 @@ where
 
     #[inline]
     pub(crate) fn change_to_step(&mut self, step: Step) {
+        info!(
+            "Node {:?}, change step from {:?} to {:?}",
+            self.params.address, self.step, step
+        );
         self.step = step;
     }
 
@@ -1003,11 +1008,13 @@ where
 
     #[inline]
     pub(crate) fn clean_feed(&mut self) {
+        trace!("Node {:?} clean feed", self.params.address);
         self.feed = None;
     }
 
     #[inline]
     pub(crate) fn clean_filter(&mut self) {
+        trace!("Node {:?} clean filter", self.params.address);
         self.height_filter.clear();
         self.round_filter.clear();
     }
