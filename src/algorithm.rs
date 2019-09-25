@@ -112,6 +112,7 @@ where
     }
 
     /// A function to start a BFT state machine.
+    #[allow(clippy::drop_copy, clippy::zero_ptr)]
     pub fn start(
         s: Sender<BftMsg>,
         r: Receiver<BftMsg>,

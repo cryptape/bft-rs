@@ -372,7 +372,7 @@ where
         verify_resp: &VerifyResp,
     ) -> BftResult<()> {
         if self.verify_results.contains_key(&round)
-            && verify_resp.is_pass != self.verify_results.get(&round).unwrap().is_pass
+            && verify_resp.is_pass != self.verify_results[&round].is_pass
         {
             Err(BftError::ShouldNotHappen(format!(
                 "get conflict verify result of round: {}",
