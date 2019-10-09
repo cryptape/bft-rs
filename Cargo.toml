@@ -26,8 +26,8 @@ rlp = "0.3.0"
 serde = "1.0"
 serde_derive = "1.0"
 time = "0.1.36"
-cita-types = { git = "https://github.com/cryptape/cita-common.git", branch = "remove-gpl" }
-proof = { git = "https://github.com/cryptape/cita-common.git", branch = "remove-gpl" }
+cita-types = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
+proof = { git = "https://github.com/cryptape/cita-common.git", branch = "develop" }
 
 [dev-dependencies]
 env_logger = "0.6.0"
@@ -37,10 +37,14 @@ sha2 = "0.8.0"
 
 
 [features]
-default = ["secp256k1", "sha3hash"]
+default = []
 verify_req = []
 machine_gun = []
 random_proposer = []
 compact_block = []
 secp256k1 = ["proof/secp256k1"]
+ed25519 = ["proof/ed25519"]
+sm2 = ["proof/sm2"]
+sm3hash = ["proof/sm3hash"]
+blake2bhash = ["proof/blake2bhash"]
 sha3hash = ["proof/sha3hash"]

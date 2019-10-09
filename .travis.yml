@@ -17,4 +17,4 @@ jobs:
     - stage: Test
       name: Clippy
       script:
-        - cargo clippy --all
+        - cargo clippy --features secp256k1
