@@ -231,7 +231,6 @@ where
             self.params.address,
             self.authority_manage
         );
-
         if self.consensus_power
             && !status
                 .authority_list
@@ -443,7 +442,9 @@ where
                 block,
                 &self.function.crypt_hash(signed_proposal_hash),
             )?;
-            self.check_proof(height, &proposal.proof)?;
+            if height > 1 {
+                self.check_proof(height, &proposal.proof)?;
+            }
         }
 
         // prevent too many higher proposals flush out current proposal
@@ -697,8 +698,7 @@ where
                 proof
             )));
         }
-
-        let authorities = self.get_authorities(height)?;
+        let authorities = self.get_authorities(proof.height - 1)?;
         self.check_proof_only(proof, height, authorities)?;
         self.set_proof(proof, true);
 

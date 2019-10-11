@@ -230,10 +230,16 @@ impl AuthorityManage {
 
     pub(crate) fn receive_authorities_list(&mut self, height: Height, mut authorities: Vec<Node>) {
         authorities.sort();
+
         if self.authorities != authorities {
             self.authorities_old.clear();
             self.authorities_old.extend_from_slice(&self.authorities);
-            self.authority_h_old = height;
+            if height == 0 {
+                self.authorities_old.extend_from_slice(&authorities);
+            }
+            if height >= 1 {
+                self.authority_h_old = height - 1;
+            }
 
             self.authorities.clear();
             self.authorities.extend_from_slice(&authorities);
