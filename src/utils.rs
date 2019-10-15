@@ -698,7 +698,7 @@ where
                 proof
             )));
         }
-        let authorities = self.get_authorities(proof.height - 1)?;
+        let authorities = self.get_authorities(proof.height)?;
         self.check_proof_only(proof, height, authorities)?;
         self.set_proof(proof, true);
 
