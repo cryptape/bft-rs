@@ -248,6 +248,33 @@ impl AuthorityManage {
     }
 }
 
+impl Encodable for AuthorityManage {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(3)
+            .append_list(&self.authorities)
+            .append_list(&self.authorities_old)
+            .append(&self.authority_h_old);
+    }
+}
+
+impl Decodable for AuthorityManage {
+    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
+        match r.prototype()? {
+            Prototype::List(3) => {
+                let authorities = r.list_at(0)?;
+                let authorities_old = r.list_at(1)?;
+                let authority_h_old = r.val_at(2)?;
+                Ok(AuthorityManage {
+                    authorities,
+                    authorities_old,
+                    authority_h_old,
+                })
+            }
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, PartialOrd, Eq, Clone, Copy, Hash)]
 pub(crate) enum Step {
     Propose,
@@ -338,6 +365,7 @@ pub(crate) enum LogType {
     VerifyResp,
     TimeOutInfo,
     Block,
+    Authorities,
 }
 
 impl From<u8> for LogType {
@@ -351,6 +379,7 @@ impl From<u8> for LogType {
             5 => LogType::VerifyResp,
             6 => LogType::TimeOutInfo,
             7 => LogType::Block,
+            8 => LogType::Authorities,
             _ => panic!("Invalid vote type!"),
         }
     }
@@ -367,6 +396,7 @@ impl Into<u8> for LogType {
             LogType::VerifyResp => 5,
             LogType::TimeOutInfo => 6,
             LogType::Block => 7,
+            LogType::Authorities => 8,
         }
     }
 }

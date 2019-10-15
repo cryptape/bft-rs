@@ -418,7 +418,7 @@ where
                     "Node {:?} receives time event Step::CommitWait",
                     self.params.address
                 );
-                self.set_status(&self.status.clone().unwrap());
+                self.set_status(&self.status.clone().unwrap(), true);
                 self.goto_new_height(self.height + 1);
                 handle_err(self.flush_cache(), &self.params.address);
                 self.new_round_start(true)?;
@@ -605,7 +605,7 @@ where
                 self.last_commit_round = None;
             }
 
-            self.set_status(&status);
+            self.set_status(&status, true);
             self.goto_new_height(status.height + 1);
             handle_err(self.flush_cache(), &self.params.address);
             self.new_round_start(true)?;

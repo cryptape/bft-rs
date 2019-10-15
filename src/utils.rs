@@ -91,7 +91,6 @@ where
                     .map_err(|e| BftError::DecodeErr(format!("verify_resp encounters {:?}", e)))?;
                 self.process(BftMsg::VerifyResp(verify_resp), false)?;
             }
-
             LogType::TimeOutInfo => {
                 info!("Node {:?} loads timeout_info", self.params.address);
                 let time_out_info: TimeoutInfo = rlp::decode(&encode).map_err(|e| {
@@ -99,11 +98,16 @@ where
                 })?;
                 self.timeout_process(time_out_info, false)?;
             }
-
             LogType::Block => {
                 info!("Node {:?} loads block", self.params.address);
                 let (height, block, block_hash) = decode_block(&encode)?;
                 self.blocks.add(height, &block_hash, &block);
+            }
+            LogType::Authorities => {
+                info!("Node {:?} loads Authorities", self.params.address);
+                let authorities = rlp::decode(&encode)
+                    .map_err(|e| BftError::DecodeErr(format!("authorities encounters {:?}", e)))?;
+                self.authority_manage = authorities;
             }
         }
         Ok(())
@@ -223,7 +227,7 @@ where
         }
     }
 
-    pub(crate) fn set_status(&mut self, status: &Status) {
+    pub(crate) fn set_status(&mut self, status: &Status, need_wal: bool) {
         self.authority_manage
             .receive_authorities_list(status.height, status.authority_list.clone());
         trace!(
@@ -231,6 +235,24 @@ where
             self.params.address,
             self.authority_manage
         );
+
+        if need_wal {
+            handle_err(
+                self.wal_log
+                    .save(
+                        status.height + 1,
+                        LogType::Authorities,
+                        &rlp::encode(&self.authority_manage),
+                    )
+                    .or_else(|e| {
+                        Err(BftError::SaveWalErr(format!(
+                            "{:?} of {:?}",
+                            e, &self.authority_manage
+                        )))
+                    }),
+                &self.params.address,
+            );
+        }
         if self.consensus_power
             && !status
                 .authority_list
