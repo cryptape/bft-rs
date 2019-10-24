@@ -1,7 +1,7 @@
 use crate::objects::LogType;
 use crate::Height;
 #[allow(unused_imports)]
-use log::{log, trace, warn};
+use log::{debug, log, trace, warn};
 use std::collections::BTreeMap;
 use std::fs::{read_dir, DirBuilder, File, OpenOptions};
 use std::io::{self, Read, Seek, Write};
@@ -114,7 +114,12 @@ impl Wal {
     }
 
     pub(crate) fn save(&mut self, height: Height, mtype: LogType, msg: &[u8]) -> io::Result<()> {
-        trace!("Wal save mtype: {:?}, height: {}", mtype, height);
+        trace!(
+            "Wal save mtype: {:?}, cur_height: {}, height: {}",
+            mtype,
+            self.current_height,
+            height
+        );
         if !self.height_fs.contains_key(&height) {
             // 2 more higher than current height, do not process it
             if height > self.current_height + 1 {
@@ -154,6 +159,7 @@ impl Wal {
         let mut vec_buf: Vec<u8> = Vec::new();
         let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
         let cur_height = self.current_height;
+        debug!("wal load current height {:?}", cur_height);
         if self.height_fs.is_empty() || cur_height == 0 {
             return vec_out;
         }

@@ -74,10 +74,17 @@ where
                 self.process(BftMsg::Feed(feed), false)?;
             }
             LogType::Status => {
+                trace!(
+                    "Node {:?} authorities {:?} while startup",
+                    self.params.address,
+                    self.authority_manage
+                );
+                // if !self.authority_manage.authorities.is_empty() {
                 info!("Node {:?} loads status", self.params.address);
                 let status: Status = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("status encounters {:?}", e)))?;
                 self.process(BftMsg::Status(status), false)?;
+                // }
             }
             LogType::Proof => {
                 info!("Node {:?} loads proof", self.params.address);
@@ -104,10 +111,23 @@ where
                 self.blocks.add(height, &block_hash, &block);
             }
             LogType::Authorities => {
-                info!("Node {:?} loads Authorities", self.params.address);
+                info!(
+                    "Node {:?} authority before load {:?}",
+                    self.params.address, self.authority_manage
+                );
                 let authorities = rlp::decode(&encode)
                     .map_err(|e| BftError::DecodeErr(format!("authorities encounters {:?}", e)))?;
-                self.authority_manage = authorities;
+                info!(
+                    "Node {:?} loads Authorities {:?}",
+                    self.params.address, authorities
+                );
+                if self.authority_manage.is_empty() {
+                    self.authority_manage = authorities;
+                }
+                info!(
+                    "Node {:?} authority after load {:?}",
+                    self.params.address, self.authority_manage
+                );
             }
         }
         Ok(())
@@ -168,6 +188,10 @@ where
     #[inline]
     fn get_authorities(&self, height: Height) -> BftResult<&Vec<Node>> {
         let p = &self.authority_manage;
+        info!(
+            "===> lalala Get height {:?} authority {:?}",
+            height, self.authority_manage
+        );
         let authorities = if height == p.authority_h_old {
             &p.authorities_old
         } else {
@@ -219,6 +243,9 @@ where
 
     #[inline]
     pub(crate) fn set_proof(&mut self, proof: &Proof, need_wal: bool) {
+        debug!("Node {:?} self proof {:?}", self.params.address, self.proof);
+        debug!("Node {:?} set proof {:?}", self.params.address, proof);
+
         if self.proof.height < proof.height {
             self.proof = proof.clone();
             if need_wal {
@@ -236,23 +263,23 @@ where
             self.authority_manage
         );
 
-        if need_wal {
-            handle_err(
-                self.wal_log
-                    .save(
-                        status.height + 1,
-                        LogType::Authorities,
-                        &rlp::encode(&self.authority_manage),
-                    )
-                    .or_else(|e| {
-                        Err(BftError::SaveWalErr(format!(
-                            "{:?} of {:?}",
-                            e, &self.authority_manage
-                        )))
-                    }),
-                &self.params.address,
-            );
-        }
+        // if need_wal {
+        //     handle_err(
+        //         self.wal_log
+        //             .save(
+        //                 status.height + 1,
+        //                 LogType::Authorities,
+        //                 &rlp::encode(&self.authority_manage),
+        //             )
+        //             .or_else(|e| {
+        //                 Err(BftError::SaveWalErr(format!(
+        //                     "{:?} of {:?}",
+        //                     e, &self.authority_manage
+        //                 )))
+        //             }),
+        //         &self.params.address,
+        //     );
+        // }
         if self.consensus_power
             && !status
                 .authority_list
@@ -578,8 +605,26 @@ where
             return Err(BftError::ObsoleteMsg(format!("{:?}", status)));
         }
         if need_wal {
-            self.save_proof(self.height + 1, &self.proof.clone());
             let status_height = status.height;
+            self.save_proof(status_height + 1, &self.proof.clone());
+            // self.save_proof(self.proof.height, &self.proof.clone());
+            debug!("save {:?}", self.authority_manage);
+            handle_err(
+                self.wal_log
+                    .save(
+                        status_height + 1,
+                        LogType::Authorities,
+                        &rlp::encode(&self.authority_manage),
+                    )
+                    .or_else(|e| {
+                        Err(BftError::SaveWalErr(format!(
+                            "{:?} of {:?}",
+                            e, &self.authority_manage
+                        )))
+                    }),
+                &self.params.address,
+            );
+
             handle_err(
                 self.wal_log
                     .save(status_height + 1, LogType::Status, &rlp::encode(status))

@@ -398,6 +398,11 @@ where
                     "Node {:?} receives time event Step::VerifyWait",
                     self.params.address
                 );
+                trace!(
+                    "Node {:?} proposals info now {:?}",
+                    self.params.address,
+                    self.proposals
+                );
                 let signed_proposal = self
                     .proposals
                     .get_proposal(self.height, self.round)
@@ -418,7 +423,10 @@ where
                     "Node {:?} receives time event Step::CommitWait",
                     self.params.address
                 );
+
                 self.set_status(&self.status.clone().unwrap(), true);
+                // self.status.map(|s| self.set_status(&s, true));
+
                 self.goto_new_height(self.height + 1);
                 handle_err(self.flush_cache(), &self.params.address);
                 self.new_round_start(true)?;
@@ -621,6 +629,10 @@ where
     }
 
     fn transmit_proposal(&mut self) -> BftResult<()> {
+        info!(
+            "Node {:?} self's height {:?}",
+            self.params.address, self.height
+        );
         if self.is_byzantine {
             return self.transmit_byzantine_proposal();
         }
@@ -676,6 +688,7 @@ where
                 lock_votes,
                 proposer: self.params.address.clone(),
             };
+            trace!("===> lalala1 transmit proposal {:?}", proposal);
             let encode = self.build_signed_proposal_encode(&proposal)?;
             BftMsg::Proposal(encode)
         } else {
@@ -701,13 +714,14 @@ where
                 lock_votes: Vec::new(),
                 proposer: self.params.address.clone(),
             };
+            trace!("===> lalala2 transmit proposal {:?}", proposal);
             let encode = self.build_signed_proposal_encode(&proposal)?;
             BftMsg::Proposal(encode)
         };
-        debug!(
-            "Node {:?} transmits proposal at h:{}, r:{}",
-            self.params.address, self.height, self.round
-        );
+        // debug!(
+        //     "Node {:?} transmits proposal at h:{}, r:{}",
+        //     self.params.address, self.height, self.round
+        // );
         self.function.transmit(msg.clone());
         self.send_bft_msg(msg)?;
         Ok(())

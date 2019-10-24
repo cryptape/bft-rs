@@ -235,16 +235,14 @@ impl AuthorityManage {
             self.authorities_old.clear();
             self.authorities_old.extend_from_slice(&self.authorities);
             self.authority_h_old = height;
-            // if height == 0 {
-            //     self.authorities_old.extend_from_slice(&authorities);
-            // }
-            // if height >= 1 {
-            //     self.authority_h_old = height - 1;
-            // }
 
             self.authorities.clear();
             self.authorities.extend_from_slice(&authorities);
         }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.authorities.is_empty()
     }
 }
 
