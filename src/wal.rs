@@ -1,7 +1,7 @@
 use crate::objects::LogType;
 use crate::Height;
 #[allow(unused_imports)]
-use log::{debug, log, trace, warn};
+use log::{debug, info, log, trace, warn};
 use std::collections::BTreeMap;
 use std::fs::{read_dir, DirBuilder, File, OpenOptions};
 use std::io::{self, Read, Seek, Write};
@@ -159,7 +159,8 @@ impl Wal {
         let mut vec_buf: Vec<u8> = Vec::new();
         let mut vec_out: Vec<(LogType, Vec<u8>)> = Vec::new();
         let cur_height = self.current_height;
-        debug!("wal load current height {:?}", cur_height);
+        info!("wal load current height {:?}", cur_height);
+        info!("wal load fs {:?}", self.height_fs);
         if self.height_fs.is_empty() || cur_height == 0 {
             return vec_out;
         }

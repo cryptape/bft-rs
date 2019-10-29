@@ -911,12 +911,12 @@ where
     fn goto_new_height(&mut self, new_height: Height) {
         self.clean_save_info();
         self.clean_filter();
-        handle_err(
-            self.wal_log
-                .set_height(new_height)
-                .map_err(|e| BftError::SaveWalErr(format!("{:?} of set_height", e))),
-            &self.params.address,
-        );
+        // handle_err(
+        //     self.wal_log
+        //         .set_height(new_height)
+        //         .map_err(|e| BftError::SaveWalErr(format!("{:?} of set_height", e))),
+        //     &self.params.address,
+        // );
 
         self.height = new_height;
         self.round = 0;

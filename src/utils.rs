@@ -46,10 +46,13 @@ where
     fn process_wal_log(&mut self, log_type: LogType, encode: Vec<u8>) -> BftResult<()> {
         match log_type {
             LogType::Proposal => {
-                info!("Node {:?} loads proposal", self.params.address);
                 let signed_proposal: SignedProposal = rlp::decode(&encode).map_err(|e| {
                     BftError::DecodeErr(format!("signed_proposal encounters {:?}", e))
                 })?;
+                info!(
+                    "Node {:?} loads proposal {:?}",
+                    self.params.address, signed_proposal
+                );
                 let proposal = signed_proposal.proposal;
                 let block_hash = proposal.block_hash;
                 let block = self
@@ -604,7 +607,7 @@ where
         if self.height > 0 && height < self.height - 1 {
             return Err(BftError::ObsoleteMsg(format!("{:?}", status)));
         }
-        if need_wal {
+        if need_wal && height == self.height {
             let status_height = status.height;
             self.save_proof(status_height + 1, &self.proof.clone());
             // self.save_proof(self.proof.height, &self.proof.clone());
@@ -629,6 +632,13 @@ where
                 self.wal_log
                     .save(status_height + 1, LogType::Status, &rlp::encode(status))
                     .or_else(|e| Err(BftError::SaveWalErr(format!("{:?} of {:?}", e, status)))),
+                &self.params.address,
+            );
+
+            handle_err(
+                self.wal_log
+                    .set_height(status_height + 1)
+                    .map_err(|e| BftError::SaveWalErr(format!("{:?} of set_height", e))),
                 &self.params.address,
             );
         }
