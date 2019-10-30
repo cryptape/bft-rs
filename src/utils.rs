@@ -191,10 +191,10 @@ where
     #[inline]
     fn get_authorities(&self, height: Height) -> BftResult<&Vec<Node>> {
         let p = &self.authority_manage;
-        info!(
-            "===> lalala Get height {:?} authority {:?}",
-            height, self.authority_manage
-        );
+        // info!(
+        //     "===> lalala Get height {:?} authority {:?}",
+        //     height, self.authority_manage
+        // );
         let authorities = if height == p.authority_h_old {
             &p.authorities_old
         } else {
@@ -257,7 +257,7 @@ where
         }
     }
 
-    pub(crate) fn set_status(&mut self, status: &Status, need_wal: bool) {
+    pub(crate) fn set_status(&mut self, status: &Status) {
         self.authority_manage
             .receive_authorities_list(status.height, status.authority_list.clone());
         trace!(

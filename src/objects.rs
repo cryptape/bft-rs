@@ -399,6 +399,7 @@ impl Into<u8> for LogType {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum PrecommitRes {
     Above,
     Below,

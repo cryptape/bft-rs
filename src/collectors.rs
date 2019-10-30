@@ -141,7 +141,7 @@ impl RoundCollector {
         }
     }
 
-    /// A functionto get the vote set of the round, and the vote type.
+    /// A function to get the vote set of the round, and the vote type.
     pub(crate) fn get_voteset(&mut self, round: Round, vote_type: &VoteType) -> Option<VoteSet> {
         self.round_votes
             .get_mut(&round)
@@ -187,7 +187,7 @@ impl StepCollector {
 pub(crate) struct VoteSet {
     /// A HashMap that K is voter, V is proposal.
     pub(crate) votes_by_sender: HashMap<Address, SignedVote>,
-    /// A HashMap that K is proposal V is count of the proposal.
+    /// A HashMap that K is proposal, V is count of the proposal.
     pub(crate) votes_by_proposal: HashMap<Hash, u64>,
     /// Count of vote set.
     pub(crate) count: u64,

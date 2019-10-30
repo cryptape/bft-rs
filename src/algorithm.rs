@@ -180,7 +180,7 @@ where
         match msg {
             BftMsg::Proposal(encode) => {
                 trace!(
-                    "Node {:?} has consensus power {:?}",
+                    "Node {:?} receives proposal, and has consensus power {:?}",
                     self.params.address,
                     self.consensus_power
                 );
@@ -412,6 +412,11 @@ where
                         )
                     })?;
                 let proposal = signed_proposal.proposal;
+                trace!(
+                    "Node {:?} proposal lock round {:?}",
+                    self.params.address,
+                    proposal.lock_round
+                );
                 if proposal.lock_round.is_some() {
                     self.clean_polc();
                 }
@@ -424,7 +429,7 @@ where
                     self.params.address
                 );
 
-                self.set_status(&self.status.clone().unwrap(), true);
+                self.set_status(&self.status.clone().unwrap());
                 // self.status.map(|s| self.set_status(&s, true));
 
                 self.goto_new_height(self.height + 1);
@@ -487,6 +492,11 @@ where
 
     fn handle_precommit(&mut self) -> BftResult<()> {
         let result = self.check_precommit_count();
+        trace!(
+            "Node {:?} check precommit result {:?}",
+            self.params.address,
+            result
+        );
         match result {
             PrecommitRes::Above => self.change_to_step(Step::PrecommitWait),
             PrecommitRes::Nil => {
@@ -613,7 +623,7 @@ where
                 self.last_commit_round = None;
             }
 
-            self.set_status(&status, true);
+            self.set_status(&status);
             self.goto_new_height(status.height + 1);
             handle_err(self.flush_cache(), &self.params.address);
             self.new_round_start(true)?;
