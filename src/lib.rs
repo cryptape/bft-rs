@@ -184,8 +184,8 @@ impl Debug for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "Commit {{ h: {}, addr: {:?}}}",
-            self.height, self.address,
+            "Commit {{ h: {}, addr: {:?}, proof: {:?}}}",
+            self.height, self.address, self.proof
         )
     }
 }

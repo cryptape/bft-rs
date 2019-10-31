@@ -24,8 +24,8 @@ impl Debug for Proposal {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "Proposal {{ h: {}, r: {}, hash:{:?}, addr: {:?}}}",
-            self.height, self.round, self.block_hash, self.proposer,
+            "Proposal {{ h: {}, r: {}, hash:{:?}, addr: {:?}, proof: {:?}, lock_round: {:?}, proposer: {:?}}}",
+            self.height, self.round, self.block_hash, self.proposer, self.proof, self.lock_round, self.proposer
         )
     }
 }

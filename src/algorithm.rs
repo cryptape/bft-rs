@@ -209,6 +209,7 @@ where
                             self.transmit_prevote(false)?;
                         }
                     }
+                    // Why
                     // handle commit after proposal is ready while bft process blocked in Commit Step
                     if self.step == Step::Commit {
                         info!(
@@ -403,22 +404,34 @@ where
                     self.params.address,
                     self.proposals
                 );
-                let signed_proposal = self
-                    .proposals
-                    .get_proposal(self.height, self.round)
-                    .ok_or_else(|| {
-                        BftError::ShouldNotHappen(
-                            "can not fetch proposal from cache when handle commit".to_string(),
-                        )
-                    })?;
-                let proposal = signed_proposal.proposal;
-                trace!(
-                    "Node {:?} proposal lock round {:?}",
-                    self.params.address,
-                    proposal.lock_round
-                );
-                if proposal.lock_round.is_some() {
-                    self.clean_polc();
+                // let signed_proposal = self
+                //     .proposals
+                //     .get_proposal(self.height, self.round)
+                //     .ok_or_else(|| {
+                //         BftError::ShouldNotHappen(
+                //             "can not fetch proposal from cache when handle commit".to_string(),
+                //         )
+                //     })?;
+                // let proposal = signed_proposal.proposal;
+                // trace!(
+                //     "Node {:?} proposal lock round {:?}",
+                //     self.params.address,
+                //     proposal.lock_round
+                // );
+                // if proposal.lock_round.is_some() {
+                //     self.clean_polc();
+                // }
+                if let Some(signed_proposal) = self.proposals.get_proposal(self.height, self.round)
+                {
+                    let proposal = signed_proposal.proposal;
+                    trace!(
+                        "Node {:?} proposal lock round {:?}",
+                        self.params.address,
+                        proposal.lock_round
+                    );
+                    if proposal.lock_round.is_some() {
+                        self.clean_polc();
+                    }
                 }
                 self.transmit_precommit(false)?;
             }
@@ -640,8 +653,8 @@ where
 
     fn transmit_proposal(&mut self) -> BftResult<()> {
         info!(
-            "Node {:?} self's height {:?}",
-            self.params.address, self.height
+            "Node {:?} current height {:?}, current lock status {:?}",
+            self.params.address, self.height, self.lock_status
         );
         if self.is_byzantine {
             return self.transmit_byzantine_proposal();
@@ -981,6 +994,12 @@ where
     }
 
     fn set_proposal(&mut self, proposal: Proposal) {
+        trace!(
+            "Node {:?} set proposal {:?}, current lock status {:?}",
+            self.params.address,
+            proposal,
+            self.lock_status
+        );
         let block_hash = proposal.block_hash;
 
         if proposal.lock_round.is_some()
