@@ -754,12 +754,14 @@ where
                                 .map_err(|e| BftError::SendMsgErr(format!("{:?}", e))),
                             &address,
                         );
+                        Ok(())
                     }
                     Err(e) => {
                         warn!(
                             "Node {:?} encounters BftError::CheckTxsFailed({:?})",
                             address, e
                         );
+                        Err(BftError::CheckBlockFailed(format!("{:?}", e)))
                     }
                 };
             });

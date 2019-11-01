@@ -1,6 +1,7 @@
 use crate::objects::{SignedProposal, SignedVote, VoteType};
 use crate::{Address, Block, Hash, Height, Round};
 
+use log::trace;
 use std::collections::HashMap;
 
 use crate::error::{BftError, BftResult};
