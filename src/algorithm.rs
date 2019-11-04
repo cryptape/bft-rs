@@ -534,10 +534,6 @@ where
             .clone()
             .unwrap_or_else(|| panic!("Node {:?} has no lock when commit!", self.params.address));
 
-        let proof = self.generate_proof(lock_status.clone());
-        debug!("generate {:?} when handle commit", proof);
-        self.set_proof(&proof, true);
-
         let signed_proposal = self
             .proposals
             .get_proposal(self.height, self.round)
@@ -547,6 +543,16 @@ where
                 )
             })?;
         let proposal = signed_proposal.proposal;
+        if proposal.block_hash != lock_status.block_hash {
+            return Err(BftError::MismatchingBlock(
+                "missing the locked block".to_string(),
+            ));
+        }
+
+        let proof = self.generate_proof(lock_status.clone());
+        debug!("generate {:?} when handle commit", proof);
+        self.set_proof(&proof, true);
+
         #[cfg(not(feature = "compact_block"))]
         let block = self
             .blocks
@@ -1082,7 +1088,7 @@ where
                                 self.params.address, self.height, self.round
                             );
                             self.clean_polc();
-                            self.block_hash = None;
+                        // self.block_hash = None;
                         } else {
                             // receive a later PoLC, update lock info
                             self.set_polc(hash, &prevote_set);
